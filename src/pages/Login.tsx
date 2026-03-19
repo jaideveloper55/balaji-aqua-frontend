@@ -78,7 +78,7 @@ const TENANT_LIST = Object.values(TENANT_CONFIG);
 
 // ─── Live Clock (compact) ─────────────────────────────────────────────────────
 
-const LiveClock: React.FC<{ accent: string }> = ({ accent }) => {
+const LiveClock: React.FC<{ accent: string }> = () => {
   const [now, setNow] = useState(new Date());
   useEffect(() => {
     const id = setInterval(() => setNow(new Date()), 1000);
