@@ -1,5 +1,12 @@
+import LoginPage from "./pages/Login";
+
+
 function App() {
-  return <div className="text-red-500">jai</div>;
+  return (
+    <>
+      <LoginPage />
+    </>
+  );
 }
 
 export default App;
