@@ -90,11 +90,34 @@ const CustomerDetail: React.FC<CustomerDetailProps> = ({
   const [tab, setTab] = useState<CustomerTabKey>("overview");
 
   useEffect(() => {
-    setLoading(true);
-    customerApi.getCustomerById(customerId).then((c) => {
-      setCustomer(c ?? null);
-      setLoading(false);
-    });
+    let isMounted = true;
+
+    const fetchCustomer = async () => {
+      try {
+        setLoading(true);
+
+        const data = await customerApi.getCustomerById(customerId);
+
+        if (isMounted) {
+          setCustomer(data ?? null);
+        }
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      } catch (err) {
+        if (isMounted) {
+          setCustomer(null);
+        }
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
+      }
+    };
+
+    fetchCustomer();
+
+    return () => {
+      isMounted = false;
+    };
   }, [customerId]);
 
   if (loading)

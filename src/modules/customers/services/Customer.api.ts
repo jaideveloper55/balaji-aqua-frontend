@@ -535,6 +535,8 @@ export const customerApi = {
   // Ledger
   async getCustomerLedger(customerId: string): Promise<LedgerEntry[]> {
     await delay(400);
-    return [...LEDGER];
+
+    // simulate per-customer ledger (real-world behavior)
+    return LEDGER.filter((entry) => entry.referenceNo?.includes(customerId));
   },
 };
