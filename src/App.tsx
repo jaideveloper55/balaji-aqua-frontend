@@ -1,9 +1,10 @@
-import LoginPage from "./modules/auth/pages/Login";
+import CustomerPage from "./modules/customers/pages/Customerpage";
 
 function App() {
   return (
     <>
-      <LoginPage />
+      {/* <LoginPage /> */}
+      <CustomerPage />
     </>
   );
 }
