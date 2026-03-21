@@ -12,8 +12,6 @@ import CustomerTable from "./Customertable";
 import CustomerModal from "./Customermodal";
 import { customerApi } from "../services/Customer.api";
 
-// ─── Stat Card ───────────────────────────────────────────────────────────────
-
 const StatCard: React.FC<{
   icon: React.ReactNode;
   label: string;
@@ -36,8 +34,6 @@ const StatCard: React.FC<{
     </div>
   </div>
 );
-
-// ─── Page ────────────────────────────────────────────────────────────────────
 
 interface CustomerListProps {
   onNavigateToDetail?: (id: string) => void;
@@ -76,7 +72,7 @@ const CustomerList: React.FC<CustomerListProps> = ({ onNavigateToDetail }) => {
   };
 
   return (
-    <div className="flex flex-col gap-6 p-6 max-w-[1400px] mx-auto">
+    <div className="flex flex-col gap-6  max-w-[1400px] mx-auto">
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
@@ -135,7 +131,7 @@ const CustomerList: React.FC<CustomerListProps> = ({ onNavigateToDetail }) => {
       </div>
 
       {/* Table */}
-      <div className="bg-white rounded-2xl border border-slate-100 shadow-[0_1px_3px_rgba(15,23,42,0.04)] p-5">
+      <div className="bg-white rounded-2xl border border-slate-100  p-5">
         <CustomerTable
           key={refreshKey}
           onView={(c) => onNavigateToDetail?.(c.id)}

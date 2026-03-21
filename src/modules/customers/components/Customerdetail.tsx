@@ -63,7 +63,7 @@ const Metric: React.FC<{
   value: string;
   color: string;
 }> = ({ icon, label, value, color }) => (
-  <div className="flex flex-col items-center gap-2 py-5 px-4 rounded-xl bg-slate-50 border border-slate-100">
+  <div className="flex flex-col items-center gap-2 py-5 shadow-sm hover:shadow-md px-4 rounded-xl bg-slate-50 border border-slate-200">
     <span style={{ color }}>{icon}</span>
     <span className="text-xl font-black text-slate-800 tabular-nums">
       {value}
@@ -149,7 +149,7 @@ const CustomerDetail: React.FC<CustomerDetailProps> = ({
     .join(", ");
 
   return (
-    <div className="flex flex-col gap-6 p-6 max-w-[1400px] mx-auto">
+    <div className="flex flex-col gap-6  max-w-[1400px] mx-auto">
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-4">
@@ -225,12 +225,12 @@ const CustomerDetail: React.FC<CustomerDetailProps> = ({
       </div>
 
       {/* Tabbed Content */}
-      <div className="bg-white rounded-2xl border border-slate-100 shadow-[0_1px_3px_rgba(15,23,42,0.04)] overflow-hidden">
+      <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
         <CustomerTabs activeTab={tab} onChange={setTab} />
         <div className="p-6">
           {tab === "overview" && (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <div className="bg-slate-50/50 rounded-xl p-5 border border-slate-100">
+              <div className="bg-slate-50/50 shadow-sm rounded-xl p-5 border border-slate-300">
                 <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
                   Contact
                 </h4>
@@ -252,7 +252,7 @@ const CustomerDetail: React.FC<CustomerDetailProps> = ({
                   />
                 </div>
               </div>
-              <div className="bg-slate-50/50 rounded-xl p-5 border border-slate-100">
+              <div className="bg-slate-50/50 shadow-sm rounded-xl p-5 border border-slate-300">
                 <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
                   Account Details
                 </h4>
