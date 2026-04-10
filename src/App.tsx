@@ -1,7 +1,12 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import LoginPage from "./modules/auth/pages/Login";
 import CustomerPage from "./modules/customers/pages/Customerpage";
-import AdminLayout from "./components/AdminLayout";
+
+import ProductsPage from "./modules/products/pages/ProductsPage";
+import JarTrackingPage from "./modules/jar-tracking/pages/JarTrackingPage";
+import InventoryPage from "./modules/inventory/page/Inventorypage";
+import Deliverypage from "./modules/delivery/page/Deliverypage";
+import AdminLayout from "./components/layouts/AdminLayout";
 
 // const isAuthenticated = () => !!localStorage.getItem("token");
 
@@ -49,7 +54,7 @@ function App() {
           element={
             // <ProtectedRoute>
             <AdminLayout>
-              <div>Products Page</div>
+              <ProductsPage />
             </AdminLayout>
             // </ProtectedRoute>
           }
@@ -59,7 +64,7 @@ function App() {
           element={
             // <ProtectedRoute>
             <AdminLayout>
-              <div>Delivery Page</div>
+              <Deliverypage />
             </AdminLayout>
             // </ProtectedRoute>
           }
@@ -69,7 +74,7 @@ function App() {
           element={
             // <ProtectedRoute>
             <AdminLayout>
-              <div>Jar / Can Tracking Page</div>
+              <JarTrackingPage />
             </AdminLayout>
             // </ProtectedRoute>
           }
@@ -99,7 +104,7 @@ function App() {
           element={
             // <ProtectedRoute>
             <AdminLayout>
-              <div>Inventory Page</div>
+              <InventoryPage />
             </AdminLayout>
             // </ProtectedRoute>
           }

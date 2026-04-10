@@ -24,14 +24,12 @@ const TYPE_OPTS: { value: CustomerType; label: string }[] = [
   { value: "commercial", label: "Commercial" },
   { value: "industrial", label: "Industrial" },
 ];
-
 const FREQ_OPTS: { value: DeliveryFrequency; label: string }[] = [
   { value: "daily", label: "Daily" },
   { value: "alternate", label: "Alternate Days" },
   { value: "weekly", label: "Weekly" },
   { value: "on_demand", label: "On Demand" },
 ];
-
 const PAY_OPTS: { value: PaymentMode; label: string }[] = [
   { value: "cash", label: "Cash" },
   { value: "upi", label: "UPI" },
@@ -47,7 +45,9 @@ const Field: React.FC<{
 }> = ({ label, error, required, children }) => (
   <div className="flex flex-col gap-1">
     <label
-      className={`text-xs font-semibold ${error ? "text-red-500" : "text-slate-600"}`}
+      className={`text-[12px] font-semibold ${
+        error ? "text-red-500" : "text-slate-600"
+      }`}
     >
       {label}
       {required && <span className="text-red-400 ml-0.5">*</span>}
@@ -59,15 +59,11 @@ const Field: React.FC<{
   </div>
 );
 
-// ─── Steps Config ────────────────────────────────────────────────────────────
-
 const STEPS = [
   { title: "Basic Info", icon: <HiOutlineUser size={14} /> },
   { title: "Delivery", icon: <HiOutlineTruck size={14} /> },
   { title: "Address", icon: <HiOutlineLocationMarker size={14} /> },
 ];
-
-// ─── Component ───────────────────────────────────────────────────────────────
 
 interface CustomerModalProps {
   open: boolean;
@@ -112,8 +108,6 @@ const CustomerModal: React.FC<CustomerModalProps> = ({
   });
 
   const watchedName = watch("name");
-
-  // Step field groups for validation
   const STEP_FIELDS: (keyof CustomerFormValues)[][] = [
     ["name", "phone", "email", "type"],
     ["deliveryFrequency", "paymentMode", "notes"],
@@ -124,7 +118,6 @@ const CustomerModal: React.FC<CustomerModalProps> = ({
     const valid = await trigger(STEP_FIELDS[step]);
     if (valid) setStep((s) => Math.min(s + 1, 2));
   }, [step, trigger]);
-
   const handleBack = () => setStep((s) => Math.max(s - 1, 0));
 
   const onSubmit = useCallback(
@@ -143,7 +136,7 @@ const CustomerModal: React.FC<CustomerModalProps> = ({
         setLoading(false);
       }
     },
-    [onSuccess],
+    [onSuccess]
   );
 
   const handleFinalSubmit = useCallback(async () => {
@@ -159,8 +152,6 @@ const CustomerModal: React.FC<CustomerModalProps> = ({
     onClose();
   };
 
-  // ─── Success State ───────────────────────────────────────────────────────
-
   if (success) {
     return (
       <Modal
@@ -172,29 +163,27 @@ const CustomerModal: React.FC<CustomerModalProps> = ({
         closable={false}
       >
         <div className="flex flex-col items-center justify-center py-10 gap-4">
-          <div className="w-16 h-16 rounded-full bg-green-50 flex items-center justify-center animate-[scaleIn_0.3s_ease]">
-            <HiOutlineCheckCircle size={36} className="text-green-500" />
+          <div className="w-16 h-16 rounded-full bg-emerald-50 flex items-center justify-center">
+            <HiOutlineCheckCircle size={36} className="text-emerald-500" />
           </div>
           <div className="text-center">
-            <h3 className="text-lg font-bold text-slate-800">
+            <h3 className="text-[16px] font-bold text-slate-800">
               Customer Created!
             </h3>
-            <p className="text-sm text-slate-500 mt-1">
+            <p className="text-[13px] text-slate-500 mt-1">
               <span className="font-semibold text-slate-700">
                 {createdName}
               </span>{" "}
               has been added successfully.
             </p>
           </div>
-          <p className="text-xs text-slate-400 animate-pulse">
+          <p className="text-[11px] text-slate-400 animate-pulse">
             Redirecting to details...
           </p>
         </div>
       </Modal>
     );
   }
-
-  // ─── Form Steps ──────────────────────────────────────────────────────────
 
   return (
     <Modal
@@ -205,18 +194,17 @@ const CustomerModal: React.FC<CustomerModalProps> = ({
       centered
       destroyOnClose
       title={null}
-      className="customer-modal"
     >
       {/* Header */}
-      <div className="flex items-center gap-3 mb-1">
+      <div className="flex items-center gap-3 mb-1 pl-4 border-l-[3px] border-l-blue-500">
         <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center">
           <HiOutlineUser size={20} className="text-blue-500" />
         </div>
         <div>
-          <h2 className="text-lg font-bold text-slate-800 leading-tight">
+          <h2 className="text-[15px] font-bold text-slate-800 leading-tight">
             New Customer
           </h2>
-          <p className="text-xs text-slate-400 mt-0.5">
+          <p className="text-[11px] text-slate-400 mt-0.5">
             {watchedName ? (
               <>
                 Adding{" "}
@@ -231,22 +219,19 @@ const CustomerModal: React.FC<CustomerModalProps> = ({
         </div>
       </div>
 
-      {/* Stepper */}
       <div className="my-5">
         <Steps
           current={step}
           size="small"
           items={STEPS.map((s) => ({
-            title: <span className="text-xs font-semibold">{s.title}</span>,
+            title: <span className="text-[11px] font-semibold">{s.title}</span>,
             icon: <span className="text-sm">{s.icon}</span>,
           }))}
         />
       </div>
 
-      {/* Step Content */}
       <form onSubmit={(e) => e.preventDefault()}>
         <div className="min-h-[280px]">
-          {/* Step 1: Basic Info */}
           {step === 0 && (
             <div className="flex flex-col gap-4 animate-[fadeIn_0.2s_ease]">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -269,11 +254,11 @@ const CustomerModal: React.FC<CustomerModalProps> = ({
                         }
                         status={errors.name ? "error" : ""}
                         autoFocus
+                        className="!rounded-lg"
                       />
                     )}
                   />
                 </Field>
-
                 <Field
                   label="Phone Number"
                   error={errors.phone?.message}
@@ -301,12 +286,12 @@ const CustomerModal: React.FC<CustomerModalProps> = ({
                           />
                         }
                         status={errors.phone ? "error" : ""}
+                        className="!rounded-lg"
                       />
                     )}
                   />
                 </Field>
               </div>
-
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <Field label="Email" error={errors.email?.message}>
                   <Controller
@@ -327,11 +312,11 @@ const CustomerModal: React.FC<CustomerModalProps> = ({
                           <HiOutlineMail size={14} className="text-slate-400" />
                         }
                         status={errors.email ? "error" : ""}
+                        className="!rounded-lg"
                       />
                     )}
                   />
                 </Field>
-
                 <Field
                   label="Customer Type"
                   error={errors.type?.message}
@@ -355,7 +340,6 @@ const CustomerModal: React.FC<CustomerModalProps> = ({
             </div>
           )}
 
-          {/* Step 2: Delivery & Payment */}
           {step === 1 && (
             <div className="flex flex-col gap-4 animate-[fadeIn_0.2s_ease]">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -378,7 +362,6 @@ const CustomerModal: React.FC<CustomerModalProps> = ({
                     )}
                   />
                 </Field>
-
                 <Field
                   label="Payment Mode"
                   error={errors.paymentMode?.message}
@@ -399,7 +382,6 @@ const CustomerModal: React.FC<CustomerModalProps> = ({
                   />
                 </Field>
               </div>
-
               <Field label="Notes">
                 <Controller
                   name="notes"
@@ -407,22 +389,21 @@ const CustomerModal: React.FC<CustomerModalProps> = ({
                   render={({ field }) => (
                     <Input.TextArea
                       {...field}
-                      placeholder="Any special delivery instructions, internal notes..."
+                      placeholder="Any special delivery instructions..."
                       rows={4}
                       size="large"
                       showCount
                       maxLength={300}
+                      className="!rounded-lg"
                     />
                   )}
                 />
               </Field>
-
-              {/* Quick summary card */}
               <div className="bg-blue-50/50 border border-blue-100 rounded-xl p-4 mt-1">
-                <p className="text-[10px] font-bold text-blue-400 uppercase tracking-wider mb-2">
+                <p className="text-[10px] font-bold text-blue-400 uppercase tracking-widest mb-2">
                   Summary so far
                 </p>
-                <div className="flex flex-wrap gap-x-6 gap-y-1 text-xs text-slate-600">
+                <div className="flex flex-wrap gap-x-6 gap-y-1 text-[12px] text-slate-600">
                   <span>
                     <span className="text-slate-400">Name:</span>{" "}
                     <span className="font-semibold">{watchedName || "—"}</span>
@@ -444,7 +425,6 @@ const CustomerModal: React.FC<CustomerModalProps> = ({
             </div>
           )}
 
-          {/* Step 3: Address */}
           {step === 2 && (
             <div className="flex flex-col gap-4 animate-[fadeIn_0.2s_ease]">
               <Field
@@ -469,11 +449,11 @@ const CustomerModal: React.FC<CustomerModalProps> = ({
                       }
                       status={errors.addressLine1 ? "error" : ""}
                       autoFocus
+                      className="!rounded-lg"
                     />
                   )}
                 />
               </Field>
-
               <Field label="Address Line 2">
                 <Controller
                   name="addressLine2"
@@ -483,11 +463,11 @@ const CustomerModal: React.FC<CustomerModalProps> = ({
                       {...field}
                       placeholder="Area, locality (optional)"
                       size="large"
+                      className="!rounded-lg"
                     />
                   )}
                 />
               </Field>
-
               <div className="grid grid-cols-2 gap-4">
                 <Field label="City" error={errors.city?.message} required>
                   <Controller
@@ -500,11 +480,11 @@ const CustomerModal: React.FC<CustomerModalProps> = ({
                         placeholder="Chennai"
                         size="large"
                         status={errors.city ? "error" : ""}
+                        className="!rounded-lg"
                       />
                     )}
                   />
                 </Field>
-
                 <Field label="State" error={errors.state?.message} required>
                   <Controller
                     name="state"
@@ -516,12 +496,12 @@ const CustomerModal: React.FC<CustomerModalProps> = ({
                         placeholder="Tamil Nadu"
                         size="large"
                         status={errors.state ? "error" : ""}
+                        className="!rounded-lg"
                       />
                     )}
                   />
                 </Field>
               </div>
-
               <div className="grid grid-cols-2 gap-4">
                 <Field label="Pincode" error={errors.pincode?.message} required>
                   <Controller
@@ -541,17 +521,22 @@ const CustomerModal: React.FC<CustomerModalProps> = ({
                         size="large"
                         maxLength={6}
                         status={errors.pincode ? "error" : ""}
+                        className="!rounded-lg"
                       />
                     )}
                   />
                 </Field>
-
                 <Field label="Landmark">
                   <Controller
                     name="landmark"
                     control={control}
                     render={({ field }) => (
-                      <Input {...field} placeholder="Near..." size="large" />
+                      <Input
+                        {...field}
+                        placeholder="Near..."
+                        size="large"
+                        className="!rounded-lg"
+                      />
                     )}
                   />
                 </Field>
@@ -560,7 +545,6 @@ const CustomerModal: React.FC<CustomerModalProps> = ({
           )}
         </div>
 
-        {/* Footer Actions */}
         <div className="flex items-center justify-between mt-6 pt-4 border-t border-slate-100">
           <div>
             {step > 0 && (
@@ -568,26 +552,24 @@ const CustomerModal: React.FC<CustomerModalProps> = ({
                 size="large"
                 icon={<HiOutlineArrowLeft size={14} />}
                 onClick={handleBack}
+                className="!rounded-xl"
               >
                 Back
               </Button>
             )}
           </div>
-
           <div className="flex items-center gap-2">
-            <span className="text-xs text-slate-400 mr-2">
+            <span className="text-[11px] text-slate-400 mr-2">
               Step {step + 1} of 3
             </span>
-
             {step < 2 ? (
               <Button
                 type="primary"
                 size="large"
                 onClick={handleNext}
-                className="!flex !items-center !gap-1"
+                className="!flex !items-center !gap-1 !rounded-xl !bg-blue-600 hover:!bg-blue-700 !font-semibold"
               >
-                Next
-                <HiOutlineArrowRight size={14} />
+                Next <HiOutlineArrowRight size={14} />
               </Button>
             ) : (
               <Button
@@ -595,10 +577,9 @@ const CustomerModal: React.FC<CustomerModalProps> = ({
                 size="large"
                 loading={loading}
                 onClick={handleFinalSubmit}
-                className="!flex !items-center !gap-1"
+                className="!flex !items-center !gap-1 !rounded-xl !bg-blue-600 hover:!bg-blue-700 !font-semibold !shadow-sm !shadow-blue-200"
               >
-                <HiOutlineCheckCircle size={15} />
-                Create Customer
+                <HiOutlineCheckCircle size={15} /> Create Customer
               </Button>
             )}
           </div>

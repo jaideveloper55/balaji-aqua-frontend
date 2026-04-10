@@ -14,6 +14,7 @@ import {
 } from "react-icons/hi";
 
 type InputType = "text" | "email" | "password";
+type InputSize = "small" | "middle" | "large";
 
 interface CustomInputProps<T extends FieldValues> {
   name: Path<T>;
@@ -26,6 +27,9 @@ interface CustomInputProps<T extends FieldValues> {
   disabled?: boolean;
   autoFocus?: boolean;
   className?: string;
+  size?: InputSize;
+  isrequired?: boolean;
+  rules?: any;
 }
 
 const ICON_MAP = {
@@ -44,6 +48,9 @@ const CustomInput = <T extends FieldValues>({
   disabled = false,
   autoFocus = false,
   className = "",
+  size = "large",
+  isrequired = false,
+  rules,
 }: CustomInputProps<T>) => {
   const errorMessage = errors?.[name]?.message as string | undefined;
   const hasError = !!errorMessage;
@@ -59,17 +66,19 @@ const CustomInput = <T extends FieldValues>({
         }`}
       >
         {label}
+        {isrequired && <span className="text-red-500 ml-0.5">*</span>}
       </label>
 
       <Controller
         name={name}
         control={control}
+        rules={rules}
         render={({ field }) =>
           type === "password" ? (
             <Input.Password
               {...field}
               id={name}
-              size="large"
+              size={size}
               placeholder={placeholder}
               disabled={disabled}
               autoFocus={autoFocus}
@@ -88,7 +97,7 @@ const CustomInput = <T extends FieldValues>({
               {...field}
               id={name}
               type={type}
-              size="large"
+              size={size}
               placeholder={placeholder}
               disabled={disabled}
               autoFocus={autoFocus}

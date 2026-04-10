@@ -23,21 +23,22 @@ interface CustomerTabsProps {
 }
 
 const CustomerTabs: React.FC<CustomerTabsProps> = ({ activeTab, onChange }) => (
-  <div className="flex border-b border-slate-200">
+  <div className="flex items-center border-b border-slate-200 px-1 overflow-x-auto scrollbar-hide">
     {TABS.map((tab) => {
       const active = tab.key === activeTab;
       return (
         <button
           key={tab.key}
           onClick={() => onChange(tab.key)}
-          className={`flex items-center gap-2 px-5 py-3 text-sm font-semibold border-b-2 transition-all duration-200 -mb-px ${
-            active
-              ? "border-blue-500 text-blue-600"
-              : "border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300"
+          className={`relative flex items-center gap-1.5 px-5 py-3.5 text-[13px] font-medium transition-colors whitespace-nowrap ${
+            active ? "text-blue-600" : "text-slate-400 hover:text-slate-600"
           }`}
         >
           {tab.icon}
           {tab.label}
+          {active && (
+            <span className="absolute bottom-0 left-2 right-2 h-[2px] bg-blue-600 rounded-t" />
+          )}
         </button>
       );
     })}

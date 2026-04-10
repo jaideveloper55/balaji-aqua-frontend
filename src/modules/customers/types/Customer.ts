@@ -63,17 +63,6 @@ export type LedgerEntryType =
   | "credit_note"
   | "debit_note";
 
-export interface LedgerEntry {
-  id: string;
-  date: string;
-  type: LedgerEntryType;
-  description: string;
-  debit: number;
-  credit: number;
-  balance: number;
-  referenceNo?: string;
-}
-
 // ─── Product (Master) ────────────────────────────────────────────────────────
 
 export interface Product {
@@ -117,4 +106,76 @@ export interface PaginatedResponse<T> {
   total: number;
   page: number;
   pageSize: number;
+}
+
+// src/modules/customers/components/ledger/types.ts
+
+import type { Dayjs } from "dayjs";
+
+export type EntryType = "invoice" | "payment" | "credit_note" | "debit_note";
+export type PaymentStatus = "paid" | "partially_paid" | "unpaid" | "adjusted";
+export type ExportFormat = "pdf" | "csv";
+export type SortDirection = "asc" | "desc";
+export type SortKey = "date" | "debit" | "credit" | "balance" | null;
+
+export interface EntryStyle {
+  label: string;
+  bg: string;
+  text: string;
+  border: string;
+  dot: string;
+}
+
+export interface StatusStyle {
+  label: string;
+  bg: string;
+  text: string;
+  icon: React.ComponentType<{ className?: string }>;
+}
+
+export interface LineItem {
+  name: string;
+  hsn: string;
+  qty: number;
+  unit: string;
+  rate: number;
+  amount: number;
+  gstRate: number;
+}
+
+export interface EntryDetails {
+  customer: string;
+  gst: string;
+  dueDate: string;
+  status: PaymentStatus;
+  items: LineItem[];
+}
+
+export interface LedgerEntry {
+  id: string;
+  date: string;
+  type: EntryType;
+  description: string;
+  referenceNo: string;
+  debit: number;
+  credit: number;
+  balance: number;
+  baseAmount: number;
+  cgst: number;
+  sgst: number;
+}
+
+export interface LedgerTableProps {
+  customerId?: string;
+}
+
+export interface FilterFormValues {
+  typeFilter: string;
+  dateRange: [Dayjs | null, Dayjs | null] | null;
+}
+
+export interface ExportFormValues {
+  exportDateRange: [Dayjs | null, Dayjs | null] | null;
+  exportType: string;
+  exportFormat: string;
 }

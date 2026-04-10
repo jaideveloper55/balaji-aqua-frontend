@@ -1,14 +1,12 @@
 import React, { useState, useEffect, useCallback } from "react";
 import {
   Table,
-  Tag,
   Button,
   Modal,
-  Input,
-  Select,
-  DatePicker,
   message,
   Popconfirm,
+  Tooltip,
+  Divider,
 } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import {
@@ -16,18 +14,35 @@ import {
   HiOutlinePlus,
   HiOutlinePencil,
   HiOutlineTrash,
+  HiOutlineX,
 } from "react-icons/hi";
-import dayjs from "dayjs";
+import dayjs, { Dayjs } from "dayjs";
+import { useForm } from "react-hook-form";
 import { customerApi } from "../services/Customer.api";
 import type {
   CustomerPricing,
   CustomerPricingFormValues,
   Product,
 } from "../types/Customer";
+import CustomInput from "../../../components/common/CustomInput";
+import CustomSelect from "../../../components/common/CustomSelect";
+import CustomDateRange from "../../../components/common/CustomDateRange";
 
 interface PricingTableProps {
   customerId: string;
 }
+
+interface PricingFormValues {
+  productId: string;
+  customerPrice: string;
+  effectiveRange: [Dayjs | null, Dayjs | null];
+}
+
+const DEFAULT_FORM_VALUES: PricingFormValues = {
+  productId: "",
+  customerPrice: "",
+  effectiveRange: [dayjs(), null],
+};
 
 const PricingTable: React.FC<PricingTableProps> = ({ customerId }) => {
   const [data, setData] = useState<CustomerPricing[]>([]);
@@ -37,13 +52,18 @@ const PricingTable: React.FC<PricingTableProps> = ({ customerId }) => {
   const [saving, setSaving] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
 
-  // Form state
-  const [productId, setProductId] = useState<string>("");
-  const [customerPrice, setCustomerPrice] = useState<string>("");
-  const [effectiveFrom, setEffectiveFrom] = useState<dayjs.Dayjs | null>(
-    dayjs(),
-  );
-  const [effectiveTo, setEffectiveTo] = useState<dayjs.Dayjs | null>(null);
+  const {
+    control,
+    handleSubmit,
+    reset,
+    watch,
+    formState: { errors },
+  } = useForm<PricingFormValues>({
+    defaultValues: DEFAULT_FORM_VALUES,
+  });
+
+  const productId = watch("productId");
+  const customerPrice = watch("customerPrice");
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -63,35 +83,38 @@ const PricingTable: React.FC<PricingTableProps> = ({ customerId }) => {
     fetchData();
   }, [fetchData]);
 
-  const resetForm = () => {
-    setProductId("");
-    setCustomerPrice("");
-    setEffectiveFrom(dayjs());
-    setEffectiveTo(null);
-    setEditingId(null);
-  };
-
   const openAdd = () => {
-    resetForm();
+    setEditingId(null);
+    reset(DEFAULT_FORM_VALUES);
     setModalOpen(true);
   };
 
-  const openEdit = (record: CustomerPricing) => {
-    setEditingId(record.id);
-    setProductId(record.productId);
-    setCustomerPrice(String(record.customerPrice));
-    setEffectiveFrom(dayjs(record.effectiveFrom));
-    setEffectiveTo(record.effectiveTo ? dayjs(record.effectiveTo) : null);
+  const openEdit = (r: CustomerPricing) => {
+    setEditingId(r.id);
+    reset({
+      productId: r.productId,
+      customerPrice: String(r.customerPrice),
+      effectiveRange: [
+        dayjs(r.effectiveFrom),
+        r.effectiveTo ? dayjs(r.effectiveTo) : null,
+      ],
+    });
     setModalOpen(true);
   };
 
-  const handleSave = async () => {
-    if (!productId || !customerPrice || !effectiveFrom) {
-      message.warning("Please fill all required fields");
+  const closeModal = () => {
+    setModalOpen(false);
+    setEditingId(null);
+    reset(DEFAULT_FORM_VALUES);
+  };
+
+  const onSubmit = async (values: PricingFormValues) => {
+    const [from, to] = values.effectiveRange;
+    if (!from) {
+      message.warning("Please select a start date");
       return;
     }
-
-    const price = parseFloat(customerPrice);
+    const price = parseFloat(values.customerPrice);
     if (isNaN(price) || price <= 0) {
       message.warning("Enter a valid price");
       return;
@@ -99,23 +122,20 @@ const PricingTable: React.FC<PricingTableProps> = ({ customerId }) => {
 
     setSaving(true);
     try {
-      const values: CustomerPricingFormValues = {
-        productId,
+      const payload: CustomerPricingFormValues = {
+        productId: values.productId,
         customerPrice: price,
-        effectiveFrom: effectiveFrom.format("YYYY-MM-DD"),
-        effectiveTo: effectiveTo?.format("YYYY-MM-DD"),
+        effectiveFrom: from.format("YYYY-MM-DD"),
+        effectiveTo: to?.format("YYYY-MM-DD"),
       };
-
       if (editingId) {
-        await customerApi.updateCustomerPricing(editingId, values);
+        await customerApi.updateCustomerPricing(editingId, payload);
         message.success("Pricing updated");
       } else {
-        await customerApi.createCustomerPricing(customerId, values);
+        await customerApi.createCustomerPricing(customerId, payload);
         message.success("Pricing added");
       }
-
-      setModalOpen(false);
-      resetForm();
+      closeModal();
       fetchData();
     } catch {
       message.error("Failed to save pricing");
@@ -134,21 +154,32 @@ const PricingTable: React.FC<PricingTableProps> = ({ customerId }) => {
     }
   };
 
-  // Selected product info for the modal
   const selectedProduct = products.find((p) => p.id === productId);
   const priceNum = parseFloat(customerPrice);
   const discount =
     selectedProduct && !isNaN(priceNum)
       ? selectedProduct.basePrice - priceNum
       : 0;
-
-  // Products not yet assigned (for add mode)
   const assignedProductIds = data
     .filter((d) => d.isActive)
     .map((d) => d.productId);
   const availableProducts = editingId
     ? products
     : products.filter((p) => !assignedProductIds.includes(p.id));
+
+  const productOptions = availableProducts.map((p) => ({
+    value: p.id,
+    label: (
+      <div className="flex items-center justify-between w-full">
+        <span>
+          {p.name} <span className="text-slate-400 text-[11px]">({p.sku})</span>
+        </span>
+        <span className="text-[11px] text-slate-500 tabular-nums font-mono">
+          ₹{p.basePrice}/{p.unit}
+        </span>
+      </div>
+    ),
+  }));
 
   const columns: ColumnsType<CustomerPricing> = [
     {
@@ -157,10 +188,12 @@ const PricingTable: React.FC<PricingTableProps> = ({ customerId }) => {
       width: 220,
       render: (_, r) => (
         <div className="flex flex-col gap-0.5">
-          <span className="text-sm font-semibold text-slate-800">
+          <span className="text-[13px] font-semibold text-slate-800">
             {r.productName}
           </span>
-          <span className="text-xs font-mono text-slate-400">{r.sku}</span>
+          <span className="text-[10px] font-mono text-slate-400 bg-slate-50 px-1.5 py-0.5 rounded w-fit">
+            {r.sku}
+          </span>
         </div>
       ),
     },
@@ -168,9 +201,10 @@ const PricingTable: React.FC<PricingTableProps> = ({ customerId }) => {
       title: "Unit",
       dataIndex: "unit",
       key: "unit",
+      align: "center",
       width: 80,
       render: (u: string) => (
-        <span className="text-xs text-slate-500 capitalize">per {u}</span>
+        <span className="text-[11px] text-slate-500 capitalize">per {u}</span>
       ),
     },
     {
@@ -178,9 +212,9 @@ const PricingTable: React.FC<PricingTableProps> = ({ customerId }) => {
       dataIndex: "basePrice",
       key: "basePrice",
       width: 110,
-      align: "right",
+      align: "center",
       render: (v: number) => (
-        <span className="text-sm text-slate-500 tabular-nums line-through">
+        <span className="text-[13px] text-slate-400 tabular-nums line-through font-mono">
           ₹{v}
         </span>
       ),
@@ -190,36 +224,56 @@ const PricingTable: React.FC<PricingTableProps> = ({ customerId }) => {
       dataIndex: "customerPrice",
       key: "customerPrice",
       width: 130,
-      align: "right",
+      align: "center",
       render: (v: number, r) => {
-        const saving = r.basePrice - v;
+        const savingAmt = r.basePrice - v;
         return (
-          <div className="flex flex-col items-end gap-0.5">
-            <span className="text-sm font-bold text-green-600 tabular-nums">
-              ₹{v}
-            </span>
-            {saving > 0 && (
-              <span className="text-[10px] font-medium text-green-500">
-                -₹{saving} off
+          <Tooltip
+            title={
+              savingAmt > 0
+                ? `${Math.round((savingAmt / r.basePrice) * 100)}% discount`
+                : savingAmt < 0
+                ? "Premium pricing"
+                : "Same as base"
+            }
+          >
+            <div className="flex flex-col gap-0.5 cursor-default">
+              <span className="text-[13px] font-bold text-emerald-600 tabular-nums font-mono">
+                ₹{v}
               </span>
-            )}
-          </div>
+              {savingAmt > 0 && (
+                <span className="text-[10px] font-semibold text-emerald-500 bg-emerald-50 px-1.5 py-0.5 rounded-md w-fit mx-auto">
+                  -₹{savingAmt}
+                </span>
+              )}
+              {savingAmt < 0 && (
+                <span className="text-[10px] font-semibold text-orange-500 bg-orange-50 px-1.5 py-0.5 rounded-md w-fit mx-auto">
+                  +₹{Math.abs(savingAmt)}
+                </span>
+              )}
+            </div>
+          </Tooltip>
         );
       },
     },
     {
       title: "Effective",
       key: "effective",
-      width: 160,
+      width: 200,
+      align: "center",
       render: (_, r) => (
-        <span className="text-xs text-slate-500">
+        <span className="text-[11px] text-slate-500 tabular-nums">
           {new Date(r.effectiveFrom).toLocaleDateString("en-IN", {
             day: "2-digit",
             month: "short",
             year: "numeric",
           })}
           {r.effectiveTo &&
-            ` → ${new Date(r.effectiveTo).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}`}
+            ` → ${new Date(r.effectiveTo).toLocaleDateString("en-IN", {
+              day: "2-digit",
+              month: "short",
+              year: "numeric",
+            })}`}
         </span>
       ),
     },
@@ -227,10 +281,21 @@ const PricingTable: React.FC<PricingTableProps> = ({ customerId }) => {
       title: "Status",
       dataIndex: "isActive",
       key: "status",
-      width: 80,
+      width: 90,
       align: "center",
       render: (v: boolean) => (
-        <Tag color={v ? "green" : "default"}>{v ? "Active" : "Expired"}</Tag>
+        <span
+          className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold ${
+            v ? "bg-emerald-50 text-emerald-700" : "bg-slate-50 text-slate-400"
+          }`}
+        >
+          <span
+            className={`w-1.5 h-1.5 rounded-full ${
+              v ? "bg-emerald-500" : "bg-slate-300"
+            }`}
+          />
+          {v ? "Active" : "Expired"}
+        </span>
       ),
     },
     {
@@ -240,27 +305,31 @@ const PricingTable: React.FC<PricingTableProps> = ({ customerId }) => {
       align: "center",
       render: (_, r) => (
         <div className="flex items-center justify-center gap-1">
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              openEdit(r);
-            }}
-            className="p-1.5 rounded-lg hover:bg-blue-50 text-slate-400 hover:text-blue-500 transition-colors"
-          >
-            <HiOutlinePencil size={14} />
-          </button>
+          <Tooltip title="Edit">
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                openEdit(r);
+              }}
+              className="p-1.5 rounded-xl hover:bg-blue-50 text-slate-400 hover:text-blue-500 transition-colors"
+            >
+              <HiOutlinePencil size={14} />
+            </button>
+          </Tooltip>
           <Popconfirm
             title="Remove this pricing?"
             onConfirm={() => handleDelete(r.id)}
             okText="Yes"
             cancelText="No"
           >
-            <button
-              onClick={(e) => e.stopPropagation()}
-              className="p-1.5 rounded-lg hover:bg-red-50 text-slate-400 hover:text-red-500 transition-colors"
-            >
-              <HiOutlineTrash size={14} />
-            </button>
+            <Tooltip title="Remove">
+              <button
+                onClick={(e) => e.stopPropagation()}
+                className="p-1.5 rounded-xl hover:bg-red-50 text-slate-400 hover:text-red-500 transition-colors"
+              >
+                <HiOutlineTrash size={14} />
+              </button>
+            </Tooltip>
           </Popconfirm>
         </div>
       ),
@@ -269,26 +338,33 @@ const PricingTable: React.FC<PricingTableProps> = ({ customerId }) => {
 
   return (
     <div className="flex flex-col gap-4">
-      {/* Header */}
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <HiOutlineTag size={16} className="text-blue-500" />
-          <h3 className="text-sm font-bold text-slate-800">Customer Pricing</h3>
-          <span className="text-xs text-slate-400 ml-1">
-            ({data.filter((d) => d.isActive).length} active)
-          </span>
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center">
+            <HiOutlineTag size={15} className="text-blue-500" />
+          </div>
+          <div>
+            <h3 className="text-[13px] font-bold text-slate-800">
+              Customer Pricing
+            </h3>
+            <p className="text-[11px] text-slate-400">
+              {data.filter((d) => d.isActive).length} active price rules
+            </p>
+          </div>
         </div>
-        <Button
-          type="primary"
-          icon={<HiOutlinePlus size={14} />}
-          onClick={openAdd}
-        >
-          Add Price
-        </Button>
+        <Tooltip title="Add custom pricing for a product">
+          <Button
+            type="primary"
+            icon={<HiOutlinePlus size={14} />}
+            onClick={openAdd}
+            className="!bg-blue-600 hover:!bg-blue-700 !rounded-xl !font-semibold !shadow-sm !shadow-blue-200"
+          >
+            Add Price
+          </Button>
+        </Tooltip>
       </div>
 
-      {/* Table */}
-      <Table<CustomerPricing>
+      <Table
         columns={columns}
         dataSource={data}
         rowKey="id"
@@ -299,72 +375,80 @@ const PricingTable: React.FC<PricingTableProps> = ({ customerId }) => {
         rowClassName={(r) => (r.isActive ? "" : "opacity-50")}
       />
 
-      {/* Add / Edit Modal */}
       <Modal
-        title={editingId ? "Edit Customer Price" : "Add Customer Price"}
         open={modalOpen}
-        onCancel={() => {
-          setModalOpen(false);
-          resetForm();
-        }}
-        onOk={handleSave}
-        confirmLoading={saving}
-        okText={editingId ? "Update" : "Add"}
-        width={480}
+        onCancel={closeModal}
+        footer={null}
+        width={500}
+        centered
         destroyOnClose
+        closeIcon={<HiOutlineX className="w-5 h-5 text-slate-400" />}
+        title={null}
       >
-        <div className="flex flex-col gap-4 py-2">
-          {/* Product Select */}
-          <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-semibold text-slate-600">
-              Product <span className="text-red-400">*</span>
-            </label>
-            <Select
-              value={productId || undefined}
-              onChange={setProductId}
-              placeholder="Select a product"
-              size="large"
-              className="w-full"
-              disabled={!!editingId}
-              options={availableProducts.map((p) => ({
-                value: p.id,
-                label: (
-                  <div className="flex items-center justify-between w-full">
-                    <span>
-                      {p.name}{" "}
-                      <span className="text-slate-400 text-xs">({p.sku})</span>
-                    </span>
-                    <span className="text-xs text-slate-500 tabular-nums">
-                      ₹{p.basePrice}/{p.unit}
-                    </span>
-                  </div>
-                ),
-              }))}
-            />
+        <div
+          className={`flex items-center gap-3.5 mb-5 pl-4 border-l-[3px] ${
+            editingId ? "border-l-amber-500" : "border-l-blue-500"
+          }`}
+        >
+          <div
+            className={`w-10 h-10 rounded-xl flex items-center justify-center ${
+              editingId ? "bg-amber-50" : "bg-blue-50"
+            }`}
+          >
+            {editingId ? (
+              <HiOutlinePencil size={20} className="text-amber-600" />
+            ) : (
+              <HiOutlineTag size={20} className="text-blue-600" />
+            )}
           </div>
+          <div>
+            <h3 className="text-[15px] font-bold text-slate-800">
+              {editingId ? "Edit Customer Price" : "Add Customer Price"}
+            </h3>
+            <p className="text-[11px] text-slate-400">
+              Set special pricing for this customer
+            </p>
+          </div>
+        </div>
 
-          {/* Customer Price */}
-          <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-semibold text-slate-600">
-              Customer Price (₹) <span className="text-red-400">*</span>
-            </label>
-            <Input
-              value={customerPrice}
-              onChange={(e) => setCustomerPrice(e.target.value)}
+        <div className="flex flex-col gap-4">
+          <CustomSelect
+            label="Product"
+            name="productId"
+            control={control}
+            errors={errors}
+            placeholder="Select a product"
+            size="large"
+            isrequired
+            disabled={!!editingId}
+            rules={{ required: "Product is required" }}
+            options={productOptions}
+          />
+
+          <div>
+            <CustomInput
+              label="Customer Price (₹)"
+              name="customerPrice"
+              control={control}
+              errors={errors}
               placeholder="Enter price"
               size="large"
-              type="number"
-              min={0}
-              prefix={<span className="text-slate-400">₹</span>}
+              isrequired
+              rules={{
+                required: "Price is required",
+                validate: (v: string) =>
+                  (parseFloat(v) > 0 && !isNaN(parseFloat(v))) ||
+                  "Enter a valid price",
+              }}
             />
             {selectedProduct && !isNaN(priceNum) && priceNum > 0 && (
-              <div className="flex items-center gap-2 text-xs mt-1">
+              <div className="flex items-center gap-2 text-[11px] mt-1 px-2 py-1.5 rounded-lg bg-slate-50">
                 <span className="text-slate-400">
                   Base: ₹{selectedProduct.basePrice}
                 </span>
                 <span className="text-slate-300">→</span>
                 {discount > 0 ? (
-                  <span className="text-green-600 font-semibold">
+                  <span className="text-emerald-600 font-semibold">
                     Saving ₹{discount} (
                     {Math.round((discount / selectedProduct.basePrice) * 100)}%
                     off)
@@ -380,33 +464,39 @@ const PricingTable: React.FC<PricingTableProps> = ({ customerId }) => {
             )}
           </div>
 
-          {/* Date Range */}
-          <div className="grid grid-cols-2 gap-3">
-            <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-semibold text-slate-600">
-                Effective From <span className="text-red-400">*</span>
-              </label>
-              <DatePicker
-                value={effectiveFrom}
-                onChange={setEffectiveFrom}
-                size="large"
-                className="w-full"
-                format="DD MMM YYYY"
-              />
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-semibold text-slate-600">
-                Effective To
-              </label>
-              <DatePicker
-                value={effectiveTo}
-                onChange={setEffectiveTo}
-                size="large"
-                className="w-full"
-                format="DD MMM YYYY"
-                placeholder="No end date"
-              />
-            </div>
+          <Divider className="!my-0 !border-slate-100" />
+
+          <CustomDateRange
+            label="Effective Period"
+            name="effectiveRange"
+            control={control}
+            errors={errors}
+            placeholder={["Start date", "End date (optional)"]}
+            isrequired
+            size="large"
+            rules={{
+              validate: (val: [Dayjs | null, Dayjs | null]) =>
+                (val && val[0] !== null) || "Start date is required",
+            }}
+          />
+        </div>
+
+        <div className="flex items-center justify-between mt-5 pt-4 border-t border-slate-100">
+          <p className="text-[10px] text-slate-400">
+            Price applies to this customer only
+          </p>
+          <div className="flex items-center gap-2">
+            <Button onClick={closeModal} className="!rounded-lg">
+              Cancel
+            </Button>
+            <Button
+              type="primary"
+              onClick={handleSubmit(onSubmit)}
+              loading={saving}
+              className="!bg-blue-600 hover:!bg-blue-700 !rounded-lg !font-semibold !shadow-sm !shadow-blue-200"
+            >
+              {editingId ? "Update" : "Add Price"}
+            </Button>
           </div>
         </div>
       </Modal>

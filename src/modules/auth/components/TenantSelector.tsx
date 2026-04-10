@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { HiOutlineChevronDown, HiOutlineCheck } from "react-icons/hi";
-import { TENANT_CONFIG, TENANT_LIST } from "./constants";
+import { TENANT_CONFIG, TENANT_LIST } from "../constants/constants";
 import type { TenantId } from "../types/Auth";
 
 // Brand logo icon (custom SVG — not available in react-icons)
@@ -74,7 +74,9 @@ const TenantSelector: React.FC<TenantSelectorProps> = ({ value, onChange }) => {
         </div>
         <HiOutlineChevronDown
           size={15}
-          className={`text-slate-400 transition-transform duration-300 ${open ? "rotate-180" : ""}`}
+          className={`text-slate-400 transition-transform duration-300 ${
+            open ? "rotate-180" : ""
+          }`}
         />
       </button>
 
@@ -117,7 +119,9 @@ const TenantSelector: React.FC<TenantSelectorProps> = ({ value, onChange }) => {
                 </div>
                 <div className="flex-1">
                   <p
-                    className={`text-xs font-bold ${isActive ? "text-slate-800" : "text-slate-600"}`}
+                    className={`text-xs font-bold ${
+                      isActive ? "text-slate-800" : "text-slate-600"
+                    }`}
                   >
                     {t.name}
                   </p>

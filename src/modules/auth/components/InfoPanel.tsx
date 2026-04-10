@@ -1,5 +1,5 @@
 import React from "react";
-import { TENANT_CONFIG } from "./constants";
+import { TENANT_CONFIG } from "../constants/constants";
 import { IconDroplet } from "./TenantSelector";
 import LiveClock from "../components/Liveclock";
 import FeatureList from "../components/Featurelist";

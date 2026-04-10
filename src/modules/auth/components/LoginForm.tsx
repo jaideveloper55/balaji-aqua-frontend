@@ -10,7 +10,7 @@ import CustomInput from "../../../components/common/CustomInput";
 import OtpInput from "../../../components/common/OtpInput";
 import AuthTabs from "./AuthTabs";
 import TenantSelector, { IconDroplet } from "./TenantSelector";
-import { TENANT_CONFIG } from "./constants";
+import { TENANT_CONFIG } from "../constants/constants";
 import type { TenantId, AuthTabKey } from "../types/Auth";
 
 interface LoginFormValues {
@@ -49,7 +49,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ tenant, onTenantChange }) => {
       setSubmitError("");
       clearErrors();
     },
-    [clearErrors],
+    [clearErrors]
   );
 
   const onSubmit = useCallback(
@@ -65,11 +65,11 @@ const LoginForm: React.FC<LoginFormProps> = ({ tenant, onTenantChange }) => {
       setTimeout(() => {
         setLoading(false);
         setSubmitError(
-          "Invalid credentials — please verify your details and try again.",
+          "Invalid credentials — please verify your details and try again."
         );
       }, 2200);
     },
-    [tab, setError],
+    [tab, setError]
   );
 
   const handleFormSubmit = useCallback(
@@ -77,7 +77,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ tenant, onTenantChange }) => {
       e.preventDefault();
       rhfSubmit(onSubmit)(e);
     },
-    [rhfSubmit, onSubmit],
+    [rhfSubmit, onSubmit]
   );
 
   const watched = watch();

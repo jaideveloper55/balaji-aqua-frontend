@@ -337,6 +337,9 @@ const LEDGER: LedgerEntry[] = [
     credit: 0,
     balance: 1250,
     referenceNo: "INV-2026-0342",
+    baseAmount: 297,
+    cgst: 26.5,
+    sgst: 26.5,
   },
   {
     id: "LED-002",
@@ -347,6 +350,9 @@ const LEDGER: LedgerEntry[] = [
     credit: 900,
     balance: 900,
     referenceNo: "UPI-REF-98234",
+    baseAmount: 900,
+    cgst: 0,
+    sgst: 0,
   },
   {
     id: "LED-003",
@@ -357,6 +363,9 @@ const LEDGER: LedgerEntry[] = [
     credit: 0,
     balance: 1800,
     referenceNo: "INV-2026-0318",
+    baseAmount: 237,
+    cgst: 21.5,
+    sgst: 21.5,
   },
   {
     id: "LED-004",
@@ -367,6 +376,9 @@ const LEDGER: LedgerEntry[] = [
     credit: 70,
     balance: 1520,
     referenceNo: "CN-2026-0045",
+    baseAmount: 59,
+    cgst: 5.5,
+    sgst: 5.5,
   },
   {
     id: "LED-005",
@@ -377,6 +389,9 @@ const LEDGER: LedgerEntry[] = [
     credit: 500,
     balance: 1590,
     referenceNo: "CASH-0312",
+    baseAmount: 500,
+    cgst: 0,
+    sgst: 0,
   },
   {
     id: "LED-006",
@@ -387,6 +402,9 @@ const LEDGER: LedgerEntry[] = [
     credit: 0,
     balance: 2090,
     referenceNo: "INV-2026-0290",
+    baseAmount: 356,
+    cgst: 32,
+    sgst: 32,
   },
   {
     id: "LED-007",
@@ -397,16 +415,22 @@ const LEDGER: LedgerEntry[] = [
     credit: 0,
     balance: 1670,
     referenceNo: "DN-2026-0012",
+    baseAmount: 42,
+    cgst: 4,
+    sgst: 4,
   },
   {
     id: "LED-008",
-    date: "2026-03-01",
+    date: "2026-03-18",
     type: "payment",
     description: "UPI Payment received",
     debit: 0,
     credit: 1200,
     balance: 1620,
     referenceNo: "UPI-REF-87122",
+    baseAmount: 1200,
+    cgst: 0,
+    sgst: 0,
   },
 ];
 
@@ -420,7 +444,7 @@ let cpCounter = CUSTOMER_PRICING.length;
 export const customerApi = {
   // Customers
   async getCustomers(
-    params?: CustomerListParams,
+    params?: CustomerListParams
   ): Promise<PaginatedResponse<Customer>> {
     await delay(500);
     let data = [...CUSTOMERS];
@@ -430,7 +454,7 @@ export const customerApi = {
         (c) =>
           c.name.toLowerCase().includes(q) ||
           c.phone.includes(q) ||
-          c.id.toLowerCase().includes(q),
+          c.id.toLowerCase().includes(q)
       );
     }
     if (params?.status) data = data.filter((c) => c.status === params.status);
@@ -489,7 +513,7 @@ export const customerApi = {
 
   async createCustomerPricing(
     customerId: string,
-    values: CustomerPricingFormValues,
+    values: CustomerPricingFormValues
   ): Promise<CustomerPricing> {
     await delay(500);
     const product = PRODUCTS.find((p) => p.id === values.productId);
@@ -515,7 +539,7 @@ export const customerApi = {
 
   async updateCustomerPricing(
     pricingId: string,
-    values: Partial<CustomerPricingFormValues>,
+    values: Partial<CustomerPricingFormValues>
   ): Promise<CustomerPricing> {
     await delay(400);
     const idx = CUSTOMER_PRICING.findIndex((p) => p.id === pricingId);

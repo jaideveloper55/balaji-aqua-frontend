@@ -1,8 +1,7 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { Table, Input, Select, Tag, Dropdown } from "antd";
+import { Table, Dropdown, Tooltip } from "antd";
 import type { ColumnsType, TablePaginationConfig } from "antd/es/table";
 import {
-  HiOutlineSearch,
   HiOutlineDotsVertical,
   HiOutlineEye,
   HiOutlinePencil,
@@ -12,18 +11,8 @@ import {
 } from "react-icons/hi";
 import { customerApi } from "../services/Customer.api";
 import type { Customer, CustomerStatus, CustomerType } from "../types/Customer";
-
-const STATUS_MAP: Record<CustomerStatus, { label: string; color: string }> = {
-  active: { label: "Active", color: "green" },
-  inactive: { label: "Inactive", color: "default" },
-  pending: { label: "Pending", color: "orange" },
-};
-
-const TYPE_MAP: Record<CustomerType, string> = {
-  residential: "Residential",
-  commercial: "Commercial",
-  industrial: "Industrial",
-};
+import { STATUS_MAP, TYPE_MAP } from "../constants/customerConstants";
+import CustomerTableFilters from "./CustomerTableFilters";
 
 interface CustomerTableProps {
   onView?: (customer: Customer) => void;
@@ -80,19 +69,33 @@ const CustomerTable: React.FC<CustomerTableProps> = ({
       key: "name",
       width: 260,
       render: (_, r) => (
-        <div className="flex flex-col gap-0.5">
-          <span className="text-sm font-semibold text-slate-800">{r.name}</span>
-          <div className="flex items-center gap-3 text-xs text-slate-400">
-            <span className="flex items-center gap-1">
-              <HiOutlinePhone size={11} />
-              {r.phone}
+        <div className="flex items-center gap-3 py-0.5">
+          <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center shrink-0">
+            <span className="text-[10px] font-bold text-blue-600">
+              {r.name
+                .split(" ")
+                .map((n) => n[0])
+                .join("")
+                .toUpperCase()
+                .slice(0, 2)}
             </span>
-            {r.email && (
+          </div>
+          <div className="flex flex-col gap-0.5">
+            <span className="text-[13px] font-semibold text-slate-800">
+              {r.name}
+            </span>
+            <div className="flex items-center gap-3 text-[11px] text-slate-400">
               <span className="flex items-center gap-1">
-                <HiOutlineMail size={11} />
-                {r.email}
+                <HiOutlinePhone size={10} />
+                {r.phone}
               </span>
-            )}
+              {r.email && (
+                <span className="flex items-center gap-1">
+                  <HiOutlineMail size={10} />
+                  {r.email}
+                </span>
+              )}
+            </div>
           </div>
         </div>
       ),
@@ -103,7 +106,7 @@ const CustomerTable: React.FC<CustomerTableProps> = ({
       key: "id",
       width: 100,
       render: (id: string) => (
-        <span className="text-xs font-mono font-medium text-slate-500">
+        <span className="text-[11px] font-mono text-slate-400 bg-slate-50 px-1.5 py-0.5 rounded">
           {id}
         </span>
       ),
@@ -114,7 +117,7 @@ const CustomerTable: React.FC<CustomerTableProps> = ({
       key: "type",
       width: 120,
       render: (t: CustomerType) => (
-        <span className="text-xs font-medium text-slate-600">
+        <span className="text-[12px] font-medium text-slate-600">
           {TYPE_MAP[t]}
         </span>
       ),
@@ -123,10 +126,22 @@ const CustomerTable: React.FC<CustomerTableProps> = ({
       title: "Status",
       dataIndex: "status",
       key: "status",
-      width: 100,
-      render: (s: CustomerStatus) => (
-        <Tag color={STATUS_MAP[s].color}>{STATUS_MAP[s].label}</Tag>
-      ),
+      width: 110,
+      render: (s: CustomerStatus) => {
+        const cfg = STATUS_MAP[s];
+        return (
+          <span
+            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold ${cfg.bg} ${cfg.text}`}
+          >
+            <span
+              className={`w-1.5 h-1.5 rounded-full ${cfg.dot} ${
+                s === "pending" ? "animate-pulse" : ""
+              }`}
+            />
+            {cfg.label}
+          </span>
+        );
+      },
     },
     {
       title: "Outstanding",
@@ -136,11 +151,15 @@ const CustomerTable: React.FC<CustomerTableProps> = ({
       align: "right",
       sorter: (a, b) => a.outstandingBalance - b.outstandingBalance,
       render: (v: number) => (
-        <span
-          className={`text-sm font-semibold tabular-nums ${v > 0 ? "text-red-500" : "text-green-600"}`}
-        >
-          {v > 0 ? `₹${v.toLocaleString("en-IN")}` : "Nil"}
-        </span>
+        <Tooltip title={v > 0 ? "Amount pending" : "Settled"}>
+          <span
+            className={`text-[13px] font-bold tabular-nums ${
+              v > 0 ? "text-red-500" : "text-emerald-600"
+            }`}
+          >
+            {v > 0 ? `₹${v.toLocaleString("en-IN")}` : "Nil"}
+          </span>
+        </Tooltip>
       ),
     },
     {
@@ -151,7 +170,7 @@ const CustomerTable: React.FC<CustomerTableProps> = ({
       align: "center",
       sorter: (a, b) => a.totalOrders - b.totalOrders,
       render: (v: number) => (
-        <span className="text-sm font-medium text-slate-700 tabular-nums">
+        <span className="text-[13px] font-semibold text-slate-700 tabular-nums">
           {v}
         </span>
       ),
@@ -162,7 +181,7 @@ const CustomerTable: React.FC<CustomerTableProps> = ({
       key: "joined",
       width: 110,
       render: (d: string) => (
-        <span className="text-xs text-slate-500">
+        <span className="text-[11px] text-slate-500 tabular-nums">
           {new Date(d).toLocaleDateString("en-IN", {
             day: "2-digit",
             month: "short",
@@ -205,7 +224,10 @@ const CustomerTable: React.FC<CustomerTableProps> = ({
           trigger={["click"]}
           placement="bottomRight"
         >
-          <button className="p-1.5 rounded-lg hover:bg-slate-100 transition-colors text-slate-400 hover:text-slate-600">
+          <button
+            onClick={(e) => e.stopPropagation()}
+            className="p-1.5 rounded-xl hover:bg-slate-100 transition-colors text-slate-400 hover:text-slate-600"
+          >
             <HiOutlineDotsVertical size={16} />
           </button>
         </Dropdown>
@@ -215,51 +237,23 @@ const CustomerTable: React.FC<CustomerTableProps> = ({
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-center gap-3">
-        <Input
-          placeholder="Search name, phone, ID..."
-          prefix={<HiOutlineSearch size={15} className="text-slate-400" />}
-          value={search}
-          onChange={(e) => {
-            setSearch(e.target.value);
-            setPage(1);
-          }}
-          allowClear
-          className="!w-64"
-        />
-        <Select
-          placeholder="Status"
-          value={statusFilter}
-          onChange={(v) => {
-            setStatusFilter(v);
-            setPage(1);
-          }}
-          allowClear
-          className="!w-32"
-          options={[
-            { value: "active", label: "Active" },
-            { value: "inactive", label: "Inactive" },
-            { value: "pending", label: "Pending" },
-          ]}
-        />
-        <Select
-          placeholder="Type"
-          value={typeFilter}
-          onChange={(v) => {
-            setTypeFilter(v);
-            setPage(1);
-          }}
-          allowClear
-          className="!w-36"
-          options={[
-            { value: "residential", label: "Residential" },
-            { value: "commercial", label: "Commercial" },
-            { value: "industrial", label: "Industrial" },
-          ]}
-        />
-      </div>
+      <CustomerTableFilters
+        search={search}
+        onSearchChange={(v) => {
+          setSearch(v);
+          setPage(1);
+        }}
+        onStatusChange={(v) => {
+          setStatusFilter(v);
+          setPage(1);
+        }}
+        onTypeChange={(v) => {
+          setTypeFilter(v);
+          setPage(1);
+        }}
+      />
 
-      <Table<Customer>
+      <Table
         columns={columns}
         dataSource={data}
         rowKey="id"
@@ -272,15 +266,16 @@ const CustomerTable: React.FC<CustomerTableProps> = ({
           pageSize,
           total,
           showSizeChanger: true,
+          pageSizeOptions: ["10", "20", "50"],
           showTotal: (t, range) => (
-            <span className="text-xs text-slate-500">
-              {range[0]}–{range[1]} of {t}
+            <span className="text-[11px] text-slate-400">
+              Showing {range[0]}–{range[1]} of {t} customers
             </span>
           ),
         }}
         onRow={(r) => ({
           onClick: () => onView?.(r),
-          className: "cursor-pointer hover:!bg-blue-50/40 transition-colors",
+          className: "cursor-pointer",
         })}
       />
     </div>
