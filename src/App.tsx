@@ -1,12 +1,14 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import LoginPage from "./modules/auth/pages/Login";
 import CustomerPage from "./modules/customers/pages/Customerpage";
-
 import ProductsPage from "./modules/products/pages/ProductsPage";
 import JarTrackingPage from "./modules/jar-tracking/pages/JarTrackingPage";
 import InventoryPage from "./modules/inventory/page/Inventorypage";
 import Deliverypage from "./modules/delivery/page/Deliverypage";
 import AdminLayout from "./components/layouts/AdminLayout";
+import Dashboard from "./modules/dashboard/Dashboard";
+import RegisterPage from "./modules/auth/pages/Register";
+import ForgotPasswordPage from "./modules/auth/pages/ForgotPassword";
 
 // const isAuthenticated = () => !!localStorage.getItem("token");
 
@@ -27,13 +29,17 @@ function App() {
         <Route path="/" element={<Navigate to="/login" replace />} />
 
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/register" element={<RegisterPage />} />
+        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
 
         <Route
           path="/admin/dashboard"
           element={
             // <ProtectedRoute>
             <AdminLayout>
-              <div>Dashboard Page</div>
+              <div>
+                <Dashboard />
+              </div>
             </AdminLayout>
             // </ProtectedRoute>
           }

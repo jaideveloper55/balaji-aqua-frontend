@@ -14,7 +14,7 @@ const InfoPanel: React.FC<InfoPanelProps> = ({ tenant }) => {
 
   return (
     <div
-      className="hidden lg:flex flex-col relative overflow-hidden transition-all duration-700 p-[clamp(28px,4vw,44px)]"
+      className="hidden lg:flex flex-col relative overflow-hidden transition-all duration-700 p-10"
       style={{
         background: `linear-gradient(160deg, ${config.gradientFrom} 0%, ${config.accent} 50%, ${config.gradientTo} 100%)`,
       }}
