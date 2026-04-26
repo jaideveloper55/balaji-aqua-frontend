@@ -9,6 +9,8 @@ import AdminLayout from "./components/layouts/AdminLayout";
 import Dashboard from "./modules/dashboard/Dashboard";
 import RegisterPage from "./modules/auth/pages/Register";
 import ForgotPasswordPage from "./modules/auth/pages/ForgotPassword";
+import CompaniesPage from "./modules/company/pages/Companiespage";
+import BillingPage from "./modules/billing/pages/Billingpage";
 
 // const isAuthenticated = () => !!localStorage.getItem("token");
 
@@ -27,11 +29,9 @@ function App() {
       <Routes>
         {/* Default redirect */}
         <Route path="/" element={<Navigate to="/login" replace />} />
-
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-
         <Route
           path="/admin/dashboard"
           element={
@@ -55,6 +55,18 @@ function App() {
             // </ProtectedRoute>
           }
         />
+        <Route
+          path="/admin/company"
+          element={
+            // <ProtectedRoute>
+            <AdminLayout>
+              <CompaniesPage />
+            </AdminLayout>
+
+            // </ProtectedRoute>
+          }
+        />
+
         <Route
           path="/admin/products"
           element={
@@ -90,7 +102,7 @@ function App() {
           element={
             // <ProtectedRoute>
             <AdminLayout>
-              <div>Billing & POS Page</div>
+              <BillingPage />
             </AdminLayout>
             // </ProtectedRoute>
           }
@@ -175,7 +187,6 @@ function App() {
             // </ProtectedRoute>
           }
         />
-
         {/* 404 fallback */}
         <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>

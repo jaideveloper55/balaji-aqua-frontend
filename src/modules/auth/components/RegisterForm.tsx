@@ -11,18 +11,40 @@ import TenantSelector, { IconDroplet } from "./TenantSelector";
 import { TENANT_CONFIG } from "../constants/constants";
 import type { TenantId } from "../types/Auth";
 
+// ── API Schema alignment ───────────────────────────────────────────────────────
+// POST /api/v1/auth/register expects:
+// {
+//   email: string          ← required
+//   password: string       ← required, min 8, uppercase + number
+//   firstName: string      ← required  (was fullName — split into two fields)
+//   lastName: string       ← required
+//   phone?: string         ← optional
+//   company: {
+//     name: string         ← from TENANT_CONFIG[tenant].name
+//     type: CompanyType    ← "WATER_PLANT" | "BEVERAGE"
+//   }
+// }
+// confirmPassword is frontend-only — never sent to API
+
 interface RegisterFormValues {
-  fullName: string;
-  email: string;
-  phone: string;
-  password: string;
-  confirmPassword: string;
+  firstName: string; // → API: firstName
+  lastName: string; // → API: lastName
+  email: string; // → API: email
+  phone: string; // → API: phone (optional)
+  password: string; // → API: password
+  confirmPassword: string; // frontend validation only — NOT sent to API
 }
 
 interface RegisterFormProps {
   tenant: TenantId;
   onTenantChange: (id: TenantId) => void;
 }
+
+// Maps frontend tenant ID → backend CompanyType enum
+const TENANT_TO_COMPANY_TYPE: Record<TenantId, "WATER_PLANT" | "BEVERAGE"> = {
+  "sri-balaji-aqua": "WATER_PLANT",
+  "royal-beverage": "BEVERAGE",
+};
 
 const getPasswordChecks = (pw: string) => ({
   length: pw.length >= 8,
@@ -51,7 +73,8 @@ const RegisterForm: React.FC<RegisterFormProps> = ({
     formState: { errors },
   } = useForm<RegisterFormValues>({
     defaultValues: {
-      fullName: "",
+      firstName: "",
+      lastName: "",
       email: "",
       phone: "",
       password: "",
@@ -86,7 +109,26 @@ const RegisterForm: React.FC<RegisterFormProps> = ({
         return;
       }
 
+      // ── Exact API payload — matches RegisterDto ──────────────────────────
+      const apiPayload = {
+        email: data.email.trim(),
+        password: data.password,
+        firstName: data.firstName.trim(),
+        lastName: data.lastName.trim(),
+        phone: data.phone.trim() || undefined, // send undefined if empty (optional)
+        company: {
+          name: config.name, // e.g. "Sri Balaji Aqua Water"
+          type: TENANT_TO_COMPANY_TYPE[tenant], // "WATER_PLANT" | "BEVERAGE"
+        },
+      };
+
+      console.log("📤 Register payload:", apiPayload); // remove in production
+
       setLoading(true);
+      // TODO: connect to real API
+      // const response = await authApi.register(apiPayload)
+      // tokenStorage.setTokens(response.accessToken, response.refreshToken)
+      // navigate("/dashboard")
       setTimeout(() => {
         setLoading(false);
         setSubmitError(
@@ -94,7 +136,7 @@ const RegisterForm: React.FC<RegisterFormProps> = ({
         );
       }, 1800);
     },
-    [strength, agree, setError]
+    [strength, agree, setError, config, tenant]
   );
 
   const handleFormSubmit = useCallback(
@@ -105,8 +147,10 @@ const RegisterForm: React.FC<RegisterFormProps> = ({
     [rhfSubmit, onSubmit]
   );
 
+  // Button disabled until required API fields are filled
   const isDisabled =
-    !watched.fullName?.trim() ||
+    !watched.firstName?.trim() ||
+    !watched.lastName?.trim() ||
     !watched.email?.trim() ||
     !watched.password ||
     !watched.confirmPassword;
@@ -150,15 +194,26 @@ const RegisterForm: React.FC<RegisterFormProps> = ({
         <TenantSelector value={tenant} onChange={onTenantChange} />
 
         <div className="flex flex-col gap-3.5">
-          <CustomInput
-            name="fullName"
-            control={control}
-            label="Full Name"
-            type="text"
-            placeholder="e.g. Jai Kumar"
-            errors={errors}
-            autoFocus
-          />
+          {/* First + Last name in a row — API expects them as separate fields */}
+          <div className="grid grid-cols-2 gap-3">
+            <CustomInput
+              name="firstName"
+              control={control}
+              label="First Name"
+              type="text"
+              placeholder="e.g. Jai"
+              errors={errors}
+              autoFocus
+            />
+            <CustomInput
+              name="lastName"
+              control={control}
+              label="Last Name"
+              type="text"
+              placeholder="e.g. Kumar"
+              errors={errors}
+            />
+          </div>
 
           <CustomInput
             name="email"
@@ -170,10 +225,11 @@ const RegisterForm: React.FC<RegisterFormProps> = ({
             iconType="mail"
           />
 
+          {/* Phone is optional in API — label makes this clear */}
           <CustomInput
             name="phone"
             control={control}
-            label="Mobile Number"
+            label="Mobile Number (optional)"
             type="text"
             placeholder="+91 98765 43210"
             errors={errors}
@@ -190,6 +246,7 @@ const RegisterForm: React.FC<RegisterFormProps> = ({
               iconType="lock"
             />
 
+            {/* Password strength — matches API @Matches regex requirements */}
             {watched.password ? (
               <>
                 <div className="flex items-center gap-2 mt-2">
@@ -295,8 +352,15 @@ const RegisterForm: React.FC<RegisterFormProps> = ({
           className={`w-full flex items-center justify-center gap-2.5 py-3.5 px-6 rounded-xl text-sm font-semibold mt-1 transition-all duration-200 ${
             isDisabled || loading
               ? "bg-slate-200 text-slate-400 cursor-not-allowed"
-              : "bg-blue-500 hover:bg-blue-600 text-white shadow-lg hover:shadow-xl"
+              : "text-white shadow-lg hover:shadow-xl hover:scale-[1.01] active:scale-[0.99]"
           }`}
+          style={
+            !isDisabled && !loading
+              ? {
+                  background: `linear-gradient(135deg, ${config.gradientFrom}, ${config.gradientTo})`,
+                }
+              : {}
+          }
         >
           {loading ? (
             <>
@@ -329,3 +393,6 @@ const RegisterForm: React.FC<RegisterFormProps> = ({
 };
 
 export default RegisterForm;
+
+
+
