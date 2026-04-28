@@ -19,7 +19,7 @@ type InputSize = "small" | "middle" | "large";
 interface CustomInputProps<T extends FieldValues> {
   name: Path<T>;
   control: Control<T>;
-  label: string;
+  label?: string;
   type?: InputType;
   placeholder?: string;
   errors?: FieldErrors;

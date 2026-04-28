@@ -9,8 +9,8 @@ import AdminLayout from "./components/layouts/AdminLayout";
 import Dashboard from "./modules/dashboard/Dashboard";
 import RegisterPage from "./modules/auth/pages/Register";
 import ForgotPasswordPage from "./modules/auth/pages/ForgotPassword";
-import CompaniesPage from "./modules/company/pages/Companiespage";
 import BillingPage from "./modules/billing/pages/Billingpage";
+import Companies from "./modules/companies/pages/Companies";
 
 // const isAuthenticated = () => !!localStorage.getItem("token");
 
@@ -56,13 +56,12 @@ function App() {
           }
         />
         <Route
-          path="/admin/company"
+          path="/admin/company/"
           element={
             // <ProtectedRoute>
             <AdminLayout>
-              <CompaniesPage />
+              <Companies />
             </AdminLayout>
-
             // </ProtectedRoute>
           }
         />
