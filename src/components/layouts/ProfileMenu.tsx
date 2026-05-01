@@ -1,8 +1,9 @@
 import React from "react";
-import { Link } from "react-router-dom";
-import { AiOutlineLogout } from "react-icons/ai";
+import { Link, useNavigate } from "react-router-dom";
+import { AiOutlineLogout, AiOutlineUser } from "react-icons/ai";
 import type { OrgConfig } from "../../config/orgConfig";
 import OrgSwitcher from "./OrgSwitcher";
+import { useLogout } from "../../modules/auth/hooks/useLogout";
 
 interface ProfileMenuProps {
   open: boolean;
@@ -13,7 +14,6 @@ interface ProfileMenuProps {
   userInitials: string;
   userRole: string;
   onOrgSwitch: (orgId: string) => void;
-  onLogout: () => void;
   onCloseMenu: () => void;
 }
 
@@ -28,12 +28,23 @@ const ProfileMenu = React.forwardRef<HTMLDivElement, ProfileMenuProps>(
       userInitials,
       userRole,
       onOrgSwitch,
-      onLogout,
       onCloseMenu,
     },
     ref
   ) => {
     const { theme } = config;
+    const navigate = useNavigate();
+    const logout = useLogout();
+
+    const handleProfileClick = () => {
+      onCloseMenu();
+      navigate("/admin/profile");
+    };
+
+    const handleLogout = () => {
+      onCloseMenu();
+      logout.mutate();
+    };
 
     return (
       <div
@@ -66,39 +77,52 @@ const ProfileMenu = React.forwardRef<HTMLDivElement, ProfileMenuProps>(
           </div>
         </div>
 
+        {/* My Profile */}
+        <div className="p-1.5">
+          <button
+            onClick={handleProfileClick}
+            className={`flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-sm text-gray-600 ${theme.dropdownHoverBg} ${theme.dropdownHoverText} transition-colors text-left`}
+          >
+            <AiOutlineUser className="w-4 h-4 text-gray-400" />
+            <span className="font-medium">My Profile</span>
+          </button>
+        </div>
+
         {/* Org switcher */}
-        <OrgSwitcher
-          orgs={otherOrgs}
-          onSwitch={onOrgSwitch}
-          variant="dropdown"
-        />
+        {otherOrgs.length > 0 && (
+          <OrgSwitcher
+            orgs={otherOrgs}
+            onSwitch={onOrgSwitch}
+            variant="dropdown"
+          />
+        )}
 
         {/* Quick links */}
-        <div className="p-1.5">
-          {config.quickLinks.map(({ href, icon: QIcon, label }) => (
-            <Link
-              key={href}
-              to={href}
-              onClick={onCloseMenu}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-gray-600 ${theme.dropdownHoverBg} ${theme.dropdownHoverText} transition-colors`}
-            >
-              <QIcon className="w-4 h-4 text-gray-400" />
-              <span className="font-medium">{label}</span>
-            </Link>
-          ))}
-        </div>
+        {config.quickLinks?.length > 0 && (
+          <div className="p-1.5 border-t border-gray-100">
+            {config.quickLinks.map(({ href, icon: QIcon, label }) => (
+              <Link
+                key={href}
+                to={href}
+                onClick={onCloseMenu}
+                className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-gray-600 ${theme.dropdownHoverBg} ${theme.dropdownHoverText} transition-colors`}
+              >
+                <QIcon className="w-4 h-4 text-gray-400" />
+                <span className="font-medium">{label}</span>
+              </Link>
+            ))}
+          </div>
+        )}
 
         {/* Logout */}
         <div className="p-1.5 border-t border-gray-100">
           <button
-            onClick={() => {
-              onCloseMenu();
-              onLogout();
-            }}
-            className="flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-sm text-red-500 hover:bg-red-50 transition-colors font-medium"
+            onClick={handleLogout}
+            disabled={logout.isPending}
+            className="flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-sm text-red-500 hover:bg-red-50 transition-colors font-medium disabled:opacity-50"
           >
             <AiOutlineLogout className="w-4 h-4" />
-            <span>Logout</span>
+            <span>{logout.isPending ? "Logging out..." : "Logout"}</span>
           </button>
         </div>
       </div>

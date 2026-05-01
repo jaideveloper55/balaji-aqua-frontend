@@ -1,7 +1,9 @@
 import React from "react";
 import { HiOutlineLockClosed, HiOutlineFingerPrint } from "react-icons/hi";
 import CustomTabs, { TabItem } from "../../../components/common/CustomTabs";
-import type { AuthTabKey } from "../types/Auth";
+
+// Define the tab keys as a union type
+export type AuthTabKey = "password" | "pin";
 
 interface AuthTabsProps {
   activeTab: AuthTabKey;

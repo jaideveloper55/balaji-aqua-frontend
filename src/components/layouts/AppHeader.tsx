@@ -2,43 +2,53 @@ import React from "react";
 import { AiOutlineMenu } from "react-icons/ai";
 import { FiChevronDown } from "react-icons/fi";
 import type { OrgConfig } from "../../config/orgConfig";
+import { useAuthStore } from "../../store/auth.store";
 import ProfileMenu from "./ProfileMenu";
 
 interface AppHeaderProps {
   config: OrgConfig;
   otherOrgs: OrgConfig[];
   pageTitle: string;
-  userName: string;
-  userEmail: string;
-  userInitials: string;
-  userRole: string;
   isProfileOpen: boolean;
   profileMenuRef: React.RefObject<HTMLDivElement | null>;
   onToggleProfile: () => void;
   onCloseProfile: () => void;
   onOrgSwitch: (orgId: string) => void;
-  onLogout: () => void;
   onOpenMobileSidebar: () => void;
 }
+
+const ROLE_LABELS: Record<string, string> = {
+  SUPER_ADMIN: "Super Admin",
+  ADMIN: "Admin",
+  STAFF: "Staff",
+  DELIVERY_BOY: "Delivery",
+};
 
 const AppHeader: React.FC<AppHeaderProps> = ({
   config,
   otherOrgs,
   pageTitle,
-  userName,
-  userEmail,
-  userInitials,
-  userRole,
   isProfileOpen,
   profileMenuRef,
   onToggleProfile,
   onCloseProfile,
   onOrgSwitch,
-  onLogout,
   onOpenMobileSidebar,
 }) => {
   const { theme } = config;
   const LogoIcon = config.logoIcon;
+
+  // Pull real user data from Zustand
+  const user = useAuthStore((s) => s.user);
+
+  const userName = user
+    ? `${user.firstName} ${user.lastName}`.trim() || "User"
+    : "User";
+  const userEmail = user?.email ?? "";
+  const userInitials =
+    `${user?.firstName?.[0] ?? ""}${user?.lastName?.[0] ?? ""}`.toUpperCase() ||
+    "U";
+  const userRole = user?.role ? ROLE_LABELS[user.role] ?? user.role : "User";
 
   return (
     <header className="bg-white border-b border-gray-100 sticky top-0 z-20 shrink-0 h-16">
@@ -105,7 +115,6 @@ const AppHeader: React.FC<AppHeaderProps> = ({
               userInitials={userInitials}
               userRole={userRole}
               onOrgSwitch={onOrgSwitch}
-              onLogout={onLogout}
               onCloseMenu={onCloseProfile}
             />
           </div>

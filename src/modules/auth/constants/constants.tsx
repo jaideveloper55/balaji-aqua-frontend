@@ -1,5 +1,31 @@
-import type { TenantConfig, TenantId } from "../types/Auth";
+import type { TenantId } from "../types/Auth";
 
+export interface TenantFeature {
+  icon: string;
+  title: string;
+  desc: string;
+}
+
+export interface TenantConfig {
+  id: TenantId;
+  name: string;
+  shortName: string;
+  tagline: string;
+
+  // Color theme
+  accent: string;
+  accentHover: string;
+  accentSoft: string;
+  gradientFrom: string;
+  gradientVia: string;
+  gradientTo: string;
+
+  // Marketing copy
+  description: string;
+  features: TenantFeature[];
+}
+
+// ─── CONFIGS ──────────────────────────────────────────────────────────────
 export const TENANT_CONFIG: Record<TenantId, TenantConfig> = {
   "sri-balaji-aqua": {
     id: "sri-balaji-aqua",

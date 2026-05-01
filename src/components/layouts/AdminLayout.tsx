@@ -1,12 +1,14 @@
 import React, { useEffect, useState, useRef } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate, Outlet } from "react-router-dom";
 import { getOrgConfig, ORG_CONFIGS } from "../../config/orgConfig";
+import { useAuthStore } from "../../store/auth.store";
+import { useLogout } from "../../modules/auth/hooks/useLogout";
 import DesktopSidebar from "./DesktopSidebar";
 import MobileSidebar from "./MobileSidebar";
 import AppHeader from "./AppHeader";
 
 interface AdminLayoutProps {
-  children: React.ReactNode;
+  children?: React.ReactNode;
   orgId?: string;
   onOrgSwitch?: (newOrgId: string) => void;
 }
@@ -25,6 +27,18 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({
   const config = getOrgConfig(orgId);
   const { menuItems: items } = config;
 
+  // Real user from auth store
+  const user = useAuthStore((s) => s.user);
+  const logout = useLogout();
+
+  const userName = user
+    ? `${user.firstName} ${user.lastName}`.trim() || "User"
+    : "User";
+  const userEmail = user?.email ?? "";
+  const userInitials =
+    `${user?.firstName?.[0] ?? ""}${user?.lastName?.[0] ?? ""}`.toUpperCase() ||
+    "U";
+
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
@@ -32,12 +46,6 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({
   const [isLg, setIsLg] = useState(false);
 
   const profileMenuRef = useRef<HTMLDivElement>(null);
-
-  // TODO: replace with your actual auth context
-  const userName = "Admin";
-  const userEmail = `admin@${config.id.replace("-", "")}.com`;
-  const userInitials = userName[0].toUpperCase();
-  const userRole = "Plant Admin";
 
   // Track lg breakpoint
   useEffect(() => {
@@ -77,7 +85,8 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
-  const handleLogout = () => navigate("/login");
+  // Real logout — clears tokens, hits API, redirects
+  const handleLogout = () => logout.mutate();
 
   const otherOrgs = Object.values(ORG_CONFIGS).filter(
     (c) => c.id !== config.id
@@ -100,7 +109,7 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({
   };
 
   const handleMobileLogoClick = () => {
-    navigate("/");
+    navigate("/admin/dashboard");
     setIsMobileSidebarOpen(false);
   };
 
@@ -125,7 +134,7 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({
         onExpand={() => setIsSidebarOpen(true)}
         onCollapse={() => setIsSidebarOpen(false)}
         onMenuClick={setActiveMenu}
-        onLogoClick={() => navigate("/")}
+        onLogoClick={() => navigate("/admin/dashboard")}
         onLogout={handleLogout}
       />
 
@@ -155,21 +164,16 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({
           config={config}
           otherOrgs={otherOrgs}
           pageTitle={pageTitle}
-          userName={userName}
-          userEmail={userEmail}
-          userInitials={userInitials}
-          userRole={userRole}
           isProfileOpen={isProfileOpen}
           profileMenuRef={profileMenuRef}
           onToggleProfile={() => setIsProfileOpen((p) => !p)}
           onCloseProfile={() => setIsProfileOpen(false)}
           onOrgSwitch={handleOrgSwitch}
-          onLogout={handleLogout}
           onOpenMobileSidebar={() => setIsMobileSidebarOpen(true)}
         />
 
         <main className="flex-1 overflow-y-auto bg-gray-50 p-3 sm:p-4 lg:p-6 custom-scrollbar">
-          {children}
+          {children ?? <Outlet />}
           <p className="mt-8 pb-2 text-center text-gray-600 text-[11px]">
             &copy; {new Date().getFullYear()} JAI Dev. All Rights Reserved.
           </p>

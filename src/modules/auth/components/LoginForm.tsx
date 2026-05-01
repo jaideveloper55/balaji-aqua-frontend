@@ -10,6 +10,7 @@ import CustomInput from "../../../components/common/CustomInput";
 import TenantSelector, { IconDroplet } from "./TenantSelector";
 import { TENANT_CONFIG } from "../constants/constants";
 import type { TenantId } from "../types/Auth";
+import { useLogin } from "../hooks/useLogin";
 
 interface LoginFormValues {
   email: string;
@@ -24,8 +25,10 @@ interface LoginFormProps {
 const LoginForm: React.FC<LoginFormProps> = ({ tenant, onTenantChange }) => {
   const config = TENANT_CONFIG[tenant];
   const [remember, setRemember] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [submitError, setSubmitError] = useState("");
+
+  // ─── TanStack Query mutation ────────────────────────────────────────────
+  // login.mutate(data) → calls API → on success: stores in Zustand + redirects
+  const login = useLogin();
 
   const {
     control,
@@ -37,16 +40,15 @@ const LoginForm: React.FC<LoginFormProps> = ({ tenant, onTenantChange }) => {
     mode: "onSubmit",
   });
 
-  const onSubmit = useCallback((_data: LoginFormValues) => {
-    setSubmitError("");
-    setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
-      setSubmitError(
-        "Invalid credentials — please verify your details and try again."
-      );
-    }, 2200);
-  }, []);
+  const onSubmit = useCallback(
+    (data: LoginFormValues) => {
+      login.mutate({
+        email: data.email.trim(),
+        password: data.password,
+      });
+    },
+    [login]
+  );
 
   const handleFormSubmit = useCallback(
     (e: React.FormEvent) => {
@@ -61,6 +63,12 @@ const LoginForm: React.FC<LoginFormProps> = ({ tenant, onTenantChange }) => {
     () => !watched.email?.trim() || !watched.password,
     [watched]
   );
+
+  // Extract API error message — backend returns { message: "..." } on errors
+  const apiErrorMessage = login.isError
+    ? (login.error as any)?.response?.data?.message ||
+      "Login failed. Please try again."
+    : "";
 
   return (
     <div className="flex flex-col justify-center w-full max-w-[510px] p-10">
@@ -152,28 +160,28 @@ const LoginForm: React.FC<LoginFormProps> = ({ tenant, onTenantChange }) => {
           </div>
         </div>
 
-        {submitError && (
+        {apiErrorMessage && (
           <div className="flex items-start gap-3 px-4 py-3.5 rounded-xl bg-red-50 border border-red-200/35">
             <HiOutlineExclamationCircle
               size={15}
               className="text-red-500 shrink-0 mt-0.5"
             />
             <p className="text-xs font-semibold leading-relaxed text-red-600">
-              {submitError}
+              {apiErrorMessage}
             </p>
           </div>
         )}
 
         <button
           type="submit"
-          disabled={isDisabled || loading}
+          disabled={isDisabled || login.isPending}
           className={`w-full flex items-center justify-center gap-2.5 py-3.5 px-6 rounded-xl text-sm font-semibold mt-1 transition-all duration-200 ${
-            isDisabled || loading
+            isDisabled || login.isPending
               ? "bg-slate-200 text-slate-400 cursor-not-allowed"
               : "bg-blue-600 hover:bg-blue-700 text-white shadow-lg hover:shadow-xl"
           }`}
         >
-          {loading ? (
+          {login.isPending ? (
             <>
               <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
               Authenticating...

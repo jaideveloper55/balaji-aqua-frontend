@@ -11,28 +11,13 @@ import TenantSelector, { IconDroplet } from "./TenantSelector";
 import { TENANT_CONFIG } from "../constants/constants";
 import type { TenantId } from "../types/Auth";
 
-// ── API Schema alignment ───────────────────────────────────────────────────────
-// POST /api/v1/auth/register expects:
-// {
-//   email: string          ← required
-//   password: string       ← required, min 8, uppercase + number
-//   firstName: string      ← required  (was fullName — split into two fields)
-//   lastName: string       ← required
-//   phone?: string         ← optional
-//   company: {
-//     name: string         ← from TENANT_CONFIG[tenant].name
-//     type: CompanyType    ← "WATER_PLANT" | "BEVERAGE"
-//   }
-// }
-// confirmPassword is frontend-only — never sent to API
-
 interface RegisterFormValues {
-  firstName: string; // → API: firstName
-  lastName: string; // → API: lastName
-  email: string; // → API: email
-  phone: string; // → API: phone (optional)
-  password: string; // → API: password
-  confirmPassword: string; // frontend validation only — NOT sent to API
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone: string;
+  password: string;
+  confirmPassword: string;
 }
 
 interface RegisterFormProps {
@@ -393,6 +378,3 @@ const RegisterForm: React.FC<RegisterFormProps> = ({
 };
 
 export default RegisterForm;
-
-
-

@@ -11,7 +11,13 @@ import {
   IoGiftOutline,
   IoPeopleOutline,
 } from "react-icons/io5";
-import type { TenantFeature } from "../types/Auth";
+
+// Type for each feature shown in the panel
+export interface TenantFeature {
+  icon: keyof typeof ICON_MAP;
+  title: string;
+  desc: string;
+}
 
 const ICON_MAP: Record<string, React.ReactNode> = {
   truck: <HiOutlineTruck size={20} />,

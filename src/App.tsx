@@ -1,192 +1,66 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { ProtectedRoute } from "./components/ProtectedRoute";
+
+// Auth pages (public)
 import LoginPage from "./modules/auth/pages/Login";
-import CustomerPage from "./modules/customers/pages/Customerpage";
-import ProductsPage from "./modules/products/pages/ProductsPage";
-import JarTrackingPage from "./modules/jar-tracking/pages/JarTrackingPage";
-import InventoryPage from "./modules/inventory/page/Inventorypage";
-import Deliverypage from "./modules/delivery/page/Deliverypage";
-import AdminLayout from "./components/layouts/AdminLayout";
-import Dashboard from "./modules/dashboard/Dashboard";
 import RegisterPage from "./modules/auth/pages/Register";
 import ForgotPasswordPage from "./modules/auth/pages/ForgotPassword";
-import BillingPage from "./modules/billing/pages/Billingpage";
-import Companies from "./modules/companies/pages/Companies";
 
-// const isAuthenticated = () => !!localStorage.getItem("token");
+// Admin layout
+import AdminLayout from "./components/layouts/AdminLayout";
+
+// Admin pages (protected)
+import Dashboard from "./modules/dashboard/Dashboard";
+import CustomerPage from "./modules/customers/pages/Customerpage";
+import Companies from "./modules/companies/pages/Companies";
+import ProductsPage from "./modules/products/pages/ProductsPage";
+import Deliverypage from "./modules/delivery/page/Deliverypage";
+import JarTrackingPage from "./modules/jar-tracking/pages/JarTrackingPage";
+import BillingPage from "./modules/billing/pages/Billingpage";
+import InventoryPage from "./modules/inventory/page/Inventorypage";
+import ProfilePage from "./modules/profile/pages/ProfilePage";
 
 function App() {
-  // const [orgId, setOrgId] = useState(
-  //   () => localStorage.getItem("orgId") || "balaji-aqua"
-  // );
-
-  // const handleOrgSwitch = (newOrgId: string) => {
-  //   localStorage.setItem("orgId", newOrgId);
-  //   setOrgId(newOrgId);
-  // };
-
   return (
     <BrowserRouter>
       <Routes>
-        {/* Default redirect */}
+        {/* ─── PUBLIC ROUTES ──────────────────────────────────────────── */}
         <Route path="/" element={<Navigate to="/login" replace />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-        <Route
-          path="/admin/dashboard"
-          element={
-            // <ProtectedRoute>
-            <AdminLayout>
-              <div>
-                <Dashboard />
-              </div>
-            </AdminLayout>
-            // </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/admin/customers"
-          element={
-            // <ProtectedRoute>
-            <AdminLayout>
-              <CustomerPage />
-            </AdminLayout>
 
-            // </ProtectedRoute>
-          }
-        />
+        {/* ─── PROTECTED ADMIN ROUTES ─────────────────────────────────── */}
+        {/* ProtectedRoute checks auth → AdminLayout wraps with sidebar/header
+            → Outlet renders the page below */}
         <Route
-          path="/admin/company/"
+          path="/admin"
           element={
-            // <ProtectedRoute>
-            <AdminLayout>
-              <Companies />
-            </AdminLayout>
-            // </ProtectedRoute>
+            <ProtectedRoute>
+              <AdminLayout />
+            </ProtectedRoute>
           }
-        />
+        >
+          <Route index element={<Navigate to="dashboard" replace />} />
+          <Route path="dashboard" element={<Dashboard />} />
+          <Route path="profile" element={<ProfilePage />} />
+          <Route path="customers" element={<CustomerPage />} />
+          <Route path="company" element={<Companies />} />
+          <Route path="products" element={<ProductsPage />} />
+          <Route path="delivery" element={<Deliverypage />} />
+          <Route path="jar-tracking" element={<JarTrackingPage />} />
+          <Route path="billing-pos" element={<BillingPage />} />
+          <Route path="inventory" element={<InventoryPage />} />
+          <Route path="event-orders" element={<div>Event Orders Page</div>} />
+          <Route path="employees" element={<div>Employees Page</div>} />
+          <Route path="attendance" element={<div>Attendance Page</div>} />
+          <Route path="salary" element={<div>Salary Page</div>} />
+          <Route path="expenses" element={<div>Expenses Page</div>} />
+          <Route path="production" element={<div>Water Production Page</div>} />
+          <Route path="reports" element={<div>Reports & Analytics Page</div>} />
+        </Route>
 
-        <Route
-          path="/admin/products"
-          element={
-            // <ProtectedRoute>
-            <AdminLayout>
-              <ProductsPage />
-            </AdminLayout>
-            // </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/admin/delivery"
-          element={
-            // <ProtectedRoute>
-            <AdminLayout>
-              <Deliverypage />
-            </AdminLayout>
-            // </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/admin/jar-tracking"
-          element={
-            // <ProtectedRoute>
-            <AdminLayout>
-              <JarTrackingPage />
-            </AdminLayout>
-            // </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/admin/billing-pos"
-          element={
-            // <ProtectedRoute>
-            <AdminLayout>
-              <BillingPage />
-            </AdminLayout>
-            // </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/admin/event-orders"
-          element={
-            // <ProtectedRoute>
-            <AdminLayout>
-              <div>Event Orders Page</div>
-            </AdminLayout>
-            // </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/admin/inventory"
-          element={
-            // <ProtectedRoute>
-            <AdminLayout>
-              <InventoryPage />
-            </AdminLayout>
-            // </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/admin/employees"
-          element={
-            // <ProtectedRoute>
-            <AdminLayout>
-              <div>Employees Page</div>
-            </AdminLayout>
-            // </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/admin/attendance"
-          element={
-            // <ProtectedRoute>
-            <AdminLayout>
-              <div>Attendance Page</div>
-            </AdminLayout>
-            // </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/admin/salary"
-          element={
-            // <ProtectedRoute>
-            <AdminLayout>
-              <div>Salary Page</div>
-            </AdminLayout>
-            // </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/admin/expenses"
-          element={
-            // <ProtectedRoute>
-            <AdminLayout>
-              <div>Expenses Page</div>
-            </AdminLayout>
-            // </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/admin/production"
-          element={
-            // <ProtectedRoute>
-            <AdminLayout>
-              <div>Water Production Page</div>
-            </AdminLayout>
-            // </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/admin/reports"
-          element={
-            // <ProtectedRoute>
-            <AdminLayout>
-              <div>Reports & Analytics Page</div>
-            </AdminLayout>
-            // </ProtectedRoute>
-          }
-        />
-        {/* 404 fallback */}
+        {/* ─── 404 FALLBACK ───────────────────────────────────────────── */}
         <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
     </BrowserRouter>
