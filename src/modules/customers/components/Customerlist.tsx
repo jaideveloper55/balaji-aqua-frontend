@@ -1,59 +1,35 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useCallback } from "react";
 import { Button, Tooltip } from "antd";
 import { HiOutlineUserAdd, HiOutlineDownload } from "react-icons/hi";
 import CustomerTable from "./Customertable";
 import CustomerModal from "./Customermodal";
 import CustomerStatCard from "./CustomerStatCard";
-import { customerApi } from "../services/Customer.api";
 import { CUSTOMER_STAT_CONFIG } from "../constants/customerConstants";
-
-interface CustomerStats {
-  total: number;
-  active: number;
-  pending: number;
-  inactive: number;
-}
+import { useCustomers } from "../hooks/useCustomers";
 
 interface CustomerListProps {
   onNavigateToDetail?: (id: string) => void;
 }
 
-const INITIAL_STATS: CustomerStats = {
-  total: 0,
-  active: 0,
-  pending: 0,
-  inactive: 0,
-};
-
 const CustomerList: React.FC<CustomerListProps> = ({ onNavigateToDetail }) => {
-  const [stats, setStats] = useState<CustomerStats>(INITIAL_STATS);
   const [modalOpen, setModalOpen] = useState(false);
-  const [refreshKey, setRefreshKey] = useState(0);
 
-  const loadStats = useCallback(async () => {
-    try {
-      // TODO: replace with a dedicated stats endpoint when available
-      const res = await customerApi.getCustomers({ pageSize: 100 });
-      const customers = res.data;
-      setStats({
-        total: customers.length,
-        active: customers.filter((c) => c.status === "active").length,
-        pending: customers.filter((c) => c.status === "pending").length,
-        inactive: customers.filter((c) => c.status === "inactive").length,
-      });
-    } catch (err) {
-      console.error("Failed to load customer stats:", err);
-    }
-  }, []);
+  // ─── Server state via TanStack Query ────────────────────────────────────
+  // Stats come pre-computed from the same /customers endpoint (saves a request)
+  const { data, isLoading } = useCustomers({ limit: 10, page: 1 });
 
-  useEffect(() => {
-    loadStats();
-  }, [loadStats, refreshKey]);
+  const stats = data?.stats ?? {
+    total: 0,
+    active: 0,
+    pending: 0,
+    inactive: 0,
+  };
 
+  // ─── Handlers ───────────────────────────────────────────────────────────
   const handleCreateSuccess = useCallback(
     (id: string) => {
       setModalOpen(false);
-      setRefreshKey((k) => k + 1);
+      // No refreshKey needed — useCreateCustomer invalidates the query automatically
       onNavigateToDetail?.(id);
     },
     [onNavigateToDetail]
@@ -106,7 +82,7 @@ const CustomerList: React.FC<CustomerListProps> = ({ onNavigateToDetail }) => {
             key={s.key}
             icon={s.icon}
             label={s.label}
-            value={stats[s.key]}
+            value={isLoading ? 0 : stats[s.key as keyof typeof stats]}
             color={s.color}
             bg={s.bg}
             tooltip={s.tooltip}
@@ -116,11 +92,7 @@ const CustomerList: React.FC<CustomerListProps> = ({ onNavigateToDetail }) => {
 
       {/* Table */}
       <div className="bg-white rounded-2xl border border-slate-100 shadow-sm shadow-slate-100/50 p-5">
-        <CustomerTable
-          key={refreshKey}
-          onView={handleView}
-          onEdit={handleView}
-        />
+        <CustomerTable onView={handleView} onEdit={handleView} />
       </div>
 
       <CustomerModal

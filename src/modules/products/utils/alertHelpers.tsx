@@ -43,5 +43,4 @@ export const SEVERITY_ICON_STYLES: {
 } = {
   critical: { bg: "bg-red-100", color: "text-red-500", pulse: true },
   warning: { bg: "bg-amber-100", color: "text-amber-500" },
-  info: { bg: "bg-blue-100", color: "text-blue-500" },
 };

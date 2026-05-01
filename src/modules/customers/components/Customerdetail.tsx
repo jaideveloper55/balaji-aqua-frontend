@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { Button, Tag, Tooltip } from "antd";
 import {
   HiOutlineArrowLeft,
@@ -15,8 +15,7 @@ import {
 import CustomerTabs, { type CustomerTabKey } from "./Customertabs";
 import PricingTable from "./Pricingtable";
 import LedgerTable from "./Ledgertable";
-import { customerApi } from "../services/Customer.api";
-import type { Customer } from "../types/Customer";
+import { useCustomer } from "../hooks/useCustomer";
 import {
   STATUS_MAP,
   TYPE_MAP,
@@ -46,41 +45,29 @@ const CustomerDetail: React.FC<CustomerDetailProps> = ({
   onBack,
   onEdit,
 }) => {
-  const [customer, setCustomer] = useState<Customer | null>(null);
-  const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<CustomerTabKey>("overview");
 
-  useEffect(() => {
-    let isMounted = true;
-    const fetchCustomer = async () => {
-      try {
-        setLoading(true);
-        const data = await customerApi.getCustomerById(customerId);
-        if (isMounted) setCustomer(data ?? null);
-      } catch {
-        if (isMounted) setCustomer(null);
-      } finally {
-        if (isMounted) setLoading(false);
-      }
-    };
-    fetchCustomer();
-    return () => {
-      isMounted = false;
-    };
-  }, [customerId]);
+  // ─── Server state via TanStack Query ────────────────────────────────────
+  // Auto-refetches on company switch, caches between visits, handles all states
+  const { data: customer, isLoading, isError } = useCustomer(customerId);
 
-  if (loading) return <DetailSkeleton />;
-  if (!customer) return <NotFound onBack={onBack} />;
+  if (isLoading) return <DetailSkeleton />;
+  if (isError || !customer) return <NotFound onBack={onBack} />;
 
+  // Build address from flat fields (backend sends addressLine1/2, not nested)
   const address = [
-    customer.address.line1,
-    customer.address.line2,
-    customer.address.city,
-    customer.address.state,
-    customer.address.pincode,
+    customer.addressLine1,
+    customer.addressLine2,
+    customer.city,
+    customer.state,
+    customer.pincode,
   ]
     .filter(Boolean)
     .join(", ");
+
+  // Outstanding can come from summary OR top-level (use summary for detail view)
+  const outstanding =
+    customer.summary?.outstandingBalance ?? customer.outstandingBalance ?? 0;
 
   return (
     <div className="flex flex-col gap-6">
@@ -105,7 +92,7 @@ const CustomerDetail: React.FC<CustomerDetailProps> = ({
               </Tag>
             </div>
             <p className="text-[11px] text-slate-400 mt-0.5 font-mono">
-              {customer.id} · {TYPE_MAP[customer.type]}
+              {customer.customerCode} · {TYPE_MAP[customer.type]}
             </p>
           </div>
         </div>
@@ -121,44 +108,50 @@ const CustomerDetail: React.FC<CustomerDetailProps> = ({
         </Tooltip>
       </div>
 
-      {/* Metrics */}
+      {/* Metrics — pulled from backend `summary` object */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <Metric
           icon={<HiOutlineShoppingCart size={22} />}
           label="Total Orders"
-          value={String(customer.totalOrders)}
+          value={String(customer.summary?.totalOrders ?? 0)}
           color="#3b82f6"
           tooltip="Lifetime orders placed by this customer"
         />
         <Metric
           icon={<HiOutlineCurrencyRupee size={22} />}
           label="Outstanding"
-          value={fmtCurrency(customer.outstandingBalance)}
-          color={customer.outstandingBalance > 0 ? "#ef4444" : "#22c55e"}
+          value={fmtCurrency(outstanding)}
+          color={outstanding > 0 ? "#ef4444" : "#22c55e"}
           tooltip={
-            customer.outstandingBalance > 0
+            outstanding > 0
               ? "Amount pending collection"
               : "No outstanding balance"
           }
-          alert={customer.outstandingBalance > 0}
+          alert={outstanding > 0}
         />
         <Metric
           icon={<HiOutlineCalendar size={22} />}
           label="Member Since"
-          value={fmtShortDate(customer.joinedAt)}
+          value={fmtShortDate(
+            customer.summary?.memberSince ?? customer.createdAt
+          )}
           color="#8b5cf6"
-          tooltip={`Joined on ${fmtFullDate(customer.joinedAt)}`}
+          tooltip={`Joined on ${fmtFullDate(
+            customer.summary?.memberSince ?? customer.createdAt
+          )}`}
         />
         <Metric
           icon={<HiOutlineTruck size={22} />}
           label="Last Order"
           value={
-            customer.lastOrderAt ? fmtDetailDate(customer.lastOrderAt) : "None"
+            customer.summary?.lastOrderDate
+              ? fmtDetailDate(customer.summary.lastOrderDate)
+              : "None"
           }
           color="#f59e0b"
           tooltip={
-            customer.lastOrderAt
-              ? `Last ordered on ${fmtFullDate(customer.lastOrderAt)}`
+            customer.summary?.lastOrderDate
+              ? `Last ordered on ${fmtFullDate(customer.summary.lastOrderDate)}`
               : "No orders yet"
           }
         />
@@ -184,24 +177,30 @@ const CustomerDetail: React.FC<CustomerDetailProps> = ({
                 <InfoRow
                   icon={<HiOutlineLocationMarker size={15} />}
                   label="Address"
-                  value={address}
+                  value={address || "—"}
                 />
               </InfoSection>
               <InfoSection title="Account Details">
                 <InfoRow
                   icon={<HiOutlineTruck size={15} />}
                   label="Delivery Frequency"
-                  value={FREQ_MAP[customer.deliveryFrequency]}
+                  value={
+                    customer.deliveryFrequency
+                      ? FREQ_MAP[customer.deliveryFrequency]
+                      : "—"
+                  }
                 />
                 <InfoRow
                   icon={<HiOutlineCreditCard size={15} />}
                   label="Payment Mode"
-                  value={PAY_MAP[customer.paymentMode]}
+                  value={
+                    customer.paymentMode ? PAY_MAP[customer.paymentMode] : "—"
+                  }
                 />
                 <InfoRow
                   icon={<HiOutlineCalendar size={15} />}
                   label="Joined"
-                  value={fmtFullDate(customer.joinedAt)}
+                  value={fmtFullDate(customer.createdAt)}
                 />
                 {customer.notes && (
                   <InfoRow

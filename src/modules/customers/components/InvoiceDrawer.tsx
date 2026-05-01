@@ -34,8 +34,9 @@ const InvoiceDrawer: React.FC<InvoiceDrawerProps> = ({
   const [downloading, setDownloading] = useState(false);
   const [activeTab, setActiveTab] = useState<"details" | "items">("items");
 
+  // Mock line items keyed by entry id (replace with API later)
   const details = LINE_ITEMS[entry.id];
-  const entryStyle = ENTRY_MAP[entry.type];
+  const entryStyle = ENTRY_MAP[entry.entryType];
   const lineItems = details?.items ?? [];
   const subtotal = lineItems.reduce((s, i) => s + i.amount, 0);
   const totalCGST = lineItems.reduce(
@@ -43,6 +44,9 @@ const InvoiceDrawer: React.FC<InvoiceDrawerProps> = ({
     0
   );
   const totalSGST = totalCGST;
+
+  // Backend doesn't return baseAmount separately — derive it
+  const baseAmount = entry.debitAmount - (entry.cgst + entry.sgst + entry.igst);
   const grandTotal = showGST ? subtotal + totalCGST + totalSGST : subtotal;
 
   const handleDownloadPDF = useCallback(() => {
@@ -142,10 +146,10 @@ const InvoiceDrawer: React.FC<InvoiceDrawerProps> = ({
             </div>
             <div>
               <h2 className="text-sm font-bold text-slate-800">
-                {entry.referenceNo}
+                {entry.referenceNo ?? "—"}
               </h2>
               <p className="text-[11px] text-slate-400">
-                {fmtDate(entry.date)} &middot; {entryStyle.label}
+                {fmtDate(entry.entryDate)} &middot; {entryStyle.label}
                 <span
                   className={`ml-2 px-1.5 py-0.5 rounded text-[9px] font-bold ${
                     showGST
@@ -176,14 +180,17 @@ const InvoiceDrawer: React.FC<InvoiceDrawerProps> = ({
               </p>
               <p
                 className={`text-2xl font-bold tabular-nums font-mono ${
-                  entry.debit > 0 ? "text-slate-800" : "text-emerald-600"
+                  entry.debitAmount > 0 ? "text-slate-800" : "text-emerald-600"
                 }`}
               >
-                ₹{fmt(showGST ? entry.debit || entry.credit : entry.baseAmount)}
+                ₹
+                {fmt(
+                  showGST ? entry.debitAmount || entry.creditAmount : baseAmount
+                )}
               </p>
               {showGST && (entry.cgst > 0 || entry.sgst > 0) && (
                 <p className="text-[10px] text-slate-400 mt-1 font-mono">
-                  Base: ₹{fmt(entry.baseAmount)} + Tax: ₹
+                  Base: ₹{fmt(baseAmount)} + Tax: ₹
                   {fmt(entry.cgst + entry.sgst)}
                 </p>
               )}
@@ -254,7 +261,7 @@ const InvoiceDrawer: React.FC<InvoiceDrawerProps> = ({
                 <InfoCard
                   icon={HiOutlineTruck}
                   label="Reference"
-                  value={entry.referenceNo}
+                  value={entry.referenceNo ?? "—"}
                   mono
                 />
               </div>
@@ -263,7 +270,7 @@ const InvoiceDrawer: React.FC<InvoiceDrawerProps> = ({
                   Description
                 </p>
                 <p className="text-sm text-slate-700 font-medium">
-                  {entry.description}
+                  {entry.description ?? "—"}
                 </p>
               </div>
             </>

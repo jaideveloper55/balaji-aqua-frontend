@@ -3,36 +3,38 @@ import {
   HiOutlineExclamation,
   HiOutlineInformationCircle,
 } from "react-icons/hi";
-import {
+import type {
   EntryStyle,
   EntryType,
   PaymentStatus,
   StatusStyle,
 } from "../types/Customer";
 
+// ─── Ledger Entry Type Styling ────────────────────────────────────────────
+
 export const ENTRY_MAP: Record<EntryType, EntryStyle> = {
-  invoice: {
+  INVOICE: {
     label: "Invoice",
     bg: "bg-blue-50",
     text: "text-blue-700",
     border: "border-blue-200",
     dot: "bg-blue-500",
   },
-  payment: {
+  PAYMENT: {
     label: "Payment",
     bg: "bg-emerald-50",
     text: "text-emerald-700",
     border: "border-emerald-200",
     dot: "bg-emerald-500",
   },
-  credit_note: {
+  CREDIT_NOTE: {
     label: "Credit Note",
     bg: "bg-cyan-50",
     text: "text-cyan-700",
     border: "border-cyan-200",
     dot: "bg-cyan-500",
   },
-  debit_note: {
+  DEBIT_NOTE: {
     label: "Debit Note",
     bg: "bg-amber-50",
     text: "text-amber-700",
@@ -41,26 +43,28 @@ export const ENTRY_MAP: Record<EntryType, EntryStyle> = {
   },
 };
 
+// ─── Payment Status Styling ───────────────────────────────────────────────
+
 export const STATUS_MAP: Record<PaymentStatus, StatusStyle> = {
-  paid: {
+  PAID: {
     label: "Paid",
     bg: "bg-emerald-50",
     text: "text-emerald-700",
     icon: HiOutlineCheckCircle,
   },
-  partially_paid: {
+  PARTIALLY_PAID: {
     label: "Partial",
     bg: "bg-amber-50",
     text: "text-amber-700",
     icon: HiOutlineExclamation,
   },
-  unpaid: {
+  UNPAID: {
     label: "Unpaid",
     bg: "bg-red-50",
     text: "text-red-600",
     icon: HiOutlineInformationCircle,
   },
-  adjusted: {
+  ADJUSTED: {
     label: "Adjusted",
     bg: "bg-slate-100",
     text: "text-slate-600",
@@ -68,12 +72,17 @@ export const STATUS_MAP: Record<PaymentStatus, StatusStyle> = {
   },
 };
 
-export const TYPE_FILTER_OPTIONS = [
+// ─── Filter Options (UPPERCASE values, but "all" stays lowercase since not an enum) ──
+
+export const TYPE_FILTER_OPTIONS: {
+  value: EntryType | "all";
+  label: string;
+}[] = [
   { value: "all", label: "All Types" },
-  { value: "invoice", label: "Invoice" },
-  { value: "payment", label: "Payment" },
-  { value: "credit_note", label: "Credit Note" },
-  { value: "debit_note", label: "Debit Note" },
+  { value: "INVOICE", label: "Invoice" },
+  { value: "PAYMENT", label: "Payment" },
+  { value: "CREDIT_NOTE", label: "Credit Note" },
+  { value: "DEBIT_NOTE", label: "Debit Note" },
 ];
 
 export const EXPORT_TYPE_OPTIONS = [...TYPE_FILTER_OPTIONS];

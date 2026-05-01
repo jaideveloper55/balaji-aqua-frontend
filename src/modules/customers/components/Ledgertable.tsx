@@ -28,16 +28,15 @@ import {
   PAGE_SIZE,
   ENTRY_MAP,
 } from "../constants/ledgerConstants";
-import { DUMMY_DATA } from "./ledger/data";
 import { fmt, fmtDate } from "../../../utils/helpers";
+import { useLedger } from "../hooks/useLedger";
 
 import InvoiceDrawer from "./InvoiceDrawer";
 import ExportModal from "./ExportModal";
 import SummaryCard from "./ledger/SummaryCard";
 import GSTToggle from "./ledger/GSTToggle";
 
-const LedgerTable: React.FC<LedgerTableProps> = () => {
-  const [data] = useState<LedgerEntry[]>(DUMMY_DATA);
+const LedgerTable: React.FC<LedgerTableProps> = ({ customerId }) => {
   const [search, setSearch] = useState("");
   const [selectedEntry, setSelectedEntry] = useState<LedgerEntry | null>(null);
   const [showExportModal, setShowExportModal] = useState(false);
@@ -54,43 +53,67 @@ const LedgerTable: React.FC<LedgerTableProps> = () => {
   const typeFilter = watch("typeFilter");
   const dateRange = watch("dateRange");
 
-  // ── Filtered data ──────────────────────────────────────────
-  const filtered = useMemo(() => {
-    let d = data;
-    if (typeFilter && typeFilter !== "all")
-      d = d.filter((e) => e.type === typeFilter);
+  // ── Server-side filters (sent to API) ──────────────────────
+  const apiFilters = useMemo(() => {
+    const f: {
+      entryType?: EntryType;
+      startDate?: string;
+      endDate?: string;
+    } = {};
+
+    if (typeFilter && typeFilter !== "all") {
+      f.entryType = typeFilter as EntryType;
+    }
     if (dateRange?.[0]) {
-      const f = dateRange[0].format("YYYY-MM-DD");
-      d = d.filter((e) => e.date >= f);
+      f.startDate = dateRange[0].format("YYYY-MM-DD");
     }
     if (dateRange?.[1]) {
-      const t = dateRange[1].format("YYYY-MM-DD");
-      d = d.filter((e) => e.date <= t);
+      f.endDate = dateRange[1].format("YYYY-MM-DD");
     }
-    if (search.trim()) {
-      const q = search.toLowerCase();
-      d = d.filter(
-        (e) =>
-          e.description.toLowerCase().includes(q) ||
-          (e.referenceNo || "").toLowerCase().includes(q)
-      );
-    }
-    return d;
-  }, [data, search, typeFilter, dateRange]);
+    return f;
+  }, [typeFilter, dateRange]);
 
-  // ── Computed totals ────────────────────────────────────────
-  const totalDebit = filtered.reduce((s, e) => s + e.debit, 0);
-  const totalCredit = filtered.reduce((s, e) => s + e.credit, 0);
+  // ── Fetch from API via TanStack Query ──────────────────────
+  const { data, isLoading, isFetching } = useLedger(customerId, {
+    ...apiFilters,
+    limit: 100, // get many — client-side search filters further
+  });
+
+  const entries = data?.data ?? [];
+
+  // ── Client-side search filter (description + reference) ────
+  const filtered = useMemo(() => {
+    if (!search.trim()) return entries;
+    const q = search.toLowerCase();
+    return entries.filter(
+      (e) =>
+        (e.description || "").toLowerCase().includes(q) ||
+        (e.referenceNo || "").toLowerCase().includes(q)
+    );
+  }, [entries, search]);
+
+  // ── Use backend's pre-computed summary OR derive client-side ──
+  // Backend gives accurate totals across ALL filtered entries.
+  // For the "incl./excl. GST" toggle and search, derive from `filtered`.
+  const totalDebit = filtered.reduce((s, e) => s + e.debitAmount, 0);
+  const totalCredit = filtered.reduce((s, e) => s + e.creditAmount, 0);
+  const totalCGST = filtered.reduce((s, e) => s + e.cgst, 0);
+  const totalSGST = filtered.reduce((s, e) => s + e.sgst, 0);
+  // const totalIGST = filtered.reduce((s, e) => s + e.igst, 0);
+
+  // baseAmount derived: debit/credit minus the GST embedded in it
   const totalBaseDebit = filtered.reduce(
-    (s, e) => s + (e.debit > 0 ? e.baseAmount : 0),
+    (s, e) =>
+      s + (e.debitAmount > 0 ? e.debitAmount - (e.cgst + e.sgst + e.igst) : 0),
     0
   );
   const totalBaseCredit = filtered.reduce(
-    (s, e) => s + (e.credit > 0 ? e.baseAmount : 0),
+    (s, e) =>
+      s +
+      (e.creditAmount > 0 ? e.creditAmount - (e.cgst + e.sgst + e.igst) : 0),
     0
   );
-  const totalCGST = filtered.reduce((s, e) => s + e.cgst, 0);
-  const totalSGST = filtered.reduce((s, e) => s + e.sgst, 0);
+
   const outstanding = totalDebit - totalCredit;
   const baseOutstanding = totalBaseDebit - totalBaseCredit;
 
@@ -99,11 +122,11 @@ const LedgerTable: React.FC<LedgerTableProps> = () => {
     const cols: ColumnsType<LedgerEntry> = [
       {
         title: "Date",
-        dataIndex: "date",
-        key: "date",
+        dataIndex: "entryDate",
+        key: "entryDate",
         width: 100,
         sorter: (a, b) =>
-          new Date(a.date).getTime() - new Date(b.date).getTime(),
+          new Date(a.entryDate).getTime() - new Date(b.entryDate).getTime(),
         render: (d: string) => (
           <span className="text-xs font-medium text-slate-600 font-mono tabular-nums whitespace-nowrap">
             {fmtDate(d)}
@@ -112,12 +135,14 @@ const LedgerTable: React.FC<LedgerTableProps> = () => {
       },
       {
         title: "Type",
-        dataIndex: "type",
-        key: "type",
+        dataIndex: "entryType",
+        key: "entryType",
         width: 150,
         align: "center",
         render: (type: EntryType) => {
           const es = ENTRY_MAP[type];
+          if (!es)
+            return <span className="text-xs text-slate-400">{type}</span>;
           return (
             <span
               className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-semibold whitespace-nowrap ${es.bg} ${es.text}`}
@@ -133,54 +158,56 @@ const LedgerTable: React.FC<LedgerTableProps> = () => {
         dataIndex: "description",
         key: "description",
         align: "start",
-        render: (text: string, record: LedgerEntry) => {
-          return (
-            <div className="flex items-center gap-2 ">
-              <div className="min-w-0 flex-1">
-                <p className="text-xs text-slate-700 font-medium truncate">
-                  {text}
+        render: (text: string | null, record: LedgerEntry) => (
+          <div className="flex items-center gap-2 ">
+            <div className="min-w-0 flex-1">
+              <p className="text-xs text-slate-700 font-medium truncate">
+                {text || "—"}
+              </p>
+              {record.referenceNo && (
+                <p className="text-[10px] font-mono text-slate-400 mt-0.5 truncate">
+                  {record.referenceNo}
                 </p>
-                {record.referenceNo && (
-                  <p className="text-[10px] font-mono text-slate-400 mt-0.5 truncate">
-                    {record.referenceNo}
-                  </p>
-                )}
-              </div>
+              )}
             </div>
+          </div>
+        ),
+      },
+      {
+        title: showGST ? "Debit" : "Debit (Base)",
+        dataIndex: "debitAmount",
+        key: "debitAmount",
+        width: 110,
+        align: "right",
+        sorter: (a, b) => a.debitAmount - b.debitAmount,
+        render: (_: number, r: LedgerEntry) => {
+          const baseAmount = r.debitAmount - (r.cgst + r.sgst + r.igst);
+          return r.debitAmount > 0 ? (
+            <span className="text-xs font-semibold text-red-500 font-mono tabular-nums whitespace-nowrap">
+              ₹{fmt(showGST ? r.debitAmount : baseAmount)}
+            </span>
+          ) : (
+            <span className="text-xs text-slate-300">—</span>
           );
         },
       },
       {
-        title: showGST ? "Debit" : "Debit (Base)",
-        dataIndex: "debit",
-        key: "debit",
-        width: 110,
-        align: "right",
-        sorter: (a, b) => a.debit - b.debit,
-        render: (_: number, r: LedgerEntry) =>
-          r.debit > 0 ? (
-            <span className="text-xs font-semibold text-red-500 font-mono tabular-nums whitespace-nowrap">
-              ₹{fmt(showGST ? r.debit : r.baseAmount)}
-            </span>
-          ) : (
-            <span className="text-xs text-slate-300">—</span>
-          ),
-      },
-      {
         title: showGST ? "Credit" : "Credit (Base)",
-        dataIndex: "credit",
-        key: "credit",
+        dataIndex: "creditAmount",
+        key: "creditAmount",
         width: 110,
         align: "right",
-        sorter: (a, b) => a.credit - b.credit,
-        render: (_: number, r: LedgerEntry) =>
-          r.credit > 0 ? (
+        sorter: (a, b) => a.creditAmount - b.creditAmount,
+        render: (_: number, r: LedgerEntry) => {
+          const baseAmount = r.creditAmount - (r.cgst + r.sgst + r.igst);
+          return r.creditAmount > 0 ? (
             <span className="text-xs font-semibold text-emerald-600 font-mono tabular-nums whitespace-nowrap">
-              ₹{fmt(showGST ? r.credit : r.baseAmount)}
+              ₹{fmt(showGST ? r.creditAmount : baseAmount)}
             </span>
           ) : (
             <span className="text-xs text-slate-300">—</span>
-          ),
+          );
+        },
       },
     ];
 
@@ -351,6 +378,7 @@ const LedgerTable: React.FC<LedgerTableProps> = () => {
           rowKey="id"
           size="middle"
           tableLayout="fixed"
+          loading={isLoading || isFetching}
           pagination={{
             pageSize: PAGE_SIZE,
             showSizeChanger: false,

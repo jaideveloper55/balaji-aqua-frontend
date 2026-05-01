@@ -37,7 +37,7 @@ const ExportModal: React.FC<ExportModalProps> = ({
   } = useForm<ExportFormValues>({
     defaultValues: {
       exportDateRange: null,
-      exportType: "all",
+      exportType: "ALL", // ← UPPERCASE default
       exportFormat: "pdf",
     },
   });
@@ -48,18 +48,22 @@ const ExportModal: React.FC<ExportModalProps> = ({
   const [exporting, setExporting] = useState(false);
   const [success, setSuccess] = useState(false);
 
+  // ─── Filter entries by date range and type ──────────────────────────────
   const filteredEntries = useMemo(() => {
     let d = data;
     if (dateRange?.[0]) {
       const f = dateRange[0].format("YYYY-MM-DD");
-      d = d.filter((e) => e.date >= f);
+      // Backend field is `entryDate` (was `date`)
+      d = d.filter((e) => e.entryDate >= f);
     }
     if (dateRange?.[1]) {
       const t = dateRange[1].format("YYYY-MM-DD");
-      d = d.filter((e) => e.date <= t);
+      d = d.filter((e) => e.entryDate <= t);
     }
-    if (exportType && exportType !== "all")
-      d = d.filter((e) => e.type === exportType);
+    // Backend field is `entryType` (was `type`)
+    if (exportType && exportType !== "ALL") {
+      d = d.filter((e) => e.entryType === exportType);
+    }
     return d;
   }, [data, dateRange, exportType]);
 
@@ -69,15 +73,17 @@ const ExportModal: React.FC<ExportModalProps> = ({
     try {
       const from = dateRange?.[0]?.format("YYYY-MM-DD") ?? "";
       const to = dateRange?.[1]?.format("YYYY-MM-DD") ?? "";
-      if (exportFormat === "pdf")
+      if (exportFormat === "pdf") {
         generateLedgerPDF(
           filteredEntries,
           from,
           to,
-          exportType ?? "all",
+          exportType ?? "ALL",
           showGST
         );
-      else generateLedgerCSV(filteredEntries, showGST);
+      } else {
+        generateLedgerCSV(filteredEntries, showGST);
+      }
       setSuccess(true);
       setTimeout(() => {
         setSuccess(false);

@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useCallback } from "react";
-import { Table, Dropdown, Tooltip } from "antd";
+import React, { useState } from "react";
+import { Table, Dropdown, Tooltip, Popconfirm } from "antd";
 import type { ColumnsType, TablePaginationConfig } from "antd/es/table";
 import {
   HiOutlineDotsVertical,
@@ -9,9 +9,10 @@ import {
   HiOutlinePhone,
   HiOutlineMail,
 } from "react-icons/hi";
-import { customerApi } from "../services/Customer.api";
+import { useCustomers } from "../hooks/useCustomers";
+import { useDeleteCustomer } from "../hooks/useDeleteCustomer";
 import type { Customer, CustomerStatus, CustomerType } from "../types/Customer";
-import { STATUS_MAP, TYPE_MAP } from "../constants/customerConstants";
+import { STATUS_MAP, TYPE_MAP } from "../components/customerDetailConstants";
 import CustomerTableFilters from "./CustomerTableFilters";
 
 interface CustomerTableProps {
@@ -20,14 +21,33 @@ interface CustomerTableProps {
   onDelete?: (customer: Customer) => void;
 }
 
+// Status badge colors — derived from STATUS_MAP color names
+const STATUS_BADGE_STYLES: Record<
+  CustomerStatus,
+  { bg: string; text: string; dot: string }
+> = {
+  ACTIVE: {
+    bg: "bg-emerald-50",
+    text: "text-emerald-700",
+    dot: "bg-emerald-500",
+  },
+  INACTIVE: {
+    bg: "bg-slate-100",
+    text: "text-slate-500",
+    dot: "bg-slate-400",
+  },
+  PENDING: {
+    bg: "bg-amber-50",
+    text: "text-amber-700",
+    dot: "bg-amber-500",
+  },
+};
 const CustomerTable: React.FC<CustomerTableProps> = ({
   onView,
   onEdit,
   onDelete,
 }) => {
-  const [data, setData] = useState<Customer[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [total, setTotal] = useState(0);
+  // ─── Local UI state (filters, pagination) ───────────────────────────────
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [search, setSearch] = useState("");
@@ -36,32 +56,36 @@ const CustomerTable: React.FC<CustomerTableProps> = ({
   >();
   const [typeFilter, setTypeFilter] = useState<CustomerType | undefined>();
 
-  const fetchData = useCallback(async () => {
-    setLoading(true);
-    try {
-      const res = await customerApi.getCustomers({
-        page,
-        pageSize,
-        search: search || undefined,
-        status: statusFilter,
-        type: typeFilter,
-      });
-      setData(res.data);
-      setTotal(res.total);
-    } finally {
-      setLoading(false);
-    }
-  }, [page, pageSize, search, statusFilter, typeFilter]);
+  // ─── Server state via TanStack Query ────────────────────────────────────
+  const { data, isLoading, isFetching } = useCustomers({
+    page,
+    limit: pageSize,
+    search: search || undefined,
+    status: statusFilter,
+    type: typeFilter,
+  });
 
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+  const deleteCustomer = useDeleteCustomer();
 
+  const customers = data?.data ?? [];
+  const total = data?.pagination.total ?? 0;
+
+  // ─── Handlers ───────────────────────────────────────────────────────────
   const handleTableChange = (pagination: TablePaginationConfig) => {
     setPage(pagination.current ?? 1);
     setPageSize(pagination.pageSize ?? 10);
   };
 
+  const handleDelete = (customer: Customer) => {
+    deleteCustomer.mutate(customer.id, {
+      onSuccess: () => {
+        // Optional: parent callback if it cares about deletion
+        onDelete?.(customer);
+      },
+    });
+  };
+
+  // ─── Columns ────────────────────────────────────────────────────────────
   const columns: ColumnsType<Customer> = [
     {
       title: "Customer",
@@ -102,12 +126,12 @@ const CustomerTable: React.FC<CustomerTableProps> = ({
     },
     {
       title: "ID",
-      dataIndex: "id",
-      key: "id",
+      dataIndex: "customerCode",
+      key: "customerCode",
       width: 100,
-      render: (id: string) => (
+      render: (code: string) => (
         <span className="text-[11px] font-mono text-slate-400 bg-slate-50 px-1.5 py-0.5 rounded">
-          {id}
+          {code}
         </span>
       ),
     },
@@ -129,13 +153,14 @@ const CustomerTable: React.FC<CustomerTableProps> = ({
       width: 110,
       render: (s: CustomerStatus) => {
         const cfg = STATUS_MAP[s];
+        const styles = STATUS_BADGE_STYLES[s];
         return (
           <span
-            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold ${cfg.bg} ${cfg.text}`}
+            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold ${styles.bg} ${styles.text}`}
           >
             <span
-              className={`w-1.5 h-1.5 rounded-full ${cfg.dot} ${
-                s === "pending" ? "animate-pulse" : ""
+              className={`w-1.5 h-1.5 rounded-full ${styles.dot} ${
+                s === "PENDING" ? "animate-pulse" : ""
               }`}
             />
             {cfg.label}
@@ -163,22 +188,9 @@ const CustomerTable: React.FC<CustomerTableProps> = ({
       ),
     },
     {
-      title: "Orders",
-      dataIndex: "totalOrders",
-      key: "orders",
-      width: 90,
-      align: "center",
-      sorter: (a, b) => a.totalOrders - b.totalOrders,
-      render: (v: number) => (
-        <span className="text-[13px] font-semibold text-slate-700 tabular-nums">
-          {v}
-        </span>
-      ),
-    },
-    {
       title: "Joined",
-      dataIndex: "joinedAt",
-      key: "joined",
+      dataIndex: "createdAt",
+      key: "createdAt",
       width: 110,
       render: (d: string) => (
         <span className="text-[11px] text-slate-500 tabular-nums">
@@ -214,10 +226,20 @@ const CustomerTable: React.FC<CustomerTableProps> = ({
               { type: "divider" },
               {
                 key: "delete",
-                label: "Delete",
-                icon: <HiOutlineTrash size={14} />,
+                label: (
+                  <Popconfirm
+                    title="Delete customer?"
+                    description={`This will permanently delete ${r.name}.`}
+                    okText="Yes, delete"
+                    cancelText="Cancel"
+                    okButtonProps={{ danger: true }}
+                    onConfirm={() => handleDelete(r)}
+                  >
+                    <span className="text-red-500">Delete</span>
+                  </Popconfirm>
+                ),
+                icon: <HiOutlineTrash size={14} className="text-red-500" />,
                 danger: true,
-                onClick: () => onDelete?.(r),
               },
             ],
           }}
@@ -255,9 +277,9 @@ const CustomerTable: React.FC<CustomerTableProps> = ({
 
       <Table
         columns={columns}
-        dataSource={data}
+        dataSource={customers}
         rowKey="id"
-        loading={loading}
+        loading={isLoading || isFetching}
         onChange={handleTableChange}
         size="middle"
         scroll={{ x: 1000 }}

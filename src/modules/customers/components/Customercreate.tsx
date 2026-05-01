@@ -1,8 +1,8 @@
-import React, { useState } from "react";
-import { Button, message } from "antd";
+import React from "react";
+import { Button } from "antd";
 import { HiOutlineArrowLeft } from "react-icons/hi";
 import CustomerForm from "./Customerform";
-import { customerApi } from "../services/Customer.api";
+import { useCreateCustomer } from "../hooks/useCreateCustomer";
 import type { CustomerFormValues } from "../types/Customer";
 
 interface CustomerCreateProps {
@@ -14,19 +14,19 @@ const CustomerCreate: React.FC<CustomerCreateProps> = ({
   onBack,
   onSuccess,
 }) => {
-  const [loading, setLoading] = useState(false);
+  // ─── Mutation hook ──────────────────────────────────────────────────────
+  // Handles: API call, loading state, notifications, query invalidation
+  const createCustomer = useCreateCustomer();
 
-  const handleSubmit = async (data: CustomerFormValues) => {
-    setLoading(true);
-    try {
-      const created = await customerApi.createCustomer(data);
-      message.success(`Customer "${created.name}" created successfully`);
-      onSuccess?.(created.id);
-    } catch {
-      message.error("Failed to create customer");
-    } finally {
-      setLoading(false);
-    }
+  const handleSubmit = (data: CustomerFormValues) => {
+    createCustomer.mutate(data, {
+      onSuccess: (created) => {
+        // Hook already shows success toast and invalidates the list
+        // We just navigate to the new customer's detail page
+        onSuccess?.(created.id);
+      },
+      // onError already handled inside the hook (shows error toast)
+    });
   };
 
   return (
@@ -36,6 +36,7 @@ const CustomerCreate: React.FC<CustomerCreateProps> = ({
           icon={<HiOutlineArrowLeft size={16} />}
           onClick={onBack}
           className="!rounded-xl"
+          disabled={createCustomer.isPending}
         />
         <div>
           <h1 className="text-2xl font-black text-slate-900 tracking-tight">
@@ -50,7 +51,7 @@ const CustomerCreate: React.FC<CustomerCreateProps> = ({
         <CustomerForm
           onSubmit={handleSubmit}
           onCancel={onBack}
-          loading={loading}
+          loading={createCustomer.isPending}
         />
       </div>
     </div>

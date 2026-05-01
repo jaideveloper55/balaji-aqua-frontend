@@ -11,6 +11,8 @@ import type {
   PaymentMode,
 } from "../types/Customer";
 
+// ─── Status Badge Styling ──────────────────────────────────────────────────
+
 export type StatusConfig = {
   label: string;
   dot: string;
@@ -19,19 +21,19 @@ export type StatusConfig = {
 };
 
 export const STATUS_MAP: { [K in CustomerStatus]: StatusConfig } = {
-  active: {
+  ACTIVE: {
     label: "Active",
     dot: "bg-emerald-500",
     bg: "bg-emerald-50",
     text: "text-emerald-700",
   },
-  inactive: {
+  INACTIVE: {
     label: "Inactive",
     dot: "bg-slate-400",
     bg: "bg-slate-50",
     text: "text-slate-500",
   },
-  pending: {
+  PENDING: {
     label: "Pending",
     dot: "bg-amber-400",
     bg: "bg-amber-50",
@@ -39,23 +41,29 @@ export const STATUS_MAP: { [K in CustomerStatus]: StatusConfig } = {
   },
 };
 
+// ─── Type Display ──────────────────────────────────────────────────────────
+
 export const TYPE_MAP: { [K in CustomerType]: string } = {
-  residential: "Residential",
-  commercial: "Commercial",
-  industrial: "Industrial",
+  RESIDENTIAL: "Residential",
+  COMMERCIAL: "Commercial",
+  INDUSTRIAL: "Industrial",
 };
 
-export const STATUS_OPTIONS = [
-  { value: "active", label: "Active" },
-  { value: "inactive", label: "Inactive" },
-  { value: "pending", label: "Pending" },
+// ─── Filter Dropdown Options (typed) ───────────────────────────────────────
+
+export const STATUS_OPTIONS: { value: CustomerStatus; label: string }[] = [
+  { value: "ACTIVE", label: "Active" },
+  { value: "INACTIVE", label: "Inactive" },
+  { value: "PENDING", label: "Pending" },
 ];
 
-export const TYPE_OPTIONS = [
-  { value: "residential", label: "Residential" },
-  { value: "commercial", label: "Commercial" },
-  { value: "industrial", label: "Industrial" },
+export const TYPE_OPTIONS: { value: CustomerType; label: string }[] = [
+  { value: "RESIDENTIAL", label: "Residential" },
+  { value: "COMMERCIAL", label: "Commercial" },
+  { value: "INDUSTRIAL", label: "Industrial" },
 ];
+
+// ─── Stat Cards Config ─────────────────────────────────────────────────────
 
 export const CUSTOMER_STAT_CONFIG = [
   {
@@ -92,28 +100,34 @@ export const CUSTOMER_STAT_CONFIG = [
   },
 ] as const;
 
+// ─── Form Field Options ────────────────────────────────────────────────────
+
 export const CUSTOMER_TYPE_OPTIONS: { value: CustomerType; label: string }[] = [
-  { value: "residential", label: "Residential" },
-  { value: "commercial", label: "Commercial" },
-  { value: "industrial", label: "Industrial" },
+  { value: "RESIDENTIAL", label: "Residential" },
+  { value: "COMMERCIAL", label: "Commercial" },
+  { value: "INDUSTRIAL", label: "Industrial" },
 ];
 
 export const DELIVERY_FREQUENCY_OPTIONS: {
   value: DeliveryFrequency;
   label: string;
 }[] = [
-  { value: "daily", label: "Daily" },
-  { value: "alternate", label: "Alternate Days" },
-  { value: "weekly", label: "Weekly" },
-  { value: "on_demand", label: "On Demand" },
+  { value: "DAILY", label: "Daily" },
+  { value: "ALTERNATE", label: "Alternate Days" },
+  { value: "WEEKLY", label: "Weekly" },
+  { value: "MONTHLY", label: "Monthly" },
+  { value: "ON_DEMAND", label: "On Demand" },
 ];
 
 export const PAYMENT_MODE_OPTIONS: { value: PaymentMode; label: string }[] = [
-  { value: "cash", label: "Cash" },
-  { value: "upi", label: "UPI" },
-  { value: "bank_transfer", label: "Bank Transfer" },
-  { value: "credit", label: "Credit" },
+  { value: "CASH", label: "Cash" },
+  { value: "UPI", label: "UPI" },
+  { value: "CARD", label: "Card" },
+  { value: "BANK_TRANSFER", label: "Bank Transfer" },
+  { value: "CREDIT", label: "Credit" },
 ];
+
+// ─── State Options (already string values, no enum) ────────────────────────
 
 export const STATE_OPTIONS = [
   { value: "Tamil Nadu", label: "Tamil Nadu" },
@@ -129,13 +143,15 @@ export const STATE_OPTIONS = [
   { value: "Delhi", label: "Delhi" },
 ];
 
+// ─── Form Defaults ─────────────────────────────────────────────────────────
+
 export const CUSTOMER_FORM_DEFAULTS = {
   name: "",
   phone: "",
   email: "",
-  type: "residential" as CustomerType,
-  deliveryFrequency: "daily" as DeliveryFrequency,
-  paymentMode: "cash" as PaymentMode,
+  type: "RESIDENTIAL" as CustomerType,
+  deliveryFrequency: "DAILY" as DeliveryFrequency,
+  paymentMode: "CASH" as PaymentMode,
   addressLine1: "",
   addressLine2: "",
   city: "",

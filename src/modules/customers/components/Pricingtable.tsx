@@ -1,32 +1,31 @@
-import React, { useState, useEffect, useCallback } from "react";
-import {
-  Table,
-  Button,
-  Modal,
-  message,
-  Popconfirm,
-  Tooltip,
-  Divider,
-} from "antd";
+import React, { useState } from "react";
+import { Table, Button, Popconfirm, Tooltip, Divider } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import {
   HiOutlineTag,
   HiOutlinePlus,
   HiOutlinePencil,
   HiOutlineTrash,
-  HiOutlineX,
 } from "react-icons/hi";
 import dayjs, { Dayjs } from "dayjs";
 import { useForm } from "react-hook-form";
-import { customerApi } from "../services/Customer.api";
+import {
+  useCustomerPricing,
+  useCreatePricing,
+  useUpdatePricing,
+  useDeletePricing,
+} from "../hooks/useCustomerPricing";
+
+import { errorNotification } from "../../../components/common/Notification";
 import type {
   CustomerPricing,
   CustomerPricingFormValues,
-  Product,
 } from "../types/Customer";
 import CustomInput from "../../../components/common/CustomInput";
 import CustomSelect from "../../../components/common/CustomSelect";
 import CustomDateRange from "../../../components/common/CustomDateRange";
+import CustomModal from "../../../components/common/CustomModal";
+import { useProducts } from "../hooks/useProducts";
 
 interface PricingTableProps {
   customerId: string;
@@ -44,20 +43,37 @@ const DEFAULT_FORM_VALUES: PricingFormValues = {
   effectiveRange: [dayjs(), null],
 };
 
+const FORM_ID = "customer-pricing-form";
+
 const PricingTable: React.FC<PricingTableProps> = ({ customerId }) => {
-  const [data, setData] = useState<CustomerPricing[]>([]);
-  const [products, setProducts] = useState<Product[]>([]);
-  const [loading, setLoading] = useState(false);
+  // ─── Server state via TanStack Query ──────────────────────────────────
+  const { data: pricingData, isLoading: pricingLoading } =
+    useCustomerPricing(customerId);
+  const { data: productsData } = useProducts();
+
+  const createPricing = useCreatePricing(customerId);
+  const updatePricing = useUpdatePricing(customerId);
+  const deletePricing = useDeletePricing(customerId);
+
+  // ─── Local UI state ───────────────────────────────────────────────────
   const [modalOpen, setModalOpen] = useState(false);
-  const [saving, setSaving] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+
+  // Defensive: API may return [] OR { data: [] } OR undefined while loading
+  const data: CustomerPricing[] = Array.isArray(pricingData)
+    ? pricingData
+    : Array.isArray((pricingData as any)?.data)
+    ? (pricingData as any).data
+    : [];
+
+  const products = Array.isArray(productsData) ? productsData : [];
 
   const {
     control,
     handleSubmit,
     reset,
     watch,
-    formState: { errors },
+    formState: { errors, isDirty },
   } = useForm<PricingFormValues>({
     defaultValues: DEFAULT_FORM_VALUES,
   });
@@ -65,24 +81,7 @@ const PricingTable: React.FC<PricingTableProps> = ({ customerId }) => {
   const productId = watch("productId");
   const customerPrice = watch("customerPrice");
 
-  const fetchData = useCallback(async () => {
-    setLoading(true);
-    try {
-      const [pricing, prods] = await Promise.all([
-        customerApi.getCustomerPricing(customerId),
-        customerApi.getProducts(),
-      ]);
-      setData(pricing);
-      setProducts(prods);
-    } finally {
-      setLoading(false);
-    }
-  }, [customerId]);
-
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
-
+  // ─── Modal handlers ────────────────────────────────────────────────────
   const openAdd = () => {
     setEditingId(null);
     reset(DEFAULT_FORM_VALUES);
@@ -108,61 +107,55 @@ const PricingTable: React.FC<PricingTableProps> = ({ customerId }) => {
     reset(DEFAULT_FORM_VALUES);
   };
 
-  const onSubmit = async (values: PricingFormValues) => {
+  // Discard-changes guard for X / overlay / ESC
+  const beforeClose = async () => {
+    if (isSaving) return false;
+    if (isDirty) return window.confirm("Discard your changes?");
+    return true;
+  };
+
+  // ─── Submit ────────────────────────────────────────────────────────────
+  const onSubmit = (values: PricingFormValues) => {
     const [from, to] = values.effectiveRange;
     if (!from) {
-      message.warning("Please select a start date");
+      errorNotification("Validation error", "Please select a start date");
       return;
     }
     const price = parseFloat(values.customerPrice);
     if (isNaN(price) || price <= 0) {
-      message.warning("Enter a valid price");
+      errorNotification("Validation error", "Enter a valid price");
       return;
     }
 
-    setSaving(true);
-    try {
-      const payload: CustomerPricingFormValues = {
-        productId: values.productId,
-        customerPrice: price,
-        effectiveFrom: from.format("YYYY-MM-DD"),
-        effectiveTo: to?.format("YYYY-MM-DD"),
-      };
-      if (editingId) {
-        await customerApi.updateCustomerPricing(editingId, payload);
-        message.success("Pricing updated");
-      } else {
-        await customerApi.createCustomerPricing(customerId, payload);
-        message.success("Pricing added");
-      }
-      closeModal();
-      fetchData();
-    } catch {
-      message.error("Failed to save pricing");
-    } finally {
-      setSaving(false);
+    const payload: CustomerPricingFormValues = {
+      productId: values.productId,
+      customerPrice: price,
+      effectiveFrom: from.format("YYYY-MM-DD"),
+      effectiveTo: to?.format("YYYY-MM-DD"),
+    };
+
+    if (editingId) {
+      updatePricing.mutate(
+        { pricingId: editingId, data: payload },
+        { onSuccess: closeModal }
+      );
+    } else {
+      createPricing.mutate(payload, { onSuccess: closeModal });
     }
   };
 
-  const handleDelete = async (id: string) => {
-    try {
-      await customerApi.deleteCustomerPricing(id);
-      message.success("Pricing removed");
-      fetchData();
-    } catch {
-      message.error("Failed to delete");
-    }
-  };
-
+  // ─── Computed UI helpers ───────────────────────────────────────────────
   const selectedProduct = products.find((p) => p.id === productId);
   const priceNum = parseFloat(customerPrice);
   const discount =
     selectedProduct && !isNaN(priceNum)
       ? selectedProduct.basePrice - priceNum
       : 0;
+
   const assignedProductIds = data
     .filter((d) => d.isActive)
     .map((d) => d.productId);
+
   const availableProducts = editingId
     ? products
     : products.filter((p) => !assignedProductIds.includes(p.id));
@@ -181,6 +174,7 @@ const PricingTable: React.FC<PricingTableProps> = ({ customerId }) => {
     ),
   }));
 
+  // ─── Columns ───────────────────────────────────────────────────────────
   const columns: ColumnsType<CustomerPricing> = [
     {
       title: "Product",
@@ -189,33 +183,33 @@ const PricingTable: React.FC<PricingTableProps> = ({ customerId }) => {
       render: (_, r) => (
         <div className="flex flex-col gap-0.5">
           <span className="text-[13px] font-semibold text-slate-800">
-            {r.productName}
+            {r.product?.name ?? "—"}
           </span>
           <span className="text-[10px] font-mono text-slate-400 bg-slate-50 px-1.5 py-0.5 rounded w-fit">
-            {r.sku}
+            {r.product?.sku ?? "—"}
           </span>
         </div>
       ),
     },
     {
       title: "Unit",
-      dataIndex: "unit",
       key: "unit",
       align: "center",
       width: 80,
-      render: (u: string) => (
-        <span className="text-[11px] text-slate-500 capitalize">per {u}</span>
+      render: (_, r) => (
+        <span className="text-[11px] text-slate-500 capitalize">
+          per {r.product?.unit ?? "—"}
+        </span>
       ),
     },
     {
       title: "Base Price",
-      dataIndex: "basePrice",
       key: "basePrice",
       width: 110,
       align: "center",
-      render: (v: number) => (
+      render: (_, r) => (
         <span className="text-[13px] text-slate-400 tabular-nums line-through font-mono">
-          ₹{v}
+          ₹{r.product?.basePrice ?? 0}
         </span>
       ),
     },
@@ -226,12 +220,13 @@ const PricingTable: React.FC<PricingTableProps> = ({ customerId }) => {
       width: 130,
       align: "center",
       render: (v: number, r) => {
-        const savingAmt = r.basePrice - v;
+        const basePrice = r.product?.basePrice ?? 0;
+        const savingAmt = basePrice - v;
         return (
           <Tooltip
             title={
               savingAmt > 0
-                ? `${Math.round((savingAmt / r.basePrice) * 100)}% discount`
+                ? `${Math.round((savingAmt / basePrice) * 100)}% discount`
                 : savingAmt < 0
                 ? "Premium pricing"
                 : "Same as base"
@@ -318,7 +313,7 @@ const PricingTable: React.FC<PricingTableProps> = ({ customerId }) => {
           </Tooltip>
           <Popconfirm
             title="Remove this pricing?"
-            onConfirm={() => handleDelete(r.id)}
+            onConfirm={() => deletePricing.mutate(r.id)}
             okText="Yes"
             cancelText="No"
           >
@@ -336,8 +331,12 @@ const PricingTable: React.FC<PricingTableProps> = ({ customerId }) => {
     },
   ];
 
+  const isSaving = createPricing.isPending || updatePricing.isPending;
+  const activeCount = data.filter((d) => d.isActive).length;
+
   return (
     <div className="flex flex-col gap-4">
+      {/* Section header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2.5">
           <div className="w-8 h-8 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center">
@@ -348,7 +347,7 @@ const PricingTable: React.FC<PricingTableProps> = ({ customerId }) => {
               Customer Pricing
             </h3>
             <p className="text-[11px] text-slate-400">
-              {data.filter((d) => d.isActive).length} active price rules
+              {activeCount} active price rule{activeCount !== 1 ? "s" : ""}
             </p>
           </div>
         </div>
@@ -368,50 +367,60 @@ const PricingTable: React.FC<PricingTableProps> = ({ customerId }) => {
         columns={columns}
         dataSource={data}
         rowKey="id"
-        loading={loading}
+        loading={pricingLoading}
         pagination={false}
         size="middle"
         scroll={{ x: 800 }}
         rowClassName={(r) => (r.isActive ? "" : "opacity-50")}
       />
 
-      <Modal
+      {/* ─── Add / Edit Modal — uses CustomModal ─── */}
+      <CustomModal
         open={modalOpen}
-        onCancel={closeModal}
-        footer={null}
-        width={500}
-        centered
-        destroyOnClose
-        closeIcon={<HiOutlineX className="w-5 h-5 text-slate-400" />}
-        title={null}
-      >
-        <div
-          className={`flex items-center gap-3.5 mb-5 pl-4 border-l-[3px] ${
-            editingId ? "border-l-amber-500" : "border-l-blue-500"
-          }`}
-        >
-          <div
-            className={`w-10 h-10 rounded-xl flex items-center justify-center ${
-              editingId ? "bg-amber-50" : "bg-blue-50"
-            }`}
-          >
-            {editingId ? (
-              <HiOutlinePencil size={20} className="text-amber-600" />
-            ) : (
-              <HiOutlineTag size={20} className="text-blue-600" />
-            )}
-          </div>
-          <div>
-            <h3 className="text-[15px] font-bold text-slate-800">
-              {editingId ? "Edit Customer Price" : "Add Customer Price"}
-            </h3>
+        onClose={closeModal}
+        beforeClose={beforeClose}
+        title={editingId ? "Edit Customer Price" : "Add Customer Price"}
+        subtitle="Set special pricing for this customer"
+        icon={
+          editingId ? (
+            <HiOutlinePencil className="w-5 h-5" />
+          ) : (
+            <HiOutlineTag className="w-5 h-5" />
+          )
+        }
+        iconTone={editingId ? "amber" : "blue"}
+        size="lg"
+        footer={
+          <div className="flex items-center justify-between gap-3">
             <p className="text-[11px] text-slate-400">
-              Set special pricing for this customer
+              Price applies to this customer only
             </p>
+            <div className="flex items-center gap-3">
+              <Button
+                onClick={closeModal}
+                className="!rounded-lg"
+                disabled={isSaving}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="primary"
+                htmlType="submit"
+                form={FORM_ID}
+                loading={isSaving}
+                className="!bg-blue-600 hover:!bg-blue-700 !rounded-lg !font-semibold !shadow-sm !shadow-blue-200"
+              >
+                {editingId ? "Update Price" : "Add Price"}
+              </Button>
+            </div>
           </div>
-        </div>
-
-        <div className="flex flex-col gap-4">
+        }
+      >
+        <form
+          id={FORM_ID}
+          onSubmit={handleSubmit(onSubmit)}
+          className="flex flex-col gap-4"
+        >
           <CustomSelect
             label="Product"
             name="productId"
@@ -479,27 +488,8 @@ const PricingTable: React.FC<PricingTableProps> = ({ customerId }) => {
                 (val && val[0] !== null) || "Start date is required",
             }}
           />
-        </div>
-
-        <div className="flex items-center justify-between mt-5 pt-4 border-t border-slate-100">
-          <p className="text-[10px] text-slate-400">
-            Price applies to this customer only
-          </p>
-          <div className="flex items-center gap-2">
-            <Button onClick={closeModal} className="!rounded-lg">
-              Cancel
-            </Button>
-            <Button
-              type="primary"
-              onClick={handleSubmit(onSubmit)}
-              loading={saving}
-              className="!bg-blue-600 hover:!bg-blue-700 !rounded-lg !font-semibold !shadow-sm !shadow-blue-200"
-            >
-              {editingId ? "Update" : "Add Price"}
-            </Button>
-          </div>
-        </div>
-      </Modal>
+        </form>
+      </CustomModal>
     </div>
   );
 };

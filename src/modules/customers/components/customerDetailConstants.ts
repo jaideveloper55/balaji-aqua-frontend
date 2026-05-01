@@ -1,32 +1,46 @@
-import type { CustomerStatus, CustomerType } from "../types/Customer";
+import type {
+  CustomerStatus,
+  CustomerType,
+  DeliveryFrequency,
+  PaymentMode,
+} from "../types/Customer";
+
+// ── Status Badge Mapping ──────────────────────────────────────
 
 export const STATUS_MAP: Record<
   CustomerStatus,
   { label: string; color: string }
 > = {
-  active: { label: "Active", color: "green" },
-  inactive: { label: "Inactive", color: "default" },
-  pending: { label: "Pending", color: "orange" },
+  ACTIVE: { label: "Active", color: "green" },
+  INACTIVE: { label: "Inactive", color: "default" },
+  PENDING: { label: "Pending", color: "orange" },
 };
+// ── Type Display Mapping ──────────────────────────────────────
 
 export const TYPE_MAP: Record<CustomerType, string> = {
-  residential: "Residential",
-  commercial: "Commercial",
-  industrial: "Industrial",
+  RESIDENTIAL: "Residential",
+  COMMERCIAL: "Commercial",
+  INDUSTRIAL: "Industrial",
 };
 
-export const FREQ_MAP: Record<string, string> = {
-  daily: "Daily",
-  alternate: "Alternate Days",
-  weekly: "Weekly",
-  on_demand: "On Demand",
+// ── Delivery Frequency Mapping ────────────────────────────────
+
+export const FREQ_MAP: Record<DeliveryFrequency, string> = {
+  DAILY: "Daily",
+  ALTERNATE: "Alternate Days",
+  WEEKLY: "Weekly",
+  MONTHLY: "Monthly",
+  ON_DEMAND: "On Demand",
 };
 
-export const PAY_MAP: Record<string, string> = {
-  cash: "Cash",
-  upi: "UPI",
-  bank_transfer: "Bank Transfer",
-  credit: "Credit",
+// ── Payment Mode Mapping ──────────────────────────────────────
+
+export const PAY_MAP: Record<PaymentMode, string> = {
+  CASH: "Cash",
+  UPI: "UPI",
+  CARD: "Card",
+  CREDIT: "Credit",
+  BANK_TRANSFER: "Bank Transfer",
 };
 
 // ── Formatters ────────────────────────────────────────────────

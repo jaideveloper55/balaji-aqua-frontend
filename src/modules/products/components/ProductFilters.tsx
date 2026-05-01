@@ -4,11 +4,9 @@ import { HiOutlineTag, HiOutlineFilter } from "react-icons/hi";
 import SearchInput from "../../../components/common/SearchInput";
 import CustomSelect from "../../../components/common/CustomSelect";
 import CustomDateRange from "../../../components/common/CustomDateRange";
-import {
-  CATEGORY_OPTIONS,
-  STATUS_OPTIONS,
-} from "../constants/productConstants";
-import type { ProductFilterFormValues } from "../types/Product";
+
+import { STATUS_OPTIONS, type ProductFilterFormValues } from "../types/Product";
+import { CATEGORY_OPTIONS } from "../../inventory/constants/Inventoryconstants";
 
 interface ProductFiltersProps {
   search: string;

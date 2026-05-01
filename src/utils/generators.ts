@@ -15,6 +15,16 @@ const MUTED: [number, number, number] = [100, 116, 139];
 const LIGHT: [number, number, number] = [241, 245, 249];
 const WHITE: [number, number, number] = [255, 255, 255];
 
+// ── Helper: derive base amount when backend doesn't store it ──
+const getBaseAmount = (entry: LedgerEntry): number => {
+  // Backend stores debit/credit as totals (incl. tax)
+  // Base = total - taxes
+  const taxes = entry.cgst + entry.sgst + entry.igst;
+  if (entry.debitAmount > 0) return entry.debitAmount - taxes;
+  if (entry.creditAmount > 0) return entry.creditAmount - taxes;
+  return 0;
+};
+
 // ═══════════════════════════════════════════════════════════════
 // INVOICE PDF
 // ═══════════════════════════════════════════════════════════════
@@ -49,12 +59,12 @@ export const generateInvoicePDF = (
   doc.setFont("helvetica", "normal");
   doc.setTextColor(200, 220, 255);
   doc.text(
-    ENTRY_MAP[entry.type]?.label.toUpperCase() ?? "",
+    ENTRY_MAP[entry.entryType]?.label.toUpperCase() ?? "",
     pageW - margin,
     23,
     { align: "right" }
   );
-  doc.text("Date: " + fmtDate(entry.date), pageW - margin, 30, {
+  doc.text("Date: " + fmtDate(entry.entryDate), pageW - margin, 30, {
     align: "right",
   });
   doc.text(showGST ? "WITH GST" : "EXCL. GST", pageW - margin, 35, {
@@ -94,7 +104,7 @@ export const generateInvoicePDF = (
       details.dueDate === "-" ? "N/A" : fmtDate(details.dueDate),
       false
     );
-    drawBox(margin + boxW + 6, y, "Reference", entry.referenceNo, true);
+    drawBox(margin + boxW + 6, y, "Reference", entry.referenceNo ?? "-", true);
     y += boxH + 8;
   }
 
@@ -238,7 +248,7 @@ export const generateInvoicePDF = (
     { align: "right" }
   );
 
-  doc.save((entry.referenceNo || "Document") + "_" + entry.date + ".pdf");
+  doc.save((entry.referenceNo || "Document") + "_" + entry.entryDate + ".pdf");
 };
 
 // ═══════════════════════════════════════════════════════════════
@@ -316,29 +326,30 @@ export const generateLedgerPDF = (
         ],
       ];
 
-  const rows = entries.map((r) =>
-    showGST
+  const rows = entries.map((r) => {
+    const baseAmount = getBaseAmount(r);
+    return showGST
       ? [
-          fmtDate(r.date),
-          ENTRY_MAP[r.type]?.label ?? r.type,
-          r.description,
-          r.referenceNo || "-",
-          r.debit > 0 ? "Rs." + fmt(r.debit) : "-",
-          r.credit > 0 ? "Rs." + fmt(r.credit) : "-",
+          fmtDate(r.entryDate),
+          ENTRY_MAP[r.entryType]?.label ?? r.entryType,
+          r.description ?? "-",
+          r.referenceNo ?? "-",
+          r.debitAmount > 0 ? "Rs." + fmt(r.debitAmount) : "-",
+          r.creditAmount > 0 ? "Rs." + fmt(r.creditAmount) : "-",
           r.cgst > 0 ? "Rs." + fmt(r.cgst) : "-",
           r.sgst > 0 ? "Rs." + fmt(r.sgst) : "-",
           "Rs." + fmt(r.balance),
         ]
       : [
-          fmtDate(r.date),
-          ENTRY_MAP[r.type]?.label ?? r.type,
-          r.description,
-          r.referenceNo || "-",
-          r.debit > 0 ? "Rs." + fmt(r.baseAmount) : "-",
-          r.credit > 0 ? "Rs." + fmt(r.baseAmount) : "-",
+          fmtDate(r.entryDate),
+          ENTRY_MAP[r.entryType]?.label ?? r.entryType,
+          r.description ?? "-",
+          r.referenceNo ?? "-",
+          r.debitAmount > 0 ? "Rs." + fmt(baseAmount) : "-",
+          r.creditAmount > 0 ? "Rs." + fmt(baseAmount) : "-",
           "Rs." + fmt(r.balance),
-        ]
-  );
+        ];
+  });
 
   autoTable(doc, {
     startY: 38,
@@ -408,29 +419,30 @@ export const generateLedgerCSV = (
         "Balance",
       ];
 
-  const rows = entries.map((e) =>
-    showGST
+  const rows = entries.map((e) => {
+    const baseAmount = getBaseAmount(e);
+    return showGST
       ? [
-          e.date,
-          ENTRY_MAP[e.type]?.label ?? e.type,
-          '"' + e.description + '"',
-          e.referenceNo,
-          e.debit,
-          e.credit,
+          e.entryDate,
+          ENTRY_MAP[e.entryType]?.label ?? e.entryType,
+          '"' + (e.description ?? "") + '"',
+          e.referenceNo ?? "",
+          e.debitAmount,
+          e.creditAmount,
           e.cgst,
           e.sgst,
           e.balance,
         ]
       : [
-          e.date,
-          ENTRY_MAP[e.type]?.label ?? e.type,
-          '"' + e.description + '"',
-          e.referenceNo,
-          e.debit > 0 ? e.baseAmount : 0,
-          e.credit > 0 ? e.baseAmount : 0,
+          e.entryDate,
+          ENTRY_MAP[e.entryType]?.label ?? e.entryType,
+          '"' + (e.description ?? "") + '"',
+          e.referenceNo ?? "",
+          e.debitAmount > 0 ? baseAmount : 0,
+          e.creditAmount > 0 ? baseAmount : 0,
           e.balance,
-        ]
-  );
+        ];
+  });
 
   const csv = [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
   const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
