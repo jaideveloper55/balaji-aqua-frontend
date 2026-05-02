@@ -6,16 +6,20 @@ import CustomerModal from "./Customermodal";
 import CustomerStatCard from "./CustomerStatCard";
 import { CUSTOMER_STAT_CONFIG } from "../constants/customerConstants";
 import { useCustomers } from "../hooks/useCustomers";
+import type { Customer } from "../types/Customer";
 
 interface CustomerListProps {
   onNavigateToDetail?: (id: string) => void;
+  onEditCustomer?: (id: string) => void;
 }
 
-const CustomerList: React.FC<CustomerListProps> = ({ onNavigateToDetail }) => {
+const CustomerList: React.FC<CustomerListProps> = ({
+  onNavigateToDetail,
+  onEditCustomer,
+}) => {
   const [modalOpen, setModalOpen] = useState(false);
+  const [editTarget, setEditTarget] = useState<Customer | null>(null);
 
-  // ─── Server state via TanStack Query ────────────────────────────────────
-  // Stats come pre-computed from the same /customers endpoint (saves a request)
   const { data, isLoading } = useCustomers({ limit: 10, page: 1 });
 
   const stats = data?.stats ?? {
@@ -25,11 +29,9 @@ const CustomerList: React.FC<CustomerListProps> = ({ onNavigateToDetail }) => {
     inactive: 0,
   };
 
-  // ─── Handlers ───────────────────────────────────────────────────────────
   const handleCreateSuccess = useCallback(
     (id: string) => {
       setModalOpen(false);
-      // No refreshKey needed — useCreateCustomer invalidates the query automatically
       onNavigateToDetail?.(id);
     },
     [onNavigateToDetail]
@@ -40,8 +42,21 @@ const CustomerList: React.FC<CustomerListProps> = ({ onNavigateToDetail }) => {
     [onNavigateToDetail]
   );
 
+  const handleEdit = useCallback(
+    (c: Customer) => {
+      onEditCustomer?.(c.id);
+    },
+    [onEditCustomer]
+  );
+
+  // ← NEW: closes edit modal & shows success
+  const handleEditSuccess = useCallback(() => {
+    setEditTarget(null);
+  }, []);
+
   const openModal = useCallback(() => setModalOpen(true), []);
   const closeModal = useCallback(() => setModalOpen(false), []);
+  const closeEditModal = useCallback(() => setEditTarget(null), []);
 
   return (
     <div className="flex flex-col gap-6">
@@ -92,13 +107,23 @@ const CustomerList: React.FC<CustomerListProps> = ({ onNavigateToDetail }) => {
 
       {/* Table */}
       <div className="bg-white rounded-2xl border border-slate-100 shadow-sm shadow-slate-100/50 p-5">
-        <CustomerTable onView={handleView} onEdit={handleView} />
+        <CustomerTable onView={handleView} onEdit={handleEdit} />
+        {/* ↑ CHANGED: was onEdit={handleView}, now onEdit={handleEdit} */}
       </div>
 
+      {/* CREATE modal */}
       <CustomerModal
         open={modalOpen}
         onClose={closeModal}
         onSuccess={handleCreateSuccess}
+      />
+
+      {/* EDIT modal — same component, different mode */}
+      <CustomerModal
+        open={!!editTarget}
+        onClose={closeEditModal}
+        customer={editTarget ?? undefined}
+        onSuccess={handleEditSuccess}
       />
     </div>
   );

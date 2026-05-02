@@ -60,13 +60,11 @@ const CustomInput = <T extends FieldValues>({
   return (
     <div className={`flex flex-col gap-1.5 ${className}`}>
       <label
-        htmlFor={name}
-        className={`text-xs font-semibold ${
-          hasError ? "text-red-500" : "text-slate-600"
-        }`}
+        htmlFor={label}
+        className="flex justify-start py-1 text-sm text-text-primary"
       >
         {label}
-        {isrequired && <span className="text-red-500 ml-0.5">*</span>}
+        {isrequired && <span className="text-red-500 ml-1">*</span>}
       </label>
 
       <Controller
