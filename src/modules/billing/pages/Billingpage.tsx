@@ -683,6 +683,7 @@ const BillingPage: React.FC = () => {
           todayUPI={todayUPI}
           todayBank={todayBank}
           todayTotal={todayTotal}
+          totalOutstanding={0}
         />
       )}
 

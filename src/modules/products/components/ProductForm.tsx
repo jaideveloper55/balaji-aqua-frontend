@@ -9,31 +9,10 @@ import {
 } from "react-icons/hi";
 import CustomInput from "../../../components/common/CustomInput";
 import CustomSelect from "../../../components/common/CustomSelect";
-
 import type { ProductFormValues } from "../types/Product";
 import { UNIT_OPTIONS, GST_OPTIONS } from "../types/Product";
 import { useCategories } from "../hooks/Usecategories";
-import CategorySelect from "./Categoryselect";
-
-const SectionLabel: React.FC<{
-  icon: React.ComponentType<{ size?: number; className?: string }>;
-  title: string;
-  subtitle?: string;
-}> = ({ icon: Icon, title, subtitle }) => (
-  <div className="flex items-center gap-2.5 mb-4">
-    <div className="w-7 h-7 rounded-lg bg-blue-50 ring-1 ring-blue-100 flex items-center justify-center">
-      <Icon size={14} className="text-blue-600" />
-    </div>
-    <div>
-      <span className="text-[11px] font-bold text-slate-700 uppercase tracking-wider">
-        {title}
-      </span>
-      {subtitle && (
-        <p className="text-[10px] text-slate-400 mt-0.5">{subtitle}</p>
-      )}
-    </div>
-  </div>
-);
+import SectionLabel from "../../../components/common/SectionLabel";
 
 interface ProductFormProps {
   defaultValues?: Partial<ProductFormValues>;
@@ -41,11 +20,8 @@ interface ProductFormProps {
   onCancel?: () => void;
   loading?: boolean;
   isEdit?: boolean;
-  /** When true, disables all inputs (view mode). */
   readOnly?: boolean;
-  /** When true, hides the form's own actions (parent owns them via footer). */
   hideActions?: boolean;
-  /** Form id used so a footer button outside the form can submit it. */
   formId?: string;
 }
 
@@ -59,7 +35,28 @@ const ProductForm: React.FC<ProductFormProps> = ({
   hideActions = false,
   formId = "product-form",
 }) => {
-  const { data: categories = [] } = useCategories();
+  const { data: categoriesResponse, isLoading: loadingCategories } =
+    useCategories();
+
+  const rawCategories: any[] = Array.isArray(categoriesResponse)
+    ? categoriesResponse
+    : (categoriesResponse as any)?.data ??
+      (categoriesResponse as any)?.categories ??
+      [];
+
+  // Build options for CustomSelect: { value, label }
+  const categoryOptions = rawCategories.map((c) => ({
+    value: c.id,
+    label: (
+      <span className="flex items-center gap-2">
+        <span
+          className="inline-block w-2.5 h-2.5 rounded-full ring-1 ring-slate-200"
+          style={{ backgroundColor: c.color || "#94a3b8" }}
+        />
+        <span>{c.name}</span>
+      </span>
+    ),
+  }));
 
   const { control, handleSubmit, formState } = useForm<ProductFormValues>({
     defaultValues: {
@@ -80,19 +77,14 @@ const ProductForm: React.FC<ProductFormProps> = ({
 
   const { errors } = formState;
 
-  const categoryOptions = categories.map((c) => ({
-    value: c.id,
-    label: c.name,
-    color: c.color,
-    bg: c.bg,
-  }));
-
   return (
     <form
       id={formId}
       onSubmit={handleSubmit(onSubmit)}
       className={`flex flex-col gap-6 ${
-        readOnly ? "[&_input]:!cursor-default [&_.ant-select]:!cursor-default" : ""
+        readOnly
+          ? "[&_input]:!cursor-default [&_.ant-select]:!cursor-default"
+          : ""
       }`}
     >
       {/* Product Information */}
@@ -123,16 +115,21 @@ const ProductForm: React.FC<ProductFormProps> = ({
             disabled={readOnly}
             rules={{ required: "SKU is required" }}
           />
-          <CategorySelect
+          <CustomSelect
             name="categoryId"
             control={control as any}
             errors={errors}
             label="Category"
-            placeholder="Select or create category"
-            isrequired
-          
-            rules={{ required: "Category is required" }}
+            placeholder={
+              loadingCategories ? "Loading categories..." : "Select a category"
+            }
             options={categoryOptions}
+            isrequired
+            size="large"
+            showSearch
+            isLoading={loadingCategories}
+            disabled={readOnly || loadingCategories}
+            rules={{ required: "Category is required" }}
           />
           <CustomSelect
             name="unit"

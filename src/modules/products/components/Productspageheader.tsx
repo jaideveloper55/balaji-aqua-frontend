@@ -28,7 +28,7 @@ const ProductsPageHeader: React.FC<ProductsPageHeaderProps> = ({
     <div className="flex flex-wrap items-start justify-between gap-4">
       {/* Title */}
       <div className="flex items-start gap-3">
-        <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center">
+        <div className="w-11 h-11 rounded-xl bg-blue-500 flex items-center justify-center">
           <HiOutlineSparkles className="text-white" size={20} />
         </div>
         <div>

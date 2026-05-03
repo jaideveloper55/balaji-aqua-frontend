@@ -19,6 +19,7 @@ import JarTrackingPage from "./modules/jar-tracking/pages/JarTrackingPage";
 import BillingPage from "./modules/billing/pages/Billingpage";
 import InventoryPage from "./modules/inventory/page/Inventorypage";
 import ProfilePage from "./modules/profile/pages/ProfilePage";
+import EventOrdersPage from "./modules/events/pages/EventsPage";
 
 function App() {
   return (
@@ -51,7 +52,7 @@ function App() {
           <Route path="jar-tracking" element={<JarTrackingPage />} />
           <Route path="billing-pos" element={<BillingPage />} />
           <Route path="inventory" element={<InventoryPage />} />
-          <Route path="event-orders" element={<div>Event Orders Page</div>} />
+          <Route path="event-orders" element={<EventOrdersPage />} />
           <Route path="employees" element={<div>Employees Page</div>} />
           <Route path="attendance" element={<div>Attendance Page</div>} />
           <Route path="salary" element={<div>Salary Page</div>} />

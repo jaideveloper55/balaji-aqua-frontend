@@ -1,5 +1,3 @@
-// ─── Customer (matches backend Prisma schema) ───────────────────────────────
-
 export type CustomerStatus = "ACTIVE" | "INACTIVE" | "PENDING";
 export type CustomerType = "RESIDENTIAL" | "COMMERCIAL" | "INDUSTRIAL";
 export type PaymentMode = "CASH" | "UPI" | "BANK_TRANSFER" | "CREDIT" | "CARD";
@@ -60,7 +58,6 @@ export interface CustomerPricing {
   isActive: boolean;
   createdAt: string;
 
-  // Optional fields populated from join (frontend may need to join product name)
   product?: {
     id: string;
     name: string;
@@ -95,6 +92,7 @@ export interface CustomerFormValues {
   phone: string;
   email?: string;
   type: CustomerType;
+  outstandingBalance: number;
   deliveryFrequency: DeliveryFrequency;
   paymentMode: PaymentMode;
   addressLine1: string;
@@ -120,6 +118,9 @@ export interface CustomerQuery {
   status?: CustomerStatus;
   type?: CustomerType;
   search?: string;
+  // 🆕 Date range filter on createdAt (YYYY-MM-DD format)
+  fromDate?: string;
+  toDate?: string;
   page?: number;
   limit?: number;
   sortBy?: "name" | "createdAt" | "outstandingBalance";
@@ -128,14 +129,17 @@ export interface CustomerQuery {
 
 // ─── API Responses ──────────────────────────────────────────────────────────
 
+// Stats shape now matches the new money-focused backend response
+export interface CustomerListStats {
+  total: number;
+  totalOutstanding: number;
+  customersWithDues: number;
+  newThisMonth: number;
+}
+
 export interface CustomerListResponse {
   data: Customer[];
-  stats: {
-    total: number;
-    active: number;
-    inactive: number;
-    pending: number;
-  };
+  stats: CustomerListStats;
   pagination: {
     total: number;
     page: number;
@@ -146,8 +150,12 @@ export interface CustomerListResponse {
   };
 }
 
+// Standalone /customers/stats endpoint (richer breakdown for analytics)
 export interface CustomerStatsResponse {
   total: number;
+  totalOutstanding: number;
+  customersWithDues: number;
+  newThisMonth: number;
   byStatus: Array<{ status: CustomerStatus; _count: number }>;
   byType: Array<{ type: CustomerType; _count: number }>;
   topOutstanding: Array<{

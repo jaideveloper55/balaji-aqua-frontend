@@ -1,8 +1,8 @@
 import {
   HiOutlineUsers,
-  HiOutlineCheckCircle,
-  HiOutlineClock,
-  HiOutlineBan,
+  HiOutlineCurrencyRupee,
+  HiOutlineExclamationCircle,
+  HiOutlineUserAdd,
 } from "react-icons/hi";
 import type {
   CustomerStatus,
@@ -49,7 +49,7 @@ export const TYPE_MAP: { [K in CustomerType]: string } = {
   INDUSTRIAL: "Industrial",
 };
 
-// ─── Filter Dropdown Options (typed) ───────────────────────────────────────
+// ─── Filter Dropdown Options (still useful for the filter row) ─────────────
 
 export const STATUS_OPTIONS: { value: CustomerStatus; label: string }[] = [
   { value: "ACTIVE", label: "Active" },
@@ -64,39 +64,46 @@ export const TYPE_OPTIONS: { value: CustomerType; label: string }[] = [
 ];
 
 // ─── Stat Cards Config ─────────────────────────────────────────────────────
+// Money-focused KPIs that match the backend's findAll stats response.
+// Backend returns: { total, totalOutstanding, customersWithDues, newThisMonth }
 
 export const CUSTOMER_STAT_CONFIG = [
   {
     key: "total" as const,
     icon: <HiOutlineUsers size={20} />,
     label: "Total Customers",
-    color: "#3b82f6",
+    color: "#2563eb",
     bg: "#eff6ff",
-    tooltip: "All registered customers",
+    tooltip: "All customers in your network",
+    format: "number" as const,
   },
   {
-    key: "active" as const,
-    icon: <HiOutlineCheckCircle size={20} />,
-    label: "Active",
-    color: "#22c55e",
-    bg: "#f0fdf4",
-    tooltip: "Customers with active delivery schedule",
+    key: "totalOutstanding" as const,
+    icon: <HiOutlineCurrencyRupee size={20} />,
+    label: "Total Outstanding",
+    color: "#dc2626",
+    bg: "#fef2f2",
+    tooltip: "Sum of all pending dues across customers",
+    format: "currency" as const,
+    alertWhenPositive: true,
   },
   {
-    key: "pending" as const,
-    icon: <HiOutlineClock size={20} />,
-    label: "Pending",
+    key: "customersWithDues" as const,
+    icon: <HiOutlineExclamationCircle size={20} />,
+    label: "With Pending Dues",
     color: "#f59e0b",
     bg: "#fffbeb",
-    tooltip: "Awaiting verification or first delivery",
+    tooltip: "Number of customers who owe money",
+    format: "number" as const,
   },
   {
-    key: "inactive" as const,
-    icon: <HiOutlineBan size={20} />,
-    label: "Inactive",
-    color: "#94a3b8",
-    bg: "#f8fafc",
-    tooltip: "Paused or churned customers",
+    key: "newThisMonth" as const,
+    icon: <HiOutlineUserAdd size={20} />,
+    label: "New This Month",
+    color: "#10b981",
+    bg: "#ecfdf5",
+    tooltip: "Customers added since the start of this month",
+    format: "number" as const,
   },
 ] as const;
 
@@ -150,6 +157,7 @@ export const CUSTOMER_FORM_DEFAULTS = {
   phone: "",
   email: "",
   type: "RESIDENTIAL" as CustomerType,
+  outstandingBalance: 0,
   deliveryFrequency: "DAILY" as DeliveryFrequency,
   paymentMode: "CASH" as PaymentMode,
   addressLine1: "",

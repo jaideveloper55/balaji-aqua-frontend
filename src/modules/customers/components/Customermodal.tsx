@@ -24,8 +24,6 @@ import type {
   PaymentMode,
 } from "../types/Customer";
 
-// ─── Options (UPPERCASE values matching backend Prisma enums) ──────────────
-
 const TYPE_OPTS: { value: CustomerType; label: string }[] = [
   { value: "RESIDENTIAL", label: "Residential" },
   { value: "COMMERCIAL", label: "Commercial" },
@@ -58,7 +56,7 @@ interface CustomerModalProps {
   open: boolean;
   onClose: () => void;
   onSuccess?: (id: string) => void;
-  customer?: Customer; // ← when present, modal is in edit mode
+  customer?: Customer;
 }
 
 const CustomerModal: React.FC<CustomerModalProps> = ({
@@ -68,11 +66,9 @@ const CustomerModal: React.FC<CustomerModalProps> = ({
   customer,
 }) => {
   const isEditMode = !!customer;
-
   const [step, setStep] = useState(0);
   const [success, setSuccess] = useState(false);
   const [savedName, setSavedName] = useState("");
-
   const createCustomer = useCreateCustomer();
   const updateCustomer = useUpdateCustomer();
   const isSaving = createCustomer.isPending || updateCustomer.isPending;
@@ -92,6 +88,7 @@ const CustomerModal: React.FC<CustomerModalProps> = ({
       type: "RESIDENTIAL",
       deliveryFrequency: "DAILY",
       paymentMode: "CASH",
+      outstandingBalance: 0,
       addressLine1: "",
       addressLine2: "",
       city: "",
@@ -115,6 +112,7 @@ const CustomerModal: React.FC<CustomerModalProps> = ({
         type: c.type ?? "RESIDENTIAL",
         deliveryFrequency: c.deliveryFrequency ?? "DAILY",
         paymentMode: c.paymentMode ?? "CASH",
+        outstandingBalance: Number(c.outstandingBalance ?? 0),
         addressLine1: c.addressLine1 ?? "",
         addressLine2: c.addressLine2 ?? "",
         city: c.city ?? "",
@@ -129,7 +127,7 @@ const CustomerModal: React.FC<CustomerModalProps> = ({
 
   const STEP_FIELDS: (keyof CustomerFormValues)[][] = [
     ["name", "phone", "email", "type"],
-    ["deliveryFrequency", "paymentMode", "notes"],
+    ["deliveryFrequency", "paymentMode", "outstandingBalance", "notes"],
     ["addressLine1", "addressLine2", "city", "state", "pincode", "landmark"],
   ];
 
@@ -144,6 +142,7 @@ const CustomerModal: React.FC<CustomerModalProps> = ({
     (data: CustomerFormValues) => {
       const payload: CustomerFormValues = {
         ...data,
+        outstandingBalance: Number(data.outstandingBalance ?? 0),
         email: data.email?.trim() || undefined,
         addressLine2: data.addressLine2?.trim() || undefined,
         landmark: data.landmark?.trim() || undefined,
@@ -193,7 +192,6 @@ const CustomerModal: React.FC<CustomerModalProps> = ({
     onClose();
   };
 
-  // ─── Success screen ──────────────────────────────────────────────────────
   if (success) {
     return (
       <CustomModal
@@ -223,7 +221,6 @@ const CustomerModal: React.FC<CustomerModalProps> = ({
     );
   }
 
-  // ─── Footer (used in main wizard) ────────────────────────────────────────
   const footer = (
     <div className="flex items-center justify-between">
       <div>
@@ -394,6 +391,50 @@ const CustomerModal: React.FC<CustomerModalProps> = ({
                   size="large"
                   options={PAY_OPTS}
                   rules={{ required: "Required" }}
+                />
+              </div>
+
+              {/* Opening Balance — outstanding amount at onboarding */}
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-semibold text-slate-600">
+                  Opening Balance{" "}
+                  <span className="text-slate-400 font-normal">
+                    (outstanding at onboarding)
+                  </span>
+                </label>
+                <Controller
+                  name="outstandingBalance"
+                  control={control}
+                  rules={{
+                    min: { value: 0, message: "Cannot be negative" },
+                  }}
+                  render={({ field, fieldState }) => (
+                    <>
+                      <Input
+                        {...field}
+                        type="number"
+                        min={0}
+                        step="0.01"
+                        prefix="₹"
+                        placeholder="0.00"
+                        size="large"
+                        className="!rounded-lg"
+                        status={fieldState.error ? "error" : ""}
+                        onChange={(e) => {
+                          const v = e.target.value;
+                          field.onChange(v === "" ? 0 : Number(v));
+                        }}
+                      />
+                      {fieldState.error && (
+                        <span className="text-[11px] text-red-500">
+                          {fieldState.error.message}
+                        </span>
+                      )}
+                      <span className="text-[10px] text-slate-400">
+                        Leave 0 if customer has no pending dues
+                      </span>
+                    </>
+                  )}
                 />
               </div>
 

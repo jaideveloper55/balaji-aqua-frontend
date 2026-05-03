@@ -11,6 +11,7 @@ import {
   HiMiniQrCode,
   HiBuildingLibrary,
 } from "react-icons/hi2";
+import { TbAlertCircle } from "react-icons/tb";
 
 import { formatCurrency, getInitials } from "../../utils/Helpers";
 import StatCard from "../StatCard";
@@ -24,6 +25,7 @@ interface Props {
   todayUPI: number;
   todayBank: number;
   todayTotal: number;
+  totalOutstanding: number;
   onExport: () => void;
 }
 
@@ -35,6 +37,7 @@ const CollectionTab: React.FC<Props> = ({
   todayUPI,
   todayBank,
   todayTotal,
+  totalOutstanding,
   onExport,
 }) => {
   const avgInvoice = Math.round(
@@ -85,7 +88,8 @@ const CollectionTab: React.FC<Props> = ({
         </button>
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      {/* ── 5 stat cards — now includes Total Outstanding ── */}
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
         <StatCard
           icon={<HiBanknotes className="w-5 h-5" />}
           label="Total Collection"
@@ -112,11 +116,20 @@ const CollectionTab: React.FC<Props> = ({
           icon={<HiOutlineExclamationCircle className="w-5 h-5" />}
           label="Credit Sales"
           value={formatCurrency(creditSales)}
-          sub="To be collected"
+          sub="Today's credit"
           color="orange"
+        />
+        {/* ── NEW CARD ── */}
+        <StatCard
+          icon={<TbAlertCircle className="w-5 h-5" />}
+          label="Total Outstanding"
+          value={formatCurrency(totalOutstanding)}
+          sub="All customers"
+          color="red"
         />
       </div>
 
+      {/* ── Payment Mode Breakdown ── */}
       <div className="bg-white rounded-xl border border-gray-100 p-5">
         <h3 className="text-[13px] font-semibold text-gray-800 mb-4">
           Payment Mode Breakdown
@@ -158,6 +171,7 @@ const CollectionTab: React.FC<Props> = ({
         </div>
       </div>
 
+      {/* ── Today's Transactions ── */}
       <div className="bg-white rounded-xl border border-gray-100 p-5">
         <h3 className="text-[13px] font-semibold text-gray-800 mb-3">
           Today's Transactions

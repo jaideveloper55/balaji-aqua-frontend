@@ -16,7 +16,7 @@ import {
   successNotification,
 } from "../../../components/common/Notification";
 
-// ─── QUERY KEYS (inline) ──────────────────────────────────────────────────
+// ─── QUERY KEYS ───────────────────────────────────────────────────────────
 const productKeys = {
   all: ["products"] as const,
   list: (params: ProductQueryParams) =>
@@ -48,7 +48,7 @@ export const useProductAlerts = () => {
   return useQuery({
     queryKey: productKeys.alerts(),
     queryFn: productsApi.alerts,
-    refetchInterval: 1000 * 60, // re-check every 60s
+    refetchInterval: 1000 * 60,
   });
 };
 

@@ -1,16 +1,9 @@
 import React from "react";
 import { Button } from "antd";
-import {
-  HiOutlineCube,
-  HiOutlinePencil,
-  HiOutlineEye,
-} from "react-icons/hi";
+import { HiOutlineCube, HiOutlinePencil, HiOutlineEye } from "react-icons/hi";
 import CustomModal from "../../../components/common/CustomModal";
 import ProductForm from "./ProductForm";
-import {
-  useCreateProduct,
-  useUpdateProduct,
-} from "../hooks/Useproducts";
+import { useCreateProduct, useUpdateProduct } from "../hooks/Useproducts";
 import type {
   CreateProductPayload,
   UpdateProductPayload,
@@ -26,7 +19,6 @@ interface ProductModalProps {
   defaultValues?: Partial<ProductFormValues>;
   mode?: ProductModalMode;
   editId?: string;
-  /** Optional: switch from view → edit inline */
   onSwitchToEdit?: () => void;
 }
 
@@ -92,7 +84,7 @@ const ProductModal: React.FC<ProductModalProps> = ({
   });
 
   const handleSubmit = async (data: ProductFormValues) => {
-    if (isView) return; // safety guard
+    if (isView) return;
 
     const payload = toPayload(data);
     try {

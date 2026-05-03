@@ -1,11 +1,9 @@
-// src/components/layouts/ProtectedRoute.tsx
 import { Navigate, Outlet, useLocation } from "react-router-dom";
 
 import type { ReactNode } from "react";
 import { useAuthStore } from "../store/auth.store";
 
 interface ProtectedRouteProps {
-  // Optional: when used as wrapper <ProtectedRoute><X /></ProtectedRoute>
   children?: ReactNode;
   // Optional: restrict to specific roles
   allowedRoles?: Array<"SUPER_ADMIN" | "ADMIN" | "STAFF" | "DELIVERY_BOY">;

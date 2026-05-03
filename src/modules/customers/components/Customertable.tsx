@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useCallback, useState } from "react";
 import { Table, Dropdown, Tooltip } from "antd";
 import type { ColumnsType, TablePaginationConfig } from "antd/es/table";
 import {
@@ -31,23 +31,27 @@ const CustomerTable: React.FC<CustomerTableProps> = ({
   onEdit,
   onDelete,
 }) => {
-  // ─── Local UI state (filters, pagination) ───────────────────────────────
+  // ─── Pagination ──────────────────────────────────────────────────────────
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
+
+  // ─── Filters ─────────────────────────────────────────────────────────────
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState<
-    CustomerStatus | undefined
-  >();
   const [typeFilter, setTypeFilter] = useState<CustomerType | undefined>();
+  const [fromDate, setFromDate] = useState<string | undefined>(undefined);
+  const [toDate, setToDate] = useState<string | undefined>(undefined);
+
+  // ─── Delete confirmation state ───────────────────────────────────────────
   const [deleteTarget, setDeleteTarget] = useState<Customer | null>(null);
 
-  // ─── Server state via TanStack Query ────────────────────────────────────
+  // ─── Server data via TanStack Query ──────────────────────────────────────
   const { data, isLoading, isFetching } = useCustomers({
     page,
     limit: pageSize,
     search: search || undefined,
-    status: statusFilter,
     type: typeFilter,
+    fromDate,
+    toDate,
   });
 
   const deleteCustomer = useDeleteCustomer();
@@ -55,12 +59,33 @@ const CustomerTable: React.FC<CustomerTableProps> = ({
   const customers = data?.data ?? [];
   const total = data?.pagination.total ?? 0;
 
-  // ─── Handlers ───────────────────────────────────────────────────────────
+  // ─── Reset to page 1 whenever filters change ─────────────────────────────
+  const handleSearchChange = useCallback((value: string) => {
+    setSearch(value);
+    setPage(1);
+  }, []);
+
+  const handleTypeChange = useCallback((value: CustomerType | undefined) => {
+    setTypeFilter(value);
+    setPage(1);
+  }, []);
+
+  const handleDateRangeChange = useCallback(
+    (from: string | undefined, to: string | undefined) => {
+      setFromDate(from);
+      setToDate(to);
+      setPage(1);
+    },
+    []
+  );
+
+  // ─── Pagination handler ──────────────────────────────────────────────────
   const handleTableChange = (pagination: TablePaginationConfig) => {
     setPage(pagination.current ?? 1);
     setPageSize(pagination.pageSize ?? 10);
   };
 
+  // ─── Style maps ──────────────────────────────────────────────────────────
   const STATUS_BADGE_STYLES: Record<
     CustomerStatus,
     { bg: string; text: string; dot: string; ring: string }
@@ -109,6 +134,7 @@ const CustomerTable: React.FC<CustomerTableProps> = ({
     },
   };
 
+  // ─── Columns ─────────────────────────────────────────────────────────────
   const columns: ColumnsType<Customer> = [
     {
       title: "Customer",
@@ -128,7 +154,6 @@ const CustomerTable: React.FC<CustomerTableProps> = ({
             </span>
           </div>
 
-          {/* Name + contact info */}
           <div className="flex flex-col gap-1 min-w-0">
             <span className="text-[14px] font-bold text-slate-900 leading-tight truncate capitalize">
               {r.name}
@@ -208,21 +233,26 @@ const CustomerTable: React.FC<CustomerTableProps> = ({
     {
       title: "Outstanding",
       dataIndex: "outstandingBalance",
-      key: "balance",
+      key: "outstandingBalance",
       width: 130,
-      align: "center",
-      sorter: (a, b) => a.outstandingBalance - b.outstandingBalance,
-      render: (v: number) => (
-        <Tooltip title={v > 0 ? "Amount pending" : "Settled"}>
-          <span
-            className={`text-[13px] font-bold tabular-nums ${
-              v > 0 ? "text-red-500" : "text-emerald-600"
-            }`}
-          >
-            {v > 0 ? `₹${v.toLocaleString("en-IN")}` : "Nil"}
-          </span>
-        </Tooltip>
-      ),
+      align: "center" as const,
+      sorter: (a, b) =>
+        Number(a.outstandingBalance ?? 0) - Number(b.outstandingBalance ?? 0),
+      render: (v: number | string | null | undefined) => {
+        const amount = Number(v ?? 0);
+        const hasDues = amount > 0;
+        return (
+          <Tooltip title={hasDues ? "Amount pending" : "Settled"}>
+            <span
+              className={`text-[13px] font-bold tabular-nums ${
+                hasDues ? "text-red-500" : "text-emerald-600"
+              }`}
+            >
+              {hasDues ? `₹${amount.toLocaleString("en-IN")}` : "Nil"}
+            </span>
+          </Tooltip>
+        );
+      },
     },
     {
       title: "Joined",
@@ -272,7 +302,7 @@ const CustomerTable: React.FC<CustomerTableProps> = ({
                 danger: true,
                 onClick: ({ domEvent }) => {
                   domEvent.stopPropagation();
-                  setDeleteTarget(r); // ← opens the modal
+                  setDeleteTarget(r);
                 },
               },
             ],
@@ -295,18 +325,9 @@ const CustomerTable: React.FC<CustomerTableProps> = ({
     <div className="flex flex-col gap-4">
       <CustomerTableFilters
         search={search}
-        onSearchChange={(v) => {
-          setSearch(v);
-          setPage(1);
-        }}
-        onStatusChange={(v) => {
-          setStatusFilter(v);
-          setPage(1);
-        }}
-        onTypeChange={(v) => {
-          setTypeFilter(v);
-          setPage(1);
-        }}
+        onSearchChange={handleSearchChange}
+        onTypeChange={handleTypeChange}
+        onDateRangeChange={handleDateRangeChange}
       />
 
       <Table

@@ -13,6 +13,13 @@ interface CustomerListProps {
   onEditCustomer?: (id: string) => void;
 }
 
+const EMPTY_STATS = {
+  total: 0,
+  totalOutstanding: 0,
+  customersWithDues: 0,
+  newThisMonth: 0,
+};
+
 const CustomerList: React.FC<CustomerListProps> = ({
   onNavigateToDetail,
   onEditCustomer,
@@ -22,11 +29,11 @@ const CustomerList: React.FC<CustomerListProps> = ({
 
   const { data, isLoading } = useCustomers({ limit: 10, page: 1 });
 
-  const stats = data?.stats ?? {
-    total: 0,
-    active: 0,
-    pending: 0,
-    inactive: 0,
+  // Merge: defaults first, then whatever the API sent.
+  // Missing keys stay 0; extra/old keys are ignored harmlessly.
+  const stats = {
+    ...EMPTY_STATS,
+    ...((data?.stats as Partial<typeof EMPTY_STATS>) ?? {}),
   };
 
   const handleCreateSuccess = useCallback(
@@ -49,7 +56,6 @@ const CustomerList: React.FC<CustomerListProps> = ({
     [onEditCustomer]
   );
 
-  // ← NEW: closes edit modal & shows success
   const handleEditSuccess = useCallback(() => {
     setEditTarget(null);
   }, []);
@@ -90,25 +96,34 @@ const CustomerList: React.FC<CustomerListProps> = ({
         </div>
       </div>
 
-      {/* Stats */}
+      {/* Stats — money-focused KPIs */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {CUSTOMER_STAT_CONFIG.map((s) => (
-          <CustomerStatCard
-            key={s.key}
-            icon={s.icon}
-            label={s.label}
-            value={isLoading ? 0 : stats[s.key as keyof typeof stats]}
-            color={s.color}
-            bg={s.bg}
-            tooltip={s.tooltip}
-          />
-        ))}
+        {CUSTOMER_STAT_CONFIG.map((s) => {
+          const rawValue = stats[s.key as keyof typeof stats] ?? 0;
+          const isAlert =
+            "alertWhenPositive" in s &&
+            (s as any).alertWhenPositive &&
+            rawValue > 0;
+
+          return (
+            <CustomerStatCard
+              key={s.key}
+              icon={s.icon}
+              label={s.label}
+              value={isLoading ? "—" : rawValue}
+              color={s.color}
+              bg={s.bg}
+              tooltip={s.tooltip}
+              format={(s as any).format ?? "number"}
+              alert={isAlert}
+            />
+          );
+        })}
       </div>
 
       {/* Table */}
       <div className="bg-white rounded-2xl border border-slate-100 shadow-sm shadow-slate-100/50 p-5">
         <CustomerTable onView={handleView} onEdit={handleEdit} />
-        {/* ↑ CHANGED: was onEdit={handleView}, now onEdit={handleEdit} */}
       </div>
 
       {/* CREATE modal */}
