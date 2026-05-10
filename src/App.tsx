@@ -20,6 +20,10 @@ import BillingPage from "./modules/billing/pages/Billingpage";
 import InventoryPage from "./modules/inventory/page/Inventorypage";
 import ProfilePage from "./modules/profile/pages/ProfilePage";
 import EventOrdersPage from "./modules/events/pages/EventsPage";
+import EmployeesPage from "./modules/employees/pages/EmployeesPage";
+import AttendancePage from "./modules/attendance/pages/Attendancepage";
+import SalaryPage from "./modules/salary/pages/Salarypage";
+import ExpensesPage from "./modules/expenses/pages/Expensespage";
 
 function App() {
   return (
@@ -53,10 +57,10 @@ function App() {
           <Route path="billing-pos" element={<BillingPage />} />
           <Route path="inventory" element={<InventoryPage />} />
           <Route path="event-orders" element={<EventOrdersPage />} />
-          <Route path="employees" element={<div>Employees Page</div>} />
-          <Route path="attendance" element={<div>Attendance Page</div>} />
-          <Route path="salary" element={<div>Salary Page</div>} />
-          <Route path="expenses" element={<div>Expenses Page</div>} />
+          <Route path="employees" element={<EmployeesPage />} />
+          <Route path="attendance" element={<AttendancePage />} />
+          <Route path="salary" element={<SalaryPage />} />
+          <Route path="expenses" element={<ExpensesPage />} />
           <Route path="production" element={<div>Water Production Page</div>} />
           <Route path="reports" element={<div>Reports & Analytics Page</div>} />
         </Route>
