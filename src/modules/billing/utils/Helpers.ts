@@ -1,7 +1,7 @@
-// modules/billing/utils/helpers.ts
-
-export const formatCurrency = (amount: number) =>
-  `₹${amount.toLocaleString("en-IN")}`;
+export const formatCurrency = (amount: number | null | undefined): string => {
+  const n = typeof amount === "number" && !isNaN(amount) ? amount : 0;
+  return `₹${n.toLocaleString("en-IN")}`;
+};
 
 export const getCustomerTypeColor = (type: string) => {
   const map: Record<string, string> = {

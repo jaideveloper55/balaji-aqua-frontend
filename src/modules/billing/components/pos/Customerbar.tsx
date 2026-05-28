@@ -34,7 +34,6 @@ interface Props {
   onOpenQuickAdd: () => void;
 }
 
-// Single accent color used throughout — calm, professional emerald
 const ACCENT = {
   text: "text-emerald-700",
   bg: "bg-emerald-600",
@@ -58,9 +57,6 @@ const CustomerBar: React.FC<Props> = ({
   onOpenPicker,
   onOpenQuickAdd,
 }) => {
-  // ═══════════════════════════════════════════════════════════
-  // SELECTED CUSTOMER VIEW — clean white card with subtle accent
-  // ═══════════════════════════════════════════════════════════
   if (selectedCustomer) {
     const hasOutstanding = selectedCustomer.outstanding > 0;
     const isWalkIn = selectedCustomer.isWalkIn;
@@ -149,9 +145,6 @@ const CustomerBar: React.FC<Props> = ({
     );
   }
 
-  // ═══════════════════════════════════════════════════════════
-  // CUSTOMER SELECTION — minimal, calm, focused
-  // ═══════════════════════════════════════════════════════════
   return (
     <div className="bg-white px-5 py-4 border-b border-slate-200">
       <div className="space-y-3">

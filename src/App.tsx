@@ -10,7 +10,7 @@ import ForgotPasswordPage from "./modules/auth/pages/ForgotPassword";
 import AdminLayout from "./components/layouts/AdminLayout";
 
 // Admin pages (protected)
-import Dashboard from "./modules/dashboard/Dashboard";
+
 import CustomerPage from "./modules/customers/pages/Customerpage";
 import Companies from "./modules/companies/pages/Companies";
 import ProductsPage from "./modules/products/pages/ProductsPage";
@@ -24,6 +24,9 @@ import EmployeesPage from "./modules/employees/pages/EmployeesPage";
 import AttendancePage from "./modules/attendance/pages/Attendancepage";
 import SalaryPage from "./modules/salary/pages/Salarypage";
 import ExpensesPage from "./modules/expenses/pages/Expensespage";
+import ProductionPage from "./modules/production/pages/Productionpage";
+import ReportsPage from "./modules/reports/pages/Reportspage";
+import Dashboard from "./modules/dashboard/pages/DashboardPage";
 
 function App() {
   return (
@@ -61,8 +64,8 @@ function App() {
           <Route path="attendance" element={<AttendancePage />} />
           <Route path="salary" element={<SalaryPage />} />
           <Route path="expenses" element={<ExpensesPage />} />
-          <Route path="production" element={<div>Water Production Page</div>} />
-          <Route path="reports" element={<div>Reports & Analytics Page</div>} />
+          <Route path="production" element={<ProductionPage />} />
+          <Route path="reports" element={<ReportsPage />} />
         </Route>
 
         {/* ─── 404 FALLBACK ───────────────────────────────────────────── */}

@@ -1,5 +1,3 @@
-// modules/billing/types/index.ts
-
 export interface CustomerPricing {
   productId: string;
   productName: string;
@@ -31,13 +29,25 @@ export interface Product {
   id: string;
   name: string;
   sku: string;
-  unit: string;
   basePrice: number;
   stock: number;
-  category: string;
+  unit: string;
+  status: string;
+  categoryId: string;
+  category?: {
+    id: string;
+    name: string;
+    color?: string;
+    bg?: string;
+  };
+  categoryName?: string;
+  gstRate?: number;
+  costPrice?: number;
+  customerPricing?: Record<string, number>;
 }
 
 export interface CartItem {
+  id: string;
   productId: string;
   productName: string;
   sku: string;
@@ -59,6 +69,7 @@ export interface InvoiceItem {
 
 export interface Invoice {
   id: string;
+  customerDbId?: string | null;
   invoiceNo: string;
   customerId: string;
   customerName: string;
@@ -68,11 +79,14 @@ export interface Invoice {
   items: InvoiceItem[];
   subtotal: number;
   gst: number;
+  dueDate: string | null;
+  dueDateRaw?: string | null;
+  overdueDays: number;
   discount: number;
   grandTotal: number;
   paidAmount: number;
   balanceAmount: number;
-  status: "Paid" | "Pending" | "Partial" | "Overdue";
+  status: "Paid" | "Pending" | "Partial" | "Overdue" | "Cancelled";
   paymentMode: string;
   deliveryMode: string;
   date: string;

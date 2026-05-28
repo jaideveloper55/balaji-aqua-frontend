@@ -52,7 +52,7 @@ const CustomSelect = (props: CustomSelectProps) => {
     value,
     isLoading,
     suffixIcon,
-    size,
+    size="middle",
     showSearch,
     onSelect,
   } = props;

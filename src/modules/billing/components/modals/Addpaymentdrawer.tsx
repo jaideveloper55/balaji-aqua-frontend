@@ -1,73 +1,174 @@
-import React from "react";
-import { Drawer, Select, InputNumber, Divider, message } from "antd";
+import React, { useMemo, useState, useEffect } from "react";
+import { Drawer, InputNumber, Divider } from "antd";
+import { useForm, Controller } from "react-hook-form";
+import { useQuery } from "@tanstack/react-query";
 import {
   HiOutlineCash,
   HiOutlineCreditCard,
   HiOutlineCheckCircle,
+  HiOutlineExclamationCircle,
 } from "react-icons/hi";
 import { HiMiniQrCode, HiBuildingLibrary } from "react-icons/hi2";
 
 import { formatCurrency } from "../../utils/Helpers";
-import Field from "../Field";
-import { Customer, Invoice } from "../../types/billing";
 
-interface Props {
-  open: boolean;
-  customers: Customer[];
-  invoices: Invoice[];
+import { billingApi } from "../../api/billing.api";
+import { customersApi } from "../../../customers/api/customers.api";
+import CustomInput from "../../../../components/common/CustomInput";
+import CustomSelect from "../../../../components/common/CustomSelect";
+
+export interface PaymentFormValues {
   paymentCustomer: string;
   paymentInvoice: string;
   paymentAmount: number;
   paymentMethod: string;
   paymentReference: string;
   paymentNotes: string;
-  onCustomerChange: (v: string) => void;
-  onInvoiceChange: (v: string) => void;
-  onAmountChange: (v: number) => void;
-  onMethodChange: (v: string) => void;
-  onReferenceChange: (v: string) => void;
-  onNotesChange: (v: string) => void;
-  onSubmit: () => void;
+}
+
+interface Props {
+  open: boolean;
+  defaultValues?: Partial<PaymentFormValues>;
+  onSubmit: (values: PaymentFormValues) => void;
   onClose: () => void;
 }
 
+const METHODS = [
+  { value: "cash", label: "Cash", icon: <HiOutlineCash className="w-4 h-4" /> },
+  { value: "upi", label: "UPI", icon: <HiMiniQrCode className="w-4 h-4" /> },
+  {
+    value: "bank",
+    label: "Bank",
+    icon: <HiBuildingLibrary className="w-4 h-4" />,
+  },
+  {
+    value: "card",
+    label: "Card",
+    icon: <HiOutlineCreditCard className="w-4 h-4" />,
+  },
+];
+
+const DEFAULTS: PaymentFormValues = {
+  paymentCustomer: "",
+  paymentInvoice: "",
+  paymentAmount: 0,
+  paymentMethod: "cash",
+  paymentReference: "",
+  paymentNotes: "",
+};
+
 const AddPaymentDrawer: React.FC<Props> = ({
   open,
-  customers,
-  invoices,
-  paymentCustomer,
-  paymentInvoice,
-  paymentAmount,
-  paymentMethod,
-  paymentReference,
-  paymentNotes,
-  onCustomerChange,
-  onInvoiceChange,
-  onAmountChange,
-  onMethodChange,
-  onReferenceChange,
-  onNotesChange,
+  defaultValues,
   onSubmit,
   onClose,
 }) => {
-  const methods = [
+  // ── react-hook-form ───────────────────────────────────────────────────────
+  const {
+    control,
+    handleSubmit,
+    watch,
+    setValue,
+    reset,
+    formState: { errors },
+  } = useForm<PaymentFormValues>({
+    defaultValues: { ...DEFAULTS, ...defaultValues },
+    mode: "onChange",
+  });
+
+  // Reset form whenever the drawer opens
+  useEffect(() => {
+    if (open) reset({ ...DEFAULTS, ...defaultValues });
+  }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const paymentCustomer = watch("paymentCustomer");
+  const paymentAmount = watch("paymentAmount");
+  const paymentMethod = watch("paymentMethod");
+
+  // ── Search-as-you-type for customers ──────────────────────────────────────
+  const [customerSearch, setCustomerSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(customerSearch), 250);
+    return () => clearTimeout(t);
+  }, [customerSearch]);
+
+  // ── Fetch customers from API (server-side search) ─────────────────────────
+  const { data: customersData, isLoading: isLoadingCustomers } = useQuery({
+    queryKey: ["billing-payment-customers", debouncedSearch],
+    queryFn: () =>
+      customersApi.list({
+        search: debouncedSearch || undefined,
+        status: "ACTIVE",
+        page: 1,
+        limit: 50,
+        sortBy: "name",
+        sortOrder: "asc",
+      }),
+    enabled: open,
+    staleTime: 1000 * 30,
+  });
+
+  const customers = customersData?.data ?? [];
+
+  const selectedCustomer = useMemo(
+    () => customers.find((c: any) => c.id === paymentCustomer),
+    [customers, paymentCustomer]
+  );
+
+  const customerOptions = useMemo(
+    () =>
+      customers.map((c: any) => {
+        const due = c.outstandingBalance ?? 0;
+        return {
+          value: c.id,
+          label:
+            due > 0
+              ? `${c.name} (${c.customerCode}) - Due: ${formatCurrency(due)}`
+              : `${c.name} (${c.customerCode})`,
+        };
+      }),
+    [customers]
+  );
+
+  // ── Fetch invoices for the selected customer ──────────────────────────────
+  const { data: customerInvoicesData, isLoading: isLoadingInvoices } = useQuery(
     {
-      value: "cash",
-      label: "Cash",
-      icon: <HiOutlineCash className="w-4 h-4" />,
-    },
-    { value: "upi", label: "UPI", icon: <HiMiniQrCode className="w-4 h-4" /> },
-    {
-      value: "bank",
-      label: "Bank",
-      icon: <HiBuildingLibrary className="w-4 h-4" />,
-    },
-    {
-      value: "card",
-      label: "Card",
-      icon: <HiOutlineCreditCard className="w-4 h-4" />,
-    },
-  ];
+      queryKey: ["billing-invoices-for-payment", paymentCustomer],
+      queryFn: () =>
+        billingApi.listInvoices({
+          customerId: paymentCustomer,
+          limit: 100,
+        }),
+      enabled: open && !!paymentCustomer,
+      staleTime: 1000 * 30,
+    }
+  );
+
+  const pendingInvoices = useMemo(() => {
+    const list = customerInvoicesData?.data ?? [];
+    return list.filter(
+      (inv: any) => (inv.balanceDue ?? 0) > 0 && inv.status !== "CANCELLED"
+    );
+  }, [customerInvoicesData]);
+
+  const invoiceOptions = useMemo(
+    () =>
+      pendingInvoices.map((inv: any) => ({
+        value: inv.id,
+        label: `${inv.invoiceNumber} - Balance: ${formatCurrency(
+          inv.balanceDue ?? 0
+        )}`,
+      })),
+    [pendingInvoices]
+  );
+
+  const canSubmit = !!paymentCustomer && paymentAmount > 0;
+
+  const submit = handleSubmit((values) => {
+    onSubmit(values);
+  });
 
   return (
     <Drawer
@@ -76,126 +177,169 @@ const AddPaymentDrawer: React.FC<Props> = ({
       title={
         <div className="flex items-center gap-2">
           <HiOutlineCash className="w-5 h-5 text-emerald-600" />
-          <span>Record Payment</span>
+          <span className="font-semibold">Record Payment</span>
         </div>
       }
       width={420}
     >
       <div className="space-y-4">
+        <CustomSelect
+          name="paymentCustomer"
+          control={control}
+          errors={errors}
+          label="Customer"
+          isrequired
+          placeholder="Search by name, phone, or code..."
+          showSearch
+          isLoading={isLoadingCustomers}
+          options={customerOptions}
+          rules={{ required: "Customer is required" }}
+          onChange={() => {
+            setValue("paymentInvoice", "");
+
+            setCustomerSearch("");
+          }}
+        />
+
+        <CustomSelect
+          name="paymentInvoice"
+          control={control}
+          errors={errors}
+          label="Invoice (optional)"
+          placeholder={
+            !paymentCustomer
+              ? "Select a customer first"
+              : "Against overall outstanding"
+          }
+          size="large"
+          disabled={!paymentCustomer}
+          isLoading={isLoadingInvoices}
+          options={invoiceOptions}
+        />
+        {paymentCustomer &&
+          !isLoadingInvoices &&
+          pendingInvoices.length === 0 && (
+            <p className="text-[11px] text-slate-400 flex items-center gap-1 -mt-2">
+              <HiOutlineExclamationCircle className="w-3.5 h-3.5" />
+              No pending invoices - payment will reduce overall outstanding
+            </p>
+          )}
+
+        {/* ── Amount ───────────────────────────────────────────────────── */}
         <div className="flex flex-col gap-1.5">
-          <label className="text-xs font-semibold text-slate-600">
-            Customer <span className="text-red-500">*</span>
+          <label className="flex justify-start py-1 text-sm text-text-primary">
+            Amount<span className="text-red-500 ml-1">*</span>
           </label>
-          <Select
-            value={paymentCustomer || undefined}
-            onChange={onCustomerChange}
-            placeholder="Select customer"
-            size="large"
-            showSearch
-            filterOption={(input, option) =>
-              String(option?.label || "")
-                .toLowerCase()
-                .includes(input.toLowerCase())
-            }
-            options={customers
-              .filter((c) => c.outstanding > 0)
-              .map((c) => ({
-                value: c.customerId,
-                label: `${c.name} (${c.customerId}) — Due: ${formatCurrency(
-                  c.outstanding
-                )}`,
-              }))}
+          <Controller
+            name="paymentAmount"
+            control={control}
+            rules={{
+              required: "Amount is required",
+              min: { value: 1, message: "Amount must be greater than 0" },
+            }}
+            render={({ field }) => (
+              <InputNumber
+                {...field}
+                size="large"
+                className="w-full"
+                prefix="Rs."
+                min={0}
+                status={errors.paymentAmount ? "error" : undefined}
+                onChange={(val) => field.onChange(val ?? 0)}
+              />
+            )}
           />
+          {errors.paymentAmount && (
+            <p className="text-xs text-red-500 font-medium">
+              {errors.paymentAmount.message as string}
+            </p>
+          )}
+          {selectedCustomer &&
+            (selectedCustomer.outstandingBalance ?? 0) > 0 && (
+              <p className="text-[11px] text-slate-400">
+                Outstanding:{" "}
+                {formatCurrency(selectedCustomer.outstandingBalance ?? 0)}
+              </p>
+            )}
         </div>
 
-        <div className="flex flex-col gap-1.5">
-          <label className="text-xs font-semibold text-slate-600">
-            Invoice (optional)
-          </label>
-          <Select
-            value={paymentInvoice || undefined}
-            onChange={onInvoiceChange}
-            placeholder="Against overall outstanding"
-            size="large"
-            allowClear
-            options={invoices
-              .filter(
-                (i) => i.customerId === paymentCustomer && i.balanceAmount > 0
-              )
-              .map((inv) => ({
-                value: inv.invoiceNo,
-                label: `${inv.invoiceNo} — Balance: ${formatCurrency(
-                  inv.balanceAmount
-                )}`,
-              }))}
-          />
-        </div>
-
-        <div className="flex flex-col gap-1.5">
-          <label className="text-xs font-semibold text-slate-600">
-            Amount <span className="text-red-500">*</span>
-          </label>
-          <InputNumber
-            value={paymentAmount}
-            onChange={(val) => onAmountChange(val || 0)}
-            size="large"
-            className="w-full"
-            prefix="₹"
-            min={0}
-          />
-        </div>
-
+        {/* ── Payment Method ───────────────────────────────────────────── */}
         <div>
-          <label className="text-xs font-semibold text-slate-600 mb-2 block">
+          <label className="flex justify-start py-1 text-sm text-text-primary mb-1">
             Payment Method
           </label>
-          <div className="grid grid-cols-4 gap-2">
-            {methods.map((m) => (
-              <button
-                key={m.value}
-                onClick={() => onMethodChange(m.value)}
-                className={`flex flex-col items-center gap-1 py-2.5 rounded-xl border-2 text-[11px] font-medium transition-all
-                  ${
-                    paymentMethod === m.value
-                      ? "border-emerald-500 bg-emerald-50 text-emerald-700"
-                      : "border-gray-100 text-gray-400 hover:border-gray-200"
-                  }`}
-              >
-                {m.icon}
-                <span>{m.label}</span>
-              </button>
-            ))}
-          </div>
+          <Controller
+            name="paymentMethod"
+            control={control}
+            render={({ field }) => (
+              <div className="grid grid-cols-4 gap-2">
+                {METHODS.map((m) => (
+                  <button
+                    key={m.value}
+                    type="button"
+                    onClick={() => field.onChange(m.value)}
+                    className={`flex flex-col items-center gap-1 py-2.5 rounded-xl border-2 text-[11px]
+                      font-medium transition-all
+                      ${
+                        paymentMethod === m.value
+                          ? "border-emerald-500 bg-emerald-50 text-emerald-700"
+                          : "border-gray-100 text-gray-400 hover:border-emerald-200 hover:text-emerald-600"
+                      }`}
+                  >
+                    {m.icon}
+                    <span>{m.label}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          />
         </div>
 
-        <Field
+        {/* ── Reference ────────────────────────────────────────────────── */}
+        <CustomInput
+          name="paymentReference"
+          control={control}
+          errors={errors}
           label="Reference / Transaction ID"
-          value={paymentReference}
-          onChange={onReferenceChange}
           placeholder="e.g. UPI-REF-12345"
+          size="large"
         />
-        <Field
+
+        {/* ── Notes ────────────────────────────────────────────────────── */}
+        <CustomInput
+          name="paymentNotes"
+          control={control}
+          errors={errors}
           label="Notes"
-          value={paymentNotes}
-          onChange={onNotesChange}
           placeholder="Optional notes..."
+          size="large"
         />
 
         <Divider className="!my-3" />
 
+        {/* ── Submit ───────────────────────────────────────────────────── */}
         <button
-          onClick={() => {
-            if (!paymentCustomer || paymentAmount <= 0) {
-              message.warning("Please fill required fields");
-              return;
-            }
-            onSubmit();
-          }}
-          className="w-full py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-[13px] flex items-center justify-center gap-2 shadow-lg shadow-emerald-200 active:scale-[0.98] transition-all"
+          type="button"
+          disabled={!canSubmit}
+          onClick={submit}
+          className={`w-full py-3 rounded-xl font-semibold text-[13px] flex items-center
+            justify-center gap-2 transition-all
+            ${
+              canSubmit
+                ? "bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg shadow-emerald-200 active:scale-[0.98]"
+                : "bg-slate-100 text-slate-400 cursor-not-allowed"
+            }`}
         >
-          <HiOutlineCheckCircle className="w-5 h-5" /> Record Payment —{" "}
-          {formatCurrency(paymentAmount)}
+          <HiOutlineCheckCircle className="w-5 h-5" />
+          Record Payment - {formatCurrency(paymentAmount)}
         </button>
+
+        {!canSubmit && (
+          <p className="text-[11px] text-slate-400 text-center flex items-center justify-center gap-1">
+            <HiOutlineExclamationCircle className="w-3.5 h-3.5" />
+            Select customer and enter amount to continue
+          </p>
+        )}
       </div>
     </Drawer>
   );

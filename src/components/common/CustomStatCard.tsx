@@ -11,7 +11,7 @@ interface StatCardProps {
   alert?: boolean;
 }
 
-const CustomerStatCard: React.FC<StatCardProps> = ({
+const CustomStatCard: React.FC<StatCardProps> = ({
   icon,
   label,
   value,
@@ -60,4 +60,4 @@ const CustomerStatCard: React.FC<StatCardProps> = ({
   );
 };
 
-export default CustomerStatCard;
+export default CustomStatCard;

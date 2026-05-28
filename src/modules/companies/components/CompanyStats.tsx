@@ -3,7 +3,7 @@ import {
   HiOutlineCheckCircle,
   HiOutlineXCircle,
 } from "react-icons/hi";
-import CustomerStatCard from "../../../components/common/CustomerStatCard";
+import CustomerStatCard from "../../../components/common/CustomStatCard";
 
 interface Stats {
   total: number;

@@ -1,6 +1,8 @@
 import React from "react";
 import { Table, Tag, Tooltip } from "antd";
 import type { ColumnsType } from "antd/es/table";
+import { Dayjs } from "dayjs";
+import { useForm } from "react-hook-form";
 import {
   HiOutlineSearch,
   HiOutlineCheckCircle,
@@ -17,6 +19,9 @@ import {
 } from "../../utils/Helpers";
 import StatCard from "../StatCard";
 import { Invoice } from "../../types/billing";
+import CustomDateRange from "../../../../components/common/CustomDateRange";
+
+export type DateRange = [Dayjs | null, Dayjs | null] | null;
 
 interface InvoiceStats {
   total: number;
@@ -34,9 +39,11 @@ interface Props {
   stats: InvoiceStats;
   search: string;
   statusFilter: string;
+  dateRange: DateRange;
   onExport: () => void;
   onSearchChange: (v: string) => void;
   onStatusFilterChange: (v: string) => void;
+  onDateRangeChange: (range: DateRange) => void;
   onView: (inv: Invoice) => void;
   onPrint: (inv: Invoice) => void;
 }
@@ -46,16 +53,25 @@ const InvoicesTab: React.FC<Props> = ({
   stats,
   search,
   statusFilter,
+  dateRange,
   onSearchChange,
   onStatusFilterChange,
+  onDateRangeChange,
   onView,
   onPrint,
 }) => {
+  const {
+    control,
+    formState: { errors },
+  } = useForm({
+    defaultValues: { dateRange },
+  });
+
   const columns: ColumnsType<Invoice> = [
     {
       title: "Invoice",
       dataIndex: "invoiceNo",
-      width: 180,
+      width: 140,
       render: (no: string, r) => (
         <div>
           <div className="font-mono text-[13px] font-semibold text-gray-800">
@@ -70,6 +86,8 @@ const InvoicesTab: React.FC<Props> = ({
     {
       title: "Customer",
       dataIndex: "customerName",
+      width: 140,
+      align: "center",
       render: (name: string, r) => (
         <div>
           <div className="font-medium text-[13px] text-gray-800">{name}</div>
@@ -85,8 +103,8 @@ const InvoicesTab: React.FC<Props> = ({
     {
       title: "Amount",
       dataIndex: "grandTotal",
-      width: 110,
-      align: "right",
+      width: 100,
+      align: "center",
       sorter: (a, b) => a.grandTotal - b.grandTotal,
       render: (amt: number) => (
         <span className="font-bold text-[13px] text-gray-900">
@@ -97,8 +115,8 @@ const InvoicesTab: React.FC<Props> = ({
     {
       title: "Paid",
       dataIndex: "paidAmount",
-      width: 100,
-      align: "right",
+      width: 90,
+      align: "center",
       render: (amt: number) => (
         <span className="text-[13px] text-emerald-600 font-medium">
           {formatCurrency(amt)}
@@ -108,8 +126,8 @@ const InvoicesTab: React.FC<Props> = ({
     {
       title: "Balance",
       dataIndex: "balanceAmount",
-      width: 100,
-      align: "right",
+      width: 90,
+      align: "center",
       render: (amt: number) =>
         amt > 0 ? (
           <span className="text-[13px] text-red-500 font-semibold">
@@ -120,9 +138,39 @@ const InvoicesTab: React.FC<Props> = ({
         ),
     },
     {
+      title: "Due Date",
+      dataIndex: "dueDate",
+      width: 110,
+      align: "center",
+      render: (date: string | null, r) => {
+        if (!date) {
+          return <span className="text-[12px] text-gray-300">—</span>;
+        }
+        if (r.balanceAmount === 0) {
+          return <span className="text-[12px] text-gray-400">{date}</span>;
+        }
+        if (r.overdueDays && r.overdueDays > 0) {
+          return (
+            <div className="flex flex-col items-center leading-tight">
+              <span className="text-[12px] font-semibold text-red-600">
+                {date}
+              </span>
+              <span className="text-[10px] text-red-500 font-medium">
+                {r.overdueDays}d overdue
+              </span>
+            </div>
+          );
+        }
+        return (
+          <span className="text-[12px] text-amber-600 font-medium">{date}</span>
+        );
+      },
+    },
+    {
       title: "Status",
       dataIndex: "status",
-      width: 100,
+      width: 90,
+      align: "center",
       render: (status: string) => (
         <Tag color={getStatusConfig(status).color} className="text-[11px]">
           {status}
@@ -132,7 +180,8 @@ const InvoicesTab: React.FC<Props> = ({
     {
       title: "Mode",
       dataIndex: "paymentMode",
-      width: 100,
+      width: 90,
+      align: "center",
       render: (mode: string) => (
         <span className="text-[12px] text-gray-500">{mode}</span>
       ),
@@ -141,8 +190,9 @@ const InvoicesTab: React.FC<Props> = ({
       title: "",
       width: 80,
       align: "center",
+      fixed: "right",
       render: (_, r) => (
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1 justify-center">
           <Tooltip title="View Details">
             <button
               onClick={() => onView(r)}
@@ -166,6 +216,7 @@ const InvoicesTab: React.FC<Props> = ({
 
   return (
     <div className="py-5 space-y-4">
+      {/* ── KPI cards ─────────────────────────────────────────────────────── */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <StatCard
           icon={<HiClipboardDocumentList className="w-5 h-5" />}
@@ -197,8 +248,10 @@ const InvoicesTab: React.FC<Props> = ({
         />
       </div>
 
+      {/* ── Filter row ────────────────────────────────────────────────────── */}
       <div className="bg-white rounded-xl border border-gray-100 p-4">
         <div className="flex items-center gap-3 flex-wrap">
+          {/* Search */}
           <div className="relative flex-1 min-w-[240px]">
             <HiOutlineSearch className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-300" />
             <input
@@ -209,6 +262,20 @@ const InvoicesTab: React.FC<Props> = ({
               className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-200 text-[13px] placeholder:text-gray-300 focus:outline-none focus:border-green-400 focus:ring-1 focus:ring-green-100"
             />
           </div>
+
+          {/* Date range filter */}
+          <div className="min-w-[260px]">
+            <CustomDateRange
+              name="dateRange"
+              control={control}
+              errors={errors}
+              size="middle"
+              placeholder={["From", "To"]}
+              onChange={(dates) => onDateRangeChange(dates)}
+            />
+          </div>
+
+          {/* Status chips */}
           <div className="flex items-center gap-1.5">
             {["all", "paid", "pending", "partial", "overdue"].map((s) => (
               <button
@@ -226,8 +293,31 @@ const InvoicesTab: React.FC<Props> = ({
             ))}
           </div>
         </div>
+
+        {/* Active filter summary — helps users see what's applied */}
+        {dateRange && dateRange[0] && dateRange[1] && (
+          <div className="mt-3 flex items-center gap-2 text-[12px] text-gray-500">
+            <span>
+              Showing invoices from{" "}
+              <span className="font-medium text-gray-700">
+                {dateRange[0].format("DD MMM YYYY")}
+              </span>{" "}
+              to{" "}
+              <span className="font-medium text-gray-700">
+                {dateRange[1].format("DD MMM YYYY")}
+              </span>
+            </span>
+            <button
+              onClick={() => onDateRangeChange(null)}
+              className="text-emerald-600 hover:text-emerald-700 font-medium"
+            >
+              Clear
+            </button>
+          </div>
+        )}
       </div>
 
+      {/* ── Table ─────────────────────────────────────────────────────────── */}
       <div className="bg-white rounded-xl border border-gray-100">
         <Table
           dataSource={invoices}
@@ -235,6 +325,7 @@ const InvoicesTab: React.FC<Props> = ({
           rowKey="id"
           pagination={{ pageSize: 10, size: "small", showSizeChanger: false }}
           size="small"
+          scroll={{ x: 1100 }}
         />
       </div>
     </div>

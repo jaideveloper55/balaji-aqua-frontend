@@ -138,9 +138,7 @@ const StockEntryModal: React.FC<StockEntryModalProps> = ({
       className="!rounded-2xl"
     >
       {/* Header with accent border */}
-      <div
-        className={`flex items-center gap-3.5 mb-5`}
-      >
+      <div className={`flex items-center gap-3.5 mb-5`}>
         <div
           className={`p-2.5 rounded-xl ${config.iconBg} transition-transform duration-300 hover:scale-105`}
         >
@@ -174,7 +172,6 @@ const StockEntryModal: React.FC<StockEntryModalProps> = ({
               placeholder="Search & select product..."
               options={PRODUCT_OPTIONS}
               isrequired
-              size="large"
               showSearch
               rules={{ required: "Product is required" }}
             />
@@ -188,7 +185,6 @@ const StockEntryModal: React.FC<StockEntryModalProps> = ({
               }
               options={sourceOptions}
               isrequired
-              size="large"
               rules={{ required: "Required" }}
             />
           </div>

@@ -125,7 +125,6 @@ const ProductForm: React.FC<ProductFormProps> = ({
             }
             options={categoryOptions}
             isrequired
-            size="large"
             showSearch
             isLoading={loadingCategories}
             disabled={readOnly || loadingCategories}

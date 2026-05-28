@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useEffect } from "react";
 import { Drawer, DatePicker, message } from "antd";
 import dayjs, { Dayjs } from "dayjs";
 import {
@@ -11,31 +11,17 @@ import {
   HiOutlineChartBar,
 } from "react-icons/hi";
 import { HiDocumentArrowDown, HiTableCells } from "react-icons/hi2";
-import { Invoice, PaymentEntry, Customer } from "../../types/billing";
-import { formatCurrency } from "../../utils/Helpers";
 import { COMPANY_INFO } from "../../constants/Mockdata";
-import {
-  exportInvoicesToPDF,
-  exportPaymentsToPDF,
-  exportOutstandingToPDF,
-  exportDailySummaryToPDF,
-  exportInvoicesToCSV,
-  exportPaymentsToCSV,
-  exportOutstandingToCSV,
-  filterByDateRange,
-} from "../../utils/ExportHelpers";
+import { billingApi, ExportFilters } from "../../api/billing.api";
 
 const { RangePicker } = DatePicker;
 
 type ReportType = "invoices" | "payments" | "outstanding" | "summary";
-type FormatType = "pdf" | "excel";
+type FormatType = "pdf" | "csv";
 
 interface Props {
   open: boolean;
   onClose: () => void;
-  invoices: Invoice[];
-  payments: PaymentEntry[];
-  customers: Customer[];
   defaultReportType?: ReportType;
 }
 
@@ -44,7 +30,7 @@ const REPORTS: {
   title: string;
   description: string;
   icon: React.ReactNode;
-  color: string;
+  color: "blue" | "green" | "red" | "purple";
   supportsDateRange: boolean;
 }[] = [
   {
@@ -73,11 +59,11 @@ const REPORTS: {
   },
   {
     key: "summary",
-    title: "Daily Summary",
-    description: "Today's collection breakdown by mode",
+    title: "Collection Summary",
+    description: "Period collection breakdown by mode",
     icon: <HiOutlineChartBar className="w-5 h-5" />,
     color: "purple",
-    supportsDateRange: false,
+    supportsDateRange: true,
   },
 ];
 
@@ -125,7 +111,6 @@ const PRESET_RANGES = [
       ] as [Dayjs, Dayjs],
   },
 ];
-
 const colorClasses: Record<
   string,
   { bg: string; text: string; border: string; ring: string }
@@ -159,9 +144,6 @@ const colorClasses: Record<
 const ExportDrawer: React.FC<Props> = ({
   open,
   onClose,
-  invoices,
-  payments,
-  customers,
   defaultReportType = "invoices",
 }) => {
   const [reportType, setReportType] = useState<ReportType>(defaultReportType);
@@ -172,115 +154,76 @@ const ExportDrawer: React.FC<Props> = ({
   const [activePreset, setActivePreset] = useState<string>("This month");
   const [isExporting, setIsExporting] = useState(false);
 
+  useEffect(() => {
+    if (open) {
+      setReportType(defaultReportType);
+    }
+  }, [open, defaultReportType]);
+
   const currentReport = REPORTS.find((r) => r.key === reportType)!;
 
-  const fromDate = dateRange?.[0]?.toDate() ?? null;
-  const toDate = dateRange?.[1]?.toDate() ?? null;
-
-  const previewCount = useMemo(() => {
-    if (reportType === "invoices") {
-      return currentReport.supportsDateRange
-        ? filterByDateRange(invoices, fromDate, toDate).length
-        : invoices.length;
-    }
-    if (reportType === "payments") {
-      return currentReport.supportsDateRange
-        ? filterByDateRange(payments, fromDate, toDate).length
-        : payments.length;
-    }
-    if (reportType === "outstanding") {
-      return customers.filter((c) => c.outstanding > 0).length;
-    }
-    return 0;
-  }, [
-    reportType,
-    fromDate,
-    toDate,
-    invoices,
-    payments,
-    customers,
-    currentReport,
-  ]);
-
-  const previewTotal = useMemo(() => {
-    if (reportType === "invoices") {
-      const filtered = currentReport.supportsDateRange
-        ? filterByDateRange(invoices, fromDate, toDate)
-        : invoices;
-      return filtered.reduce((s, i) => s + i.grandTotal, 0);
-    }
-    if (reportType === "payments") {
-      const filtered = currentReport.supportsDateRange
-        ? filterByDateRange(payments, fromDate, toDate)
-        : payments;
-      return filtered.reduce((s, p) => s + p.amount, 0);
-    }
-    if (reportType === "outstanding") {
-      return customers
-        .filter((c) => c.outstanding > 0)
-        .reduce((s, c) => s + c.outstanding, 0);
-    }
-    return 0;
-  }, [
-    reportType,
-    fromDate,
-    toDate,
-    invoices,
-    payments,
-    customers,
-    currentReport,
-  ]);
+  const fromDate = dateRange?.[0] ?? null;
+  const toDate = dateRange?.[1] ?? null;
 
   const handlePresetClick = (preset: (typeof PRESET_RANGES)[0]) => {
     setActivePreset(preset.label);
     setDateRange(preset.getRange());
   };
 
-  const handleExport = () => {
-    if (previewCount === 0 && reportType !== "summary") {
-      message.warning("No data to export for the selected range");
-      return;
-    }
+  // ── Trigger browser download from a Blob ─────────────────────────────────
+  const downloadBlob = (blob: Blob, filename: string) => {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  };
 
+  const handleExport = async () => {
     setIsExporting(true);
-    setTimeout(() => {
-      try {
-        const opts = currentReport.supportsDateRange
-          ? { fromDate, toDate }
-          : {};
-
-        if (reportType === "invoices") {
-          if (format === "pdf") exportInvoicesToPDF(invoices, opts);
-          else exportInvoicesToCSV(invoices, opts);
-        } else if (reportType === "payments") {
-          if (format === "pdf") exportPaymentsToPDF(payments, opts);
-          else exportPaymentsToCSV(payments, opts);
-        } else if (reportType === "outstanding") {
-          if (format === "pdf") exportOutstandingToPDF(customers);
-          else exportOutstandingToCSV(customers);
-        } else if (reportType === "summary") {
-          const today = new Date().toLocaleDateString("en-IN", {
-            day: "2-digit",
-            month: "short",
-            year: "numeric",
-          });
-          const todayInvoices = invoices.filter(
-            (i) => i.date === today || i.date === "25 Apr 2026"
-          );
-          const todayPayments = payments.filter(
-            (p) => p.date === today || p.date === "25 Apr 2026"
-          );
-          exportDailySummaryToPDF(todayInvoices, todayPayments, today);
-        }
-        message.success(`${currentReport.title} exported successfully`);
-        onClose();
-      } catch (err) {
-        console.error(err);
-        message.error("Export failed. Please try again.");
-      } finally {
-        setIsExporting(false);
+    try {
+      const filters: ExportFilters = { format };
+      if (currentReport.supportsDateRange) {
+        if (fromDate) filters.dateFrom = fromDate.format("YYYY-MM-DD");
+        if (toDate) filters.dateTo = toDate.format("YYYY-MM-DD");
       }
-    }, 600);
+
+      let blob: Blob;
+      if (reportType === "invoices") {
+        blob = await billingApi.exportInvoices(filters);
+      } else if (reportType === "payments") {
+        blob = await billingApi.exportPayments(filters);
+      } else if (reportType === "outstanding") {
+        blob = await billingApi.exportOutstanding({ format });
+      } else {
+        blob = await billingApi.exportDailySummary(filters);
+      }
+
+      const timestamp = dayjs().format("YYYYMMDD_HHmmss");
+      downloadBlob(blob, `${reportType}_${timestamp}.${format}`);
+
+      message.success(`${currentReport.title} downloaded`);
+      onClose();
+    } catch (err: any) {
+      console.error(err);
+      // If the backend returned a JSON error inside the blob, try to read it
+      if (err?.response?.data instanceof Blob) {
+        try {
+          const text = await err.response.data.text();
+          const parsed = JSON.parse(text);
+          message.error(parsed.message ?? "Export failed");
+        } catch {
+          message.error("Export failed. Please try again.");
+        }
+      } else {
+        message.error(err?.message ?? "Export failed. Please try again.");
+      }
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   return (
@@ -290,7 +233,7 @@ const ExportDrawer: React.FC<Props> = ({
       width={500}
       title={
         <div className="flex items-center gap-2">
-          <HiOutlineDownload className="w-5 h-5 text-emerald-600" />
+          <HiOutlineDownload className="w-5 h-5 text-blue-600" />
           <span>Export Report</span>
         </div>
       }
@@ -337,7 +280,7 @@ const ExportDrawer: React.FC<Props> = ({
           </div>
         </div>
 
-        {/* Step 2: Date range */}
+        {/* Step 2: Date range (only if the report supports it) */}
         {currentReport.supportsDateRange && (
           <div>
             <label className="text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-2 block">
@@ -351,7 +294,7 @@ const ExportDrawer: React.FC<Props> = ({
                   className={`px-3 py-1.5 rounded-lg text-[11px] font-medium transition-colors
                     ${
                       activePreset === preset.label
-                        ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                        ? "bg-blue-50 text-blue-700 border border-blue-200"
                         : "bg-gray-50 text-gray-600 border border-transparent hover:border-gray-200"
                     }`}
                 >
@@ -403,19 +346,13 @@ const ExportDrawer: React.FC<Props> = ({
               </div>
             </button>
             <button
-              onClick={() => setFormat("excel")}
+              onClick={() => setFormat("csv")}
               className={`p-3 rounded-xl border-2 transition-all text-left
                 ${
-                  format === "excel"
+                  format === "csv"
                     ? "border-emerald-300 bg-emerald-50/50 ring-4 ring-emerald-100"
                     : "border-gray-100 hover:border-gray-200 bg-white"
-                }
-                ${
-                  reportType === "summary"
-                    ? "opacity-50 cursor-not-allowed"
-                    : ""
                 }`}
-              disabled={reportType === "summary"}
             >
               <div className="flex items-center gap-2">
                 <div className="w-9 h-9 rounded-lg bg-emerald-50 flex items-center justify-center text-emerald-600">
@@ -426,9 +363,7 @@ const ExportDrawer: React.FC<Props> = ({
                     Excel / CSV
                   </div>
                   <div className="text-[10px] text-gray-500">
-                    {reportType === "summary"
-                      ? "Not available"
-                      : "Analyze in Excel"}
+                    Analyze in Excel
                   </div>
                 </div>
               </div>
@@ -436,12 +371,12 @@ const ExportDrawer: React.FC<Props> = ({
           </div>
         </div>
 
-        {/* Preview */}
-        <div className="bg-gradient-to-br from-gray-50 to-gray-100/50 border border-gray-200 rounded-xl p-4">
+        {/* Preview — shows only what we know without hitting the server */}
+        <div className="bg-gradient-to-br from-blue-50/40 to-gray-50 border border-blue-100 rounded-xl p-4">
           <div className="flex items-center gap-2 mb-2.5">
-            <HiOutlineDocumentText className="w-4 h-4 text-gray-500" />
+            <HiOutlineDocumentText className="w-4 h-4 text-blue-500" />
             <span className="text-[11px] font-bold text-gray-600 uppercase tracking-wider">
-              Preview
+              Export Details
             </span>
           </div>
           <div className="space-y-1.5">
@@ -455,28 +390,15 @@ const ExportDrawer: React.FC<Props> = ({
               <div className="flex justify-between text-[12px]">
                 <span className="text-gray-500">Date Range</span>
                 <span className="font-semibold text-gray-800">
-                  {dayjs(fromDate).format("DD MMM")} —{" "}
-                  {dayjs(toDate).format("DD MMM YYYY")}
+                  {fromDate.format("DD MMM")} — {toDate.format("DD MMM YYYY")}
                 </span>
               </div>
             )}
-            <div className="flex justify-between text-[12px]">
-              <span className="text-gray-500">
-                {reportType === "summary" ? "Type" : "Records"}
-              </span>
-              <span className="font-semibold text-gray-800">
-                {reportType === "summary"
-                  ? "Today's snapshot"
-                  : `${previewCount} entries`}
-              </span>
-            </div>
-            {reportType !== "summary" && (
+            {!currentReport.supportsDateRange && (
               <div className="flex justify-between text-[12px]">
-                <span className="text-gray-500">
-                  {reportType === "outstanding" ? "Total Due" : "Total Value"}
-                </span>
-                <span className="font-bold text-emerald-600">
-                  {formatCurrency(previewTotal)}
+                <span className="text-gray-500">Scope</span>
+                <span className="font-semibold text-gray-800">
+                  All active customers
                 </span>
               </div>
             )}
@@ -485,6 +407,10 @@ const ExportDrawer: React.FC<Props> = ({
               <span className="font-semibold text-gray-800 uppercase">
                 {format}
               </span>
+            </div>
+            <div className="flex justify-between text-[12px]">
+              <span className="text-gray-500">Source</span>
+              <span className="font-semibold text-gray-800">Live (server)</span>
             </div>
           </div>
         </div>
@@ -500,14 +426,12 @@ const ExportDrawer: React.FC<Props> = ({
           </button>
           <button
             onClick={handleExport}
-            disabled={
-              isExporting || (previewCount === 0 && reportType !== "summary")
-            }
+            disabled={isExporting}
             className={`flex-1 py-2.5 rounded-xl font-semibold text-[13px] flex items-center justify-center gap-2 transition-all
               ${
-                isExporting || (previewCount === 0 && reportType !== "summary")
+                isExporting
                   ? "bg-gray-100 text-gray-400 cursor-not-allowed"
-                  : "bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg shadow-emerald-200 active:scale-[0.98]"
+                  : "bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-200 active:scale-[0.98]"
               }`}
           >
             {isExporting ? (
@@ -526,8 +450,8 @@ const ExportDrawer: React.FC<Props> = ({
 
         <div className="text-center pt-1">
           <p className="text-[10px] text-gray-400">
-            Reports include {COMPANY_INFO.name} branding and are watermarked as
-            confidential
+            Reports include {COMPANY_INFO.name} branding and are pulled live
+            from the server
           </p>
         </div>
       </div>

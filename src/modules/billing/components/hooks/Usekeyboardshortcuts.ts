@@ -1,5 +1,3 @@
-// modules/billing/hooks/useKeyboardShortcuts.ts
-
 import { useEffect } from "react";
 
 interface ShortcutHandlers {

@@ -1,237 +1,930 @@
 import React from "react";
-import { Tag } from "antd";
-import { HiOutlinePhone } from "react-icons/hi";
 import { Invoice } from "../types/billing";
-import { formatCurrency, getStatusConfig } from "../utils/Helpers";
+import { formatCurrency } from "../utils/Helpers";
 import { COMPANY_INFO } from "../constants/Mockdata";
 
 interface Props {
   invoice: Invoice;
 }
 
-const PrintableInvoice: React.FC<Props> = ({ invoice }) => (
-  <div
-    className="printable-invoice bg-white p-8 max-w-[800px] mx-auto"
-    id="printable-invoice"
-  >
-    {/* Header */}
-    <div className="flex justify-between items-start pb-6 border-b-2 border-emerald-600">
-      <div>
-        <div className="flex items-center gap-2 mb-2">
-          <div className="w-12 h-12 rounded-xl bg-emerald-600 flex items-center justify-center text-white text-2xl font-bold">
-            💧
+// Convert a number to Indian-format words (e.g. 1234 → "One Thousand Two Hundred Thirty Four Rupees Only")
+const numberToWords = (num: number): string => {
+  if (num === 0) return "Zero Rupees Only";
+
+  const ones = [
+    "",
+    "One",
+    "Two",
+    "Three",
+    "Four",
+    "Five",
+    "Six",
+    "Seven",
+    "Eight",
+    "Nine",
+    "Ten",
+    "Eleven",
+    "Twelve",
+    "Thirteen",
+    "Fourteen",
+    "Fifteen",
+    "Sixteen",
+    "Seventeen",
+    "Eighteen",
+    "Nineteen",
+  ];
+  const tens = [
+    "",
+    "",
+    "Twenty",
+    "Thirty",
+    "Forty",
+    "Fifty",
+    "Sixty",
+    "Seventy",
+    "Eighty",
+    "Ninety",
+  ];
+
+  const twoDigit = (n: number): string => {
+    if (n < 20) return ones[n];
+    return (
+      tens[Math.floor(n / 10)] + (n % 10 ? " " + ones[n % 10] : "")
+    ).trim();
+  };
+
+  const threeDigit = (n: number): string => {
+    const h = Math.floor(n / 100);
+    const r = n % 100;
+    return (
+      (h ? ones[h] + " Hundred" : "") +
+      (h && r ? " " : "") +
+      (r ? twoDigit(r) : "")
+    ).trim();
+  };
+
+  const rupees = Math.floor(num);
+  const paise = Math.round((num - rupees) * 100);
+
+  let words = "";
+  const crore = Math.floor(rupees / 10000000);
+  const lakh = Math.floor((rupees % 10000000) / 100000);
+  const thousand = Math.floor((rupees % 100000) / 1000);
+  const rest = rupees % 1000;
+
+  if (crore) words += twoDigit(crore) + " Crore ";
+  if (lakh) words += twoDigit(lakh) + " Lakh ";
+  if (thousand) words += twoDigit(thousand) + " Thousand ";
+  if (rest) words += threeDigit(rest);
+
+  words = words.trim() + " Rupees";
+  if (paise) words += " and " + twoDigit(paise) + " Paise";
+  return words + " Only";
+};
+
+const PrintableInvoice: React.FC<Props> = ({ invoice }) => {
+  const isPaid = invoice.status === "Paid";
+  const isCancelled = invoice.status === "Cancelled";
+  const hasBalance = invoice.balanceAmount > 0;
+
+  return (
+    <div
+      className="printable-invoice bg-white text-gray-900"
+      id="printable-invoice"
+      style={{
+        width: "210mm",
+        minHeight: "297mm",
+        padding: "16mm 14mm",
+        margin: "0 auto",
+        fontFamily:
+          "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
+        fontSize: "11px",
+        lineHeight: 1.5,
+        color: "#111827",
+      }}
+    >
+      {/* ── Top accent bar ─────────────────────────────────────────── */}
+      <div
+        style={{
+          height: "4px",
+          background:
+            "linear-gradient(90deg, #047857 0%, #10b981 50%, #34d399 100%)",
+          borderRadius: "2px",
+          marginBottom: "20px",
+        }}
+      />
+
+      {/* ── Header: company (left) / invoice meta (right) ──────────── */}
+      <div className="flex justify-between items-start mb-8">
+        <div style={{ maxWidth: "55%" }}>
+          <div className="flex items-center gap-3 mb-3">
+            <div
+              style={{
+                width: "44px",
+                height: "44px",
+                borderRadius: "10px",
+                background: "linear-gradient(135deg, #047857, #10b981)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                color: "white",
+                fontWeight: 900,
+                fontSize: "20px",
+                letterSpacing: "-0.5px",
+              }}
+            >
+              {COMPANY_INFO.name.charAt(0)}
+            </div>
+            <div>
+              <div
+                style={{
+                  fontSize: "20px",
+                  fontWeight: 800,
+                  letterSpacing: "-0.5px",
+                  color: "#064e3b",
+                  lineHeight: 1.1,
+                }}
+              >
+                {COMPANY_INFO.name}
+              </div>
+              <div
+                style={{
+                  fontSize: "10px",
+                  color: "#6b7280",
+                  marginTop: "2px",
+                  letterSpacing: "0.3px",
+                }}
+              >
+                {COMPANY_INFO.tagline}
+              </div>
+            </div>
           </div>
-          <div>
-            <h1 className="text-2xl font-black text-gray-900">
-              {COMPANY_INFO.name}
-            </h1>
-            <p className="text-xs text-gray-500">{COMPANY_INFO.tagline}</p>
+          <div
+            style={{
+              fontSize: "10px",
+              color: "#4b5563",
+              lineHeight: 1.7,
+            }}
+          >
+            <div>{COMPANY_INFO.address}</div>
+            <div>
+              <span style={{ color: "#9ca3af" }}>Phone</span>{" "}
+              {COMPANY_INFO.phone}
+              <span style={{ margin: "0 6px", color: "#d1d5db" }}>|</span>
+              <span style={{ color: "#9ca3af" }}>Email</span>{" "}
+              {COMPANY_INFO.email}
+            </div>
+            <div>
+              <span style={{ color: "#9ca3af" }}>GSTIN</span>{" "}
+              <span style={{ fontFamily: "monospace", fontWeight: 600 }}>
+                {COMPANY_INFO.gstin}
+              </span>
+              <span style={{ margin: "0 6px", color: "#d1d5db" }}>|</span>
+              <span style={{ color: "#9ca3af" }}>FSSAI</span>{" "}
+              <span style={{ fontFamily: "monospace", fontWeight: 600 }}>
+                {COMPANY_INFO.fssai}
+              </span>
+            </div>
           </div>
         </div>
-        <div className="text-[11px] text-gray-500 leading-relaxed mt-2">
-          {COMPANY_INFO.address}
-          <br />
-          Phone: {COMPANY_INFO.phone} · Email: {COMPANY_INFO.email}
-          <br />
-          GSTIN: {COMPANY_INFO.gstin} · FSSAI: {COMPANY_INFO.fssai}
-        </div>
-      </div>
-      <div className="text-right">
-        <div className="inline-block px-4 py-1.5 rounded-lg bg-emerald-50 text-emerald-700 text-xs font-bold uppercase tracking-wider mb-2">
-          Tax Invoice
-        </div>
-        <div className="font-mono text-base font-bold text-gray-900">
-          {invoice.invoiceNo}
-        </div>
-        <div className="text-xs text-gray-500 mt-1">
-          {invoice.date} · {invoice.time}
-        </div>
-        <Tag
-          color={getStatusConfig(invoice.status).color}
-          className="mt-2 text-[10px]"
+
+        {/* Right: invoice meta box */}
+        <div
+          style={{
+            textAlign: "right",
+            minWidth: "220px",
+          }}
         >
-          {invoice.status.toUpperCase()}
-        </Tag>
+          <div
+            style={{
+              display: "inline-block",
+              padding: "4px 10px",
+              borderRadius: "4px",
+              background: "#ecfdf5",
+              color: "#047857",
+              fontSize: "10px",
+              fontWeight: 700,
+              letterSpacing: "1.5px",
+              textTransform: "uppercase",
+              marginBottom: "10px",
+            }}
+          >
+            Tax Invoice
+          </div>
+          <div
+            style={{
+              fontFamily: "monospace",
+              fontSize: "16px",
+              fontWeight: 800,
+              color: "#111827",
+              letterSpacing: "-0.3px",
+            }}
+          >
+            {invoice.invoiceNo}
+          </div>
+          <div
+            style={{
+              fontSize: "11px",
+              color: "#6b7280",
+              marginTop: "4px",
+            }}
+          >
+            Issued <strong>{invoice.date}</strong> · {invoice.time}
+          </div>
+          {invoice.dueDate && (
+            <div
+              style={{
+                fontSize: "11px",
+                color: hasBalance ? "#dc2626" : "#6b7280",
+                marginTop: "2px",
+                fontWeight: hasBalance ? 600 : 400,
+              }}
+            >
+              Due by {invoice.dueDate}
+            </div>
+          )}
+          <div
+            style={{
+              marginTop: "10px",
+              display: "inline-block",
+              padding: "5px 12px",
+              borderRadius: "6px",
+              fontSize: "10px",
+              fontWeight: 700,
+              letterSpacing: "1px",
+              textTransform: "uppercase",
+              ...(isPaid
+                ? {
+                    background: "#d1fae5",
+                    color: "#065f46",
+                    border: "1px solid #6ee7b7",
+                  }
+                : isCancelled
+                ? {
+                    background: "#f3f4f6",
+                    color: "#6b7280",
+                    border: "1px solid #d1d5db",
+                  }
+                : hasBalance
+                ? {
+                    background: "#fef3c7",
+                    color: "#92400e",
+                    border: "1px solid #fcd34d",
+                  }
+                : {
+                    background: "#dbeafe",
+                    color: "#1e40af",
+                    border: "1px solid #93c5fd",
+                  }),
+            }}
+          >
+            {invoice.status}
+          </div>
+        </div>
       </div>
-    </div>
 
-    {/* Bill To */}
-    <div className="grid grid-cols-2 gap-6 my-6">
-      <div>
-        <div className="text-[10px] text-gray-400 uppercase tracking-wider font-bold mb-2">
-          Bill To
-        </div>
-        <div className="font-bold text-gray-900 text-base">
-          {invoice.customerName}
-        </div>
-        <div className="text-xs text-gray-500 mt-0.5 font-mono">
-          {invoice.customerId}
-        </div>
-        {invoice.customerPhone && (
-          <div className="text-xs text-gray-600 mt-1.5 flex items-center gap-1">
-            <HiOutlinePhone className="w-3 h-3" /> {invoice.customerPhone}
+      {/* ── Bill To / Details two-column ──────────────────────────── */}
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "1fr 1fr",
+          gap: "16px",
+          marginBottom: "20px",
+        }}
+      >
+        <div
+          style={{
+            padding: "14px 16px",
+            background: "#f9fafb",
+            borderRadius: "8px",
+            borderLeft: "3px solid #10b981",
+          }}
+        >
+          <div
+            style={{
+              fontSize: "9px",
+              fontWeight: 700,
+              color: "#9ca3af",
+              letterSpacing: "1.5px",
+              textTransform: "uppercase",
+              marginBottom: "6px",
+            }}
+          >
+            Bill To
           </div>
-        )}
-        {invoice.customerAddress && (
-          <div className="text-xs text-gray-600 mt-1 leading-relaxed">
-            {invoice.customerAddress}
+          <div
+            style={{
+              fontSize: "14px",
+              fontWeight: 700,
+              color: "#111827",
+              marginBottom: "2px",
+            }}
+          >
+            {invoice.customerName}
           </div>
-        )}
-      </div>
-      <div className="text-right">
-        <div className="text-[10px] text-gray-400 uppercase tracking-wider font-bold mb-2">
-          Details
+          <div
+            style={{
+              fontSize: "10px",
+              fontFamily: "monospace",
+              color: "#6b7280",
+              marginBottom: "6px",
+            }}
+          >
+            {invoice.customerId}
+          </div>
+          {invoice.customerPhone && (
+            <div style={{ fontSize: "11px", color: "#374151" }}>
+              <span style={{ color: "#9ca3af" }}>Phone</span>{" "}
+              {invoice.customerPhone}
+            </div>
+          )}
+          {invoice.customerAddress && (
+            <div
+              style={{
+                fontSize: "11px",
+                color: "#374151",
+                marginTop: "2px",
+                lineHeight: 1.5,
+              }}
+            >
+              {invoice.customerAddress}
+            </div>
+          )}
         </div>
-        <div className="text-xs space-y-1">
-          <div className="flex justify-between">
-            <span className="text-gray-500">Customer Type</span>
-            <span className="font-medium text-gray-800">
-              {invoice.customerType}
-            </span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-gray-500">Payment Mode</span>
-            <span className="font-medium text-gray-800">
-              {invoice.paymentMode}
-            </span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-gray-500">Delivery</span>
-            <span className="font-medium text-gray-800">
-              {invoice.deliveryMode}
-            </span>
-          </div>
-        </div>
-      </div>
-    </div>
 
-    {/* Items */}
-    <table className="w-full mb-6">
-      <thead>
-        <tr className="bg-gray-900 text-white text-[11px] uppercase tracking-wider">
-          <th className="text-left px-3 py-2.5 font-semibold">#</th>
-          <th className="text-left px-3 py-2.5 font-semibold">Product</th>
-          <th className="text-left px-3 py-2.5 font-semibold">SKU</th>
-          <th className="text-center px-3 py-2.5 font-semibold">Qty</th>
-          <th className="text-right px-3 py-2.5 font-semibold">Rate</th>
-          <th className="text-right px-3 py-2.5 font-semibold">Total</th>
-        </tr>
-      </thead>
-      <tbody>
-        {invoice.items.map((item, idx) => (
-          <tr key={idx} className="border-b border-gray-100">
-            <td className="px-3 py-3 text-xs text-gray-500">{idx + 1}</td>
-            <td className="px-3 py-3 text-[13px] font-semibold text-gray-900">
-              {item.product}
-            </td>
-            <td className="px-3 py-3 text-[11px] font-mono text-gray-500">
-              {item.sku || "—"}
-            </td>
-            <td className="px-3 py-3 text-[13px] text-gray-700 text-center">
-              {item.qty}
-            </td>
-            <td className="px-3 py-3 text-[13px] text-gray-700 text-right">
-              {formatCurrency(item.price)}
-            </td>
-            <td className="px-3 py-3 text-[13px] font-bold text-gray-900 text-right">
-              {formatCurrency(item.total)}
-            </td>
+        <div
+          style={{
+            padding: "14px 16px",
+            background: "#f9fafb",
+            borderRadius: "8px",
+          }}
+        >
+          <div
+            style={{
+              fontSize: "9px",
+              fontWeight: 700,
+              color: "#9ca3af",
+              letterSpacing: "1.5px",
+              textTransform: "uppercase",
+              marginBottom: "8px",
+            }}
+          >
+            Invoice Details
+          </div>
+          {[
+            { label: "Customer Type", value: invoice.customerType },
+            { label: "Payment Mode", value: invoice.paymentMode },
+            { label: "Delivery", value: invoice.deliveryMode },
+            { label: "Place of Supply", value: "Tamil Nadu (33)" },
+          ].map((row) => (
+            <div
+              key={row.label}
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                fontSize: "11px",
+                padding: "3px 0",
+              }}
+            >
+              <span style={{ color: "#6b7280" }}>{row.label}</span>
+              <span style={{ color: "#111827", fontWeight: 600 }}>
+                {row.value}
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* ── Items table ───────────────────────────────────────────── */}
+      <table
+        style={{
+          width: "100%",
+          borderCollapse: "collapse",
+          marginBottom: "20px",
+          fontSize: "11px",
+        }}
+      >
+        <thead>
+          <tr
+            style={{
+              background: "#064e3b",
+              color: "white",
+            }}
+          >
+            <th
+              style={{
+                textAlign: "center",
+                padding: "10px 8px",
+                fontSize: "10px",
+                fontWeight: 700,
+                letterSpacing: "0.5px",
+                textTransform: "uppercase",
+                width: "32px",
+              }}
+            >
+              #
+            </th>
+            <th
+              style={{
+                textAlign: "left",
+                padding: "10px 8px",
+                fontSize: "10px",
+                fontWeight: 700,
+                letterSpacing: "0.5px",
+                textTransform: "uppercase",
+              }}
+            >
+              Description
+            </th>
+            <th
+              style={{
+                textAlign: "left",
+                padding: "10px 8px",
+                fontSize: "10px",
+                fontWeight: 700,
+                letterSpacing: "0.5px",
+                textTransform: "uppercase",
+                width: "80px",
+              }}
+            >
+              HSN/SKU
+            </th>
+            <th
+              style={{
+                textAlign: "center",
+                padding: "10px 8px",
+                fontSize: "10px",
+                fontWeight: 700,
+                letterSpacing: "0.5px",
+                textTransform: "uppercase",
+                width: "50px",
+              }}
+            >
+              Qty
+            </th>
+            <th
+              style={{
+                textAlign: "right",
+                padding: "10px 8px",
+                fontSize: "10px",
+                fontWeight: 700,
+                letterSpacing: "0.5px",
+                textTransform: "uppercase",
+                width: "80px",
+              }}
+            >
+              Rate
+            </th>
+            <th
+              style={{
+                textAlign: "right",
+                padding: "10px 12px",
+                fontSize: "10px",
+                fontWeight: 700,
+                letterSpacing: "0.5px",
+                textTransform: "uppercase",
+                width: "100px",
+              }}
+            >
+              Amount
+            </th>
           </tr>
-        ))}
-      </tbody>
-    </table>
+        </thead>
+        <tbody>
+          {invoice.items.map((item, idx) => (
+            <tr
+              key={idx}
+              style={{
+                borderBottom: "1px solid #f3f4f6",
+                background: idx % 2 === 0 ? "white" : "#fafafa",
+              }}
+            >
+              <td
+                style={{
+                  padding: "10px 8px",
+                  textAlign: "center",
+                  color: "#9ca3af",
+                  fontWeight: 600,
+                }}
+              >
+                {idx + 1}
+              </td>
+              <td
+                style={{
+                  padding: "10px 8px",
+                  fontWeight: 600,
+                  color: "#111827",
+                }}
+              >
+                {item.product}
+              </td>
+              <td
+                style={{
+                  padding: "10px 8px",
+                  fontFamily: "monospace",
+                  fontSize: "10px",
+                  color: "#6b7280",
+                }}
+              >
+                {item.sku || "—"}
+              </td>
+              <td
+                style={{
+                  padding: "10px 8px",
+                  textAlign: "center",
+                  color: "#374151",
+                  fontWeight: 600,
+                }}
+              >
+                {item.qty}
+              </td>
+              <td
+                style={{
+                  padding: "10px 8px",
+                  textAlign: "right",
+                  color: "#374151",
+                }}
+              >
+                {formatCurrency(item.price)}
+              </td>
+              <td
+                style={{
+                  padding: "10px 12px",
+                  textAlign: "right",
+                  fontWeight: 700,
+                  color: "#111827",
+                }}
+              >
+                {formatCurrency(item.total)}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
 
-    {/* Totals */}
-    <div className="flex justify-end mb-6">
-      <div className="w-72 space-y-2">
-        <div className="flex justify-between text-[13px]">
-          <span className="text-gray-500">Subtotal</span>
-          <span className="font-medium text-gray-800">
-            {formatCurrency(invoice.subtotal)}
-          </span>
+      {/* ── Amount in words + Totals side by side ─────────────────── */}
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "1fr 280px",
+          gap: "16px",
+          marginBottom: "24px",
+        }}
+      >
+        {/* Amount in words */}
+        <div
+          style={{
+            padding: "14px 16px",
+            background: "#fffbeb",
+            border: "1px dashed #fcd34d",
+            borderRadius: "8px",
+            alignSelf: "start",
+          }}
+        >
+          <div
+            style={{
+              fontSize: "9px",
+              fontWeight: 700,
+              color: "#92400e",
+              letterSpacing: "1.5px",
+              textTransform: "uppercase",
+              marginBottom: "4px",
+            }}
+          >
+            Amount in Words
+          </div>
+          <div
+            style={{
+              fontSize: "12px",
+              color: "#78350f",
+              fontWeight: 600,
+              fontStyle: "italic",
+              lineHeight: 1.5,
+            }}
+          >
+            {numberToWords(invoice.grandTotal)}
+          </div>
         </div>
-        {invoice.gst > 0 && (
-          <div className="flex justify-between text-[13px]">
-            <span className="text-gray-500">GST (18%)</span>
-            <span className="font-medium text-gray-800">
-              +{formatCurrency(invoice.gst)}
+
+        {/* Totals panel */}
+        <div
+          style={{
+            border: "1px solid #e5e7eb",
+            borderRadius: "8px",
+            overflow: "hidden",
+          }}
+        >
+          <div style={{ padding: "12px 14px" }}>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                fontSize: "11px",
+                padding: "3px 0",
+              }}
+            >
+              <span style={{ color: "#6b7280" }}>Subtotal</span>
+              <span style={{ color: "#111827", fontWeight: 600 }}>
+                {formatCurrency(invoice.subtotal)}
+              </span>
+            </div>
+            {invoice.gst > 0 && (
+              <>
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    fontSize: "11px",
+                    padding: "3px 0",
+                  }}
+                >
+                  <span style={{ color: "#6b7280" }}>CGST (9%)</span>
+                  <span style={{ color: "#111827", fontWeight: 600 }}>
+                    +{formatCurrency(invoice.gst / 2)}
+                  </span>
+                </div>
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    fontSize: "11px",
+                    padding: "3px 0",
+                  }}
+                >
+                  <span style={{ color: "#6b7280" }}>SGST (9%)</span>
+                  <span style={{ color: "#111827", fontWeight: 600 }}>
+                    +{formatCurrency(invoice.gst / 2)}
+                  </span>
+                </div>
+              </>
+            )}
+            {invoice.discount > 0 && (
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  fontSize: "11px",
+                  padding: "3px 0",
+                }}
+              >
+                <span style={{ color: "#6b7280" }}>Discount</span>
+                <span style={{ color: "#059669", fontWeight: 600 }}>
+                  -{formatCurrency(invoice.discount)}
+                </span>
+              </div>
+            )}
+          </div>
+
+          {/* Grand Total - emphasised */}
+          <div
+            style={{
+              background: "linear-gradient(135deg, #047857, #10b981)",
+              color: "white",
+              padding: "14px 14px",
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+            }}
+          >
+            <span
+              style={{
+                fontSize: "11px",
+                fontWeight: 700,
+                letterSpacing: "1px",
+                textTransform: "uppercase",
+              }}
+            >
+              Grand Total
+            </span>
+            <span style={{ fontSize: "20px", fontWeight: 800 }}>
+              {formatCurrency(invoice.grandTotal)}
             </span>
           </div>
-        )}
-        {invoice.discount > 0 && (
-          <div className="flex justify-between text-[13px]">
-            <span className="text-gray-500">Discount</span>
-            <span className="font-medium text-emerald-600">
-              -{formatCurrency(invoice.discount)}
-            </span>
+
+          {/* Paid / Balance */}
+          <div
+            style={{
+              padding: "10px 14px",
+              background: "#f9fafb",
+              borderTop: "1px solid #e5e7eb",
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                fontSize: "11px",
+                padding: "2px 0",
+              }}
+            >
+              <span style={{ color: "#059669", fontWeight: 600 }}>Paid</span>
+              <span style={{ color: "#059669", fontWeight: 700 }}>
+                {formatCurrency(invoice.paidAmount)}
+              </span>
+            </div>
+            {hasBalance && (
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  fontSize: "12px",
+                  padding: "4px 0 2px",
+                  marginTop: "4px",
+                  borderTop: "1px dashed #e5e7eb",
+                }}
+              >
+                <span style={{ color: "#dc2626", fontWeight: 700 }}>
+                  Balance Due
+                </span>
+                <span style={{ color: "#dc2626", fontWeight: 800 }}>
+                  {formatCurrency(invoice.balanceAmount)}
+                </span>
+              </div>
+            )}
           </div>
-        )}
-        <div className="border-t-2 border-gray-900 pt-2 flex justify-between">
-          <span className="text-base font-black text-gray-900">
-            GRAND TOTAL
-          </span>
-          <span className="text-xl font-black text-emerald-700">
-            {formatCurrency(invoice.grandTotal)}
-          </span>
         </div>
-        <div className="flex justify-between text-[13px] pt-1">
-          <span className="text-emerald-600 font-medium">Paid</span>
-          <span className="text-emerald-600 font-bold">
-            {formatCurrency(invoice.paidAmount)}
-          </span>
-        </div>
-        {invoice.balanceAmount > 0 && (
-          <div className="flex justify-between text-[13px] bg-red-50 rounded px-2 py-1">
-            <span className="text-red-600 font-bold">Balance Due</span>
-            <span className="text-red-600 font-black">
-              {formatCurrency(invoice.balanceAmount)}
-            </span>
+      </div>
+
+      {/* ── Bank details (only when there's a balance due) ────────── */}
+      {hasBalance && !isCancelled && (
+        <div
+          style={{
+            padding: "12px 16px",
+            background: "#eff6ff",
+            border: "1px solid #bfdbfe",
+            borderRadius: "8px",
+            marginBottom: "20px",
+          }}
+        >
+          <div
+            style={{
+              fontSize: "9px",
+              fontWeight: 700,
+              color: "#1e40af",
+              letterSpacing: "1.5px",
+              textTransform: "uppercase",
+              marginBottom: "6px",
+            }}
+          >
+            Payment Instructions
           </div>
-        )}
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "1fr 1fr 1fr",
+              gap: "12px",
+              fontSize: "10px",
+              color: "#1e3a8a",
+            }}
+          >
+            <div>
+              <div style={{ color: "#60a5fa", fontSize: "9px" }}>Account</div>
+              <div style={{ fontWeight: 600 }}>{COMPANY_INFO.name}</div>
+            </div>
+            <div>
+              <div style={{ color: "#60a5fa", fontSize: "9px" }}>
+                UPI / Bank
+              </div>
+              <div style={{ fontWeight: 600 }}>
+                Contact us at {COMPANY_INFO.phone}
+              </div>
+            </div>
+            <div>
+              <div style={{ color: "#60a5fa", fontSize: "9px" }}>Reference</div>
+              <div style={{ fontFamily: "monospace", fontWeight: 600 }}>
+                {invoice.invoiceNo}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Notes ─────────────────────────────────────────────────── */}
+      {invoice.notes && (
+        <div
+          style={{
+            padding: "10px 14px",
+            background: "#f9fafb",
+            borderLeft: "3px solid #6b7280",
+            marginBottom: "20px",
+            fontSize: "11px",
+            color: "#374151",
+          }}
+        >
+          <strong style={{ color: "#111827" }}>Note: </strong>
+          {invoice.notes}
+        </div>
+      )}
+
+      {/* ── Footer: Terms + Signatures ────────────────────────────── */}
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "1fr 1fr",
+          gap: "24px",
+          paddingTop: "16px",
+          borderTop: "1px solid #e5e7eb",
+        }}
+      >
+        <div>
+          <div
+            style={{
+              fontSize: "9px",
+              fontWeight: 700,
+              color: "#9ca3af",
+              letterSpacing: "1.5px",
+              textTransform: "uppercase",
+              marginBottom: "6px",
+            }}
+          >
+            Terms & Conditions
+          </div>
+          <ol
+            style={{
+              fontSize: "10px",
+              color: "#4b5563",
+              paddingLeft: "16px",
+              lineHeight: 1.7,
+              margin: 0,
+            }}
+          >
+            <li>Goods once sold are non-refundable.</li>
+            <li>Empty cans/jars to be returned within 7 days.</li>
+            <li>Payment due within 15 days for credit sales.</li>
+            <li>
+              Any dispute is subject to{" "}
+              {COMPANY_INFO.address?.split(",").pop()?.trim() ?? "local"}{" "}
+              jurisdiction.
+            </li>
+          </ol>
+        </div>
+
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "1fr 1fr",
+            gap: "12px",
+            alignItems: "end",
+          }}
+        >
+          <div style={{ textAlign: "center" }}>
+            <div
+              style={{
+                borderTop: "1px solid #9ca3af",
+                paddingTop: "4px",
+                marginTop: "32px",
+                fontSize: "10px",
+                color: "#6b7280",
+              }}
+            >
+              Receiver's Signature
+            </div>
+          </div>
+          <div style={{ textAlign: "center" }}>
+            <div
+              style={{
+                fontSize: "10px",
+                fontWeight: 700,
+                color: "#111827",
+                marginBottom: "32px",
+              }}
+            >
+              For {COMPANY_INFO.name}
+            </div>
+            <div
+              style={{
+                borderTop: "1px solid #9ca3af",
+                paddingTop: "4px",
+                fontSize: "10px",
+                color: "#6b7280",
+              }}
+            >
+              Authorised Signatory
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Bottom line ───────────────────────────────────────────── */}
+      <div
+        style={{
+          marginTop: "24px",
+          paddingTop: "12px",
+          borderTop: "1px dashed #e5e7eb",
+          textAlign: "center",
+          fontSize: "9px",
+          color: "#9ca3af",
+        }}
+      >
+        Thank you for your business. This is a computer-generated invoice and
+        does not require a physical signature.
+        <br />
+        <span style={{ color: "#d1d5db" }}>
+          Generated by {COMPANY_INFO.name} ERP · {invoice.date}
+        </span>
       </div>
     </div>
-
-    {invoice.notes && (
-      <div className="bg-amber-50 border-l-4 border-amber-400 px-3 py-2 mb-6">
-        <div className="text-[10px] text-amber-700 font-bold uppercase tracking-wider">
-          Notes
-        </div>
-        <div className="text-xs text-amber-900 mt-0.5">{invoice.notes}</div>
-      </div>
-    )}
-
-    {/* Footer */}
-    <div className="border-t border-gray-200 pt-4 mt-6 grid grid-cols-2 gap-6 text-[10px] text-gray-500">
-      <div>
-        <div className="font-bold text-gray-700 uppercase tracking-wider mb-1">
-          Terms
-        </div>
-        <ul className="space-y-0.5 leading-relaxed">
-          <li>· Goods once sold are non-refundable</li>
-          <li>· Empty cans/jars to be returned within 7 days</li>
-          <li>· Payment due within 15 days for credit sales</li>
-        </ul>
-      </div>
-      <div className="text-right">
-        <div className="font-bold text-gray-700 uppercase tracking-wider mb-8">
-          For {COMPANY_INFO.name}
-        </div>
-        <div className="border-t border-gray-300 pt-1 inline-block min-w-[140px]">
-          <div className="text-[10px]">Authorised Signatory</div>
-        </div>
-      </div>
-    </div>
-
-    <div className="text-center mt-6 pt-4 border-t border-dashed border-gray-200">
-      <div className="text-[10px] text-gray-400">
-        Thank you for your business! 💧
-      </div>
-      <div className="text-[9px] text-gray-300 mt-0.5">
-        This is a computer-generated invoice and does not require a physical
-        signature.
-      </div>
-    </div>
-  </div>
-);
+  );
+};
 
 export default PrintableInvoice;

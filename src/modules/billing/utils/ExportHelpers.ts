@@ -1,16 +1,9 @@
-// src/modules/billing/utils/ExportHelpers.ts
-
 import { Invoice, PaymentEntry, Customer } from "../types/billing";
 import { COMPANY_INFO } from "../constants/Mockdata";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 
-/* ════════════════════════════════════════════════════════════════════════════
-   DATE HELPERS
-   ════════════════════════════════════════════════════════════════════════════ */
-
 const parseInvoiceDate = (dateStr: string): Date => {
-  // "25 Apr 2026" -> Date
   const [day, month, year] = dateStr.split(" ");
   const months = [
     "Jan",

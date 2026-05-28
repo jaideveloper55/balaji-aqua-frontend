@@ -48,7 +48,7 @@ const CustomInput = <T extends FieldValues>({
   disabled = false,
   autoFocus = false,
   className = "",
-  size = "large",
+  size = "middle",
   isrequired = false,
   rules,
 }: CustomInputProps<T>) => {

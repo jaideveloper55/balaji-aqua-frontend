@@ -1,15 +1,20 @@
 import React, { useState, useEffect } from "react";
-import { Modal, InputNumber, message } from "antd";
+import { InputNumber, message } from "antd";
+import { useForm } from "react-hook-form";
+import dayjs, { Dayjs } from "dayjs";
 import {
   HiOutlineCash,
   HiOutlineCreditCard,
   HiOutlineExclamationCircle,
   HiOutlineCheckCircle,
   HiOutlineCheck,
+  HiOutlineCalendar,
 } from "react-icons/hi";
 import { HiMiniQrCode, HiBuildingLibrary } from "react-icons/hi2";
 import { Customer } from "../../types/billing";
 import { formatCurrency } from "../../utils/Helpers";
+import CustomModal from "../../../../components/common/CustomModal";
+import CustomDateRange from "../../../../components/common/CustomDateRange";
 
 interface Props {
   open: boolean;
@@ -21,14 +26,21 @@ interface Props {
   grandTotal: number;
   onPaymentModeChange: (mode: string) => void;
   onAmountReceivedChange: (val: number) => void;
-  onConfirm: (reference?: string) => void;
+  onConfirm: (reference?: string, dueDate?: string) => void;
   onClose: () => void;
 }
 
-// ─── CONFIGURE YOUR BUSINESS UPI ID HERE ─────────────────────────
-const BUSINESS_UPI_ID = "balajiaqua@hdfc"; // Change to your real UPI ID
+const BUSINESS_UPI_ID = "balajiaqua@hdfc";
 const BUSINESS_NAME = "Balaji Aqua Water Plant";
-// ──────────────────────────────────────────────────────────────────
+
+type FormShape = { dueDate: Dayjs | null };
+
+const DUE_PRESETS = [
+  { label: "7 Days", build: () => dayjs().add(7, "day") },
+  { label: "15 Days", build: () => dayjs().add(15, "day") },
+  { label: "30 Days", build: () => dayjs().add(30, "day") },
+  { label: "End of Month", build: () => dayjs().endOf("month") },
+];
 
 const PaymentModal: React.FC<Props> = ({
   open,
@@ -46,20 +58,42 @@ const PaymentModal: React.FC<Props> = ({
   const [upiReference, setUpiReference] = useState("");
   const [upiVerified, setUpiVerified] = useState(false);
 
-  // Reset when modal opens/closes or mode changes
+  // react-hook-form just for the due date (so CustomDatePicker plugs in cleanly)
+  const {
+    control,
+    watch,
+    setValue,
+    formState: { errors },
+    reset,
+  } = useForm<FormShape>({
+    defaultValues: { dueDate: dayjs().add(30, "day") },
+    mode: "onChange",
+  });
+
+  const dueDate = watch("dueDate");
+
+  const isPartial =
+    paymentMode !== "credit" &&
+    amountReceived > 0 &&
+    amountReceived < grandTotal;
+
+  const showDueDateSection = paymentMode === "credit" || isPartial;
+
+  // Reset everything when modal closes
   useEffect(() => {
     if (!open) {
       setUpiReference("");
       setUpiVerified(false);
+      reset({ dueDate: dayjs().add(30, "day") });
     }
-  }, [open]);
+  }, [open, reset]);
 
   useEffect(() => {
     setUpiReference("");
     setUpiVerified(false);
   }, [paymentMode]);
 
-  // Generate UPI deep link — works in any UPI app
+  // UPI link + QR
   const upiLink = `upi://pay?pa=${encodeURIComponent(
     BUSINESS_UPI_ID
   )}&pn=${encodeURIComponent(
@@ -67,8 +101,6 @@ const PaymentModal: React.FC<Props> = ({
   )}&am=${grandTotal}&cu=INR&tn=${encodeURIComponent(
     `Invoice payment - ${selectedCustomer?.name || "Customer"}`
   )}`;
-
-  // QR code URL — using free public QR generator
   const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=${encodeURIComponent(
     upiLink
   )}`;
@@ -98,7 +130,22 @@ const PaymentModal: React.FC<Props> = ({
       message.warning("Please verify the UPI payment reference first");
       return;
     }
-    onConfirm(paymentMode === "upi" ? upiReference : undefined);
+
+    if (showDueDateSection) {
+      if (!dueDate) {
+        message.warning("Please select a due date");
+        return;
+      }
+      if (dueDate.isBefore(dayjs().startOf("day"))) {
+        message.warning("Due date cannot be in the past");
+        return;
+      }
+    }
+
+    onConfirm(
+      paymentMode === "upi" ? upiReference : undefined,
+      showDueDateSection ? dueDate?.toISOString() : undefined
+    );
   };
 
   const handleVerifyUPI = () => {
@@ -123,20 +170,72 @@ const PaymentModal: React.FC<Props> = ({
     }
   };
 
+  const applyPreset = (build: () => Dayjs) => {
+    setValue("dueDate", build(), { shouldValidate: true });
+  };
+
+  const isPresetActive = (build: () => Dayjs): boolean => {
+    if (!dueDate) return false;
+    return dueDate.isSame(build(), "day");
+  };
+
+  const dueDaysFromNow = dueDate
+    ? dueDate.diff(dayjs().startOf("day"), "day")
+    : 0;
+
+  // ── Footer for CustomModal ──
+  const modalFooter = (
+    <div className="flex gap-2">
+      <button
+        onClick={onClose}
+        disabled={isProcessing}
+        className="flex-1 py-2.5 rounded-xl border border-gray-200 text-gray-600 text-[13px] font-medium hover:bg-gray-50 disabled:opacity-50"
+      >
+        Cancel
+      </button>
+      <button
+        onClick={handleConfirm}
+        disabled={isProcessing || (paymentMode === "upi" && !upiVerified)}
+        className={`flex-[2] py-2.5 rounded-xl font-semibold text-[13px] flex items-center justify-center gap-2 transition-all
+          ${
+            isProcessing || (paymentMode === "upi" && !upiVerified)
+              ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+              : "bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg shadow-emerald-200 active:scale-[0.98]"
+          }`}
+      >
+        {isProcessing ? (
+          <>
+            <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+            Processing...
+          </>
+        ) : (
+          <>
+            <HiOutlineCheckCircle className="w-4 h-4" />
+            {isPartial
+              ? `Pay ₹${amountReceived} (Partial)`
+              : paymentMode === "credit"
+              ? `Confirm Credit Sale ${formatCurrency(grandTotal)}`
+              : `Confirm ${formatCurrency(grandTotal)}`}
+          </>
+        )}
+      </button>
+    </div>
+  );
+
   return (
-    <Modal
+    <CustomModal
       open={open}
-      onCancel={onClose}
-      footer={null}
-      width={520}
-      title={
-        <div className="flex items-center gap-2">
-          <HiOutlineCash className="w-5 h-5 text-emerald-600" />
-          <span>Process Payment</span>
-        </div>
+      onClose={onClose}
+      title="Process Payment"
+      subtitle={
+        selectedCustomer?.name ? `Bill for ${selectedCustomer.name}` : undefined
       }
+      icon={<HiOutlineCash className="w-5 h-5" />}
+      iconTone="green"
+      size="lg"
+      footer={modalFooter}
     >
-      <div className="space-y-4 py-2">
+      <div className="space-y-4">
         {/* Customer & Total */}
         <div className="bg-gradient-to-br from-emerald-50 to-green-50 rounded-xl p-4 border border-emerald-100">
           <div className="text-[11px] text-emerald-600 font-medium uppercase tracking-wide mb-1">
@@ -207,12 +306,11 @@ const PaymentModal: React.FC<Props> = ({
           </div>
         )}
 
-        {/* ─── UPI FLOW (Manual Collection) ─── */}
+        {/* ─── UPI FLOW ─── */}
         {paymentMode === "upi" && (
           <div className="space-y-3">
             {!upiVerified ? (
               <>
-                {/* QR Code Display */}
                 <div className="bg-white rounded-xl border-2 border-blue-100 p-4">
                   <div className="text-center mb-3">
                     <div className="text-[11px] font-semibold text-blue-600 uppercase tracking-wide mb-1">
@@ -255,7 +353,6 @@ const PaymentModal: React.FC<Props> = ({
                   </div>
                 </div>
 
-                {/* Reference Entry */}
                 <div className="bg-blue-50/40 border border-blue-100 rounded-xl p-3.5">
                   <div className="text-[11px] font-semibold text-blue-600 uppercase tracking-wide mb-1">
                     Step 2 — Enter Reference
@@ -283,7 +380,6 @@ const PaymentModal: React.FC<Props> = ({
                 </div>
               </>
             ) : (
-              /* Verified state */
               <div className="bg-emerald-50 border-2 border-emerald-200 rounded-xl p-4">
                 <div className="flex items-center gap-3 mb-2">
                   <div className="w-10 h-10 rounded-full bg-emerald-500 flex items-center justify-center">
@@ -327,21 +423,19 @@ const PaymentModal: React.FC<Props> = ({
           </div>
         )}
 
-        {/* ─── BANK TRANSFER FLOW ─── */}
+        {/* ─── BANK FLOW ─── */}
         {paymentMode === "bank" && (
-          <div className="space-y-2">
-            <div className="bg-indigo-50/40 border border-indigo-100 rounded-xl p-4">
-              <div className="text-[11px] font-semibold text-indigo-600 uppercase tracking-wide mb-2">
-                Bank Transfer Reference
-              </div>
-              <input
-                type="text"
-                value={upiReference}
-                onChange={(e) => setUpiReference(e.target.value)}
-                placeholder="NEFT/IMPS/RTGS reference number"
-                className="w-full px-3 py-2 rounded-lg border border-gray-200 text-[13px] font-mono placeholder:text-gray-300 focus:outline-none focus:border-indigo-400 bg-white"
-              />
+          <div className="bg-indigo-50/40 border border-indigo-100 rounded-xl p-4">
+            <div className="text-[11px] font-semibold text-indigo-600 uppercase tracking-wide mb-2">
+              Bank Transfer Reference
             </div>
+            <input
+              type="text"
+              value={upiReference}
+              onChange={(e) => setUpiReference(e.target.value)}
+              placeholder="NEFT/IMPS/RTGS reference number"
+              className="w-full px-3 py-2 rounded-lg border border-gray-200 text-[13px] font-mono placeholder:text-gray-300 focus:outline-none focus:border-indigo-400 bg-white"
+            />
           </div>
         )}
 
@@ -364,40 +458,60 @@ const PaymentModal: React.FC<Props> = ({
           </div>
         )}
 
-        {/* Action Buttons */}
-        <div className="flex gap-2 pt-2">
-          <button
-            onClick={onClose}
-            disabled={isProcessing}
-            className="flex-1 py-2.5 rounded-xl border border-gray-200 text-gray-600 text-[13px] font-medium hover:bg-gray-50 disabled:opacity-50"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={handleConfirm}
-            disabled={isProcessing || (paymentMode === "upi" && !upiVerified)}
-            className={`flex-[2] py-2.5 rounded-xl font-semibold text-[13px] flex items-center justify-center gap-2 transition-all
-              ${
-                isProcessing || (paymentMode === "upi" && !upiVerified)
-                  ? "bg-gray-100 text-gray-400 cursor-not-allowed"
-                  : "bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg shadow-emerald-200 active:scale-[0.98]"
-              }`}
-          >
-            {isProcessing ? (
-              <>
-                <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
-                Processing...
-              </>
-            ) : (
-              <>
-                <HiOutlineCheckCircle className="w-4 h-4" />
-                Confirm {formatCurrency(grandTotal)}
-              </>
+        {/* ─── DUE DATE (credit + partial) ─── */}
+        {showDueDateSection && (
+          <div className="bg-blue-50/40 border border-blue-100 rounded-xl p-3.5 space-y-2.5">
+            <div className="flex items-center gap-2">
+              <HiOutlineCalendar className="w-4 h-4 text-blue-600" />
+              <label className="text-[11px] font-bold text-blue-600 uppercase tracking-wider">
+                Payment Due By
+              </label>
+            </div>
+
+            {/* Quick presets */}
+            <div className="flex gap-1.5 flex-wrap">
+              {DUE_PRESETS.map((preset) => {
+                const active = isPresetActive(preset.build);
+                return (
+                  <button
+                    key={preset.label}
+                    onClick={() => applyPreset(preset.build)}
+                    className={`px-3 py-1.5 rounded-lg text-[11px] font-medium border transition-all
+                      ${
+                        active
+                          ? "bg-blue-600 text-white border-blue-600"
+                          : "bg-white text-gray-600 border-gray-200 hover:border-blue-300"
+                      }`}
+                  >
+                    {preset.label}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Custom date picker */}
+            <CustomDateRange
+              name="dueDate"
+              control={control}
+              errors={errors}
+              size="large"
+              isrequired
+              rules={{ required: "Due date is required" }}
+            />
+
+            {dueDate && (
+              <div className="text-[11px] text-gray-500">
+                {dueDaysFromNow === 0
+                  ? "Due today"
+                  : `Due in ${dueDaysFromNow} day${
+                      dueDaysFromNow === 1 ? "" : "s"
+                    } · ${dueDate.format("dddd, DD MMM YYYY")}`}
+              </div>
             )}
-          </button>
-        </div>
+          </div>
+        )}
       </div>
-    </Modal>
+    </CustomModal>
   );
 };
 

@@ -1,12 +1,7 @@
 import React, { RefObject } from "react";
-import { Switch } from "antd";
-import {
-  CartItem,
-  Customer,
-  CustomerMode,
-  Invoice,
-  Product,
-} from "../../types/billing";
+import { Spin, Switch } from "antd";
+import { CartItem, Customer, CustomerMode, Invoice } from "../../types/billing";
+import type { POSProduct } from "../../api/billing.api";
 import CustomerBar from "../pos/Customerbar";
 import ProductGrid from "../pos/Productgrid";
 import CartPanel from "../pos/Cartpanel";
@@ -24,15 +19,14 @@ interface Props {
   onOpenPicker: () => void;
   onOpenQuickAdd: () => void;
 
-  // Products
-  products: Product[];
+  products: POSProduct[];
+  isLoadingProducts: boolean;
   productSearch: string;
   onProductSearchChange: (v: string) => void;
-  onAddToCart: (p: Product) => void;
+  onAddToCart: (p: POSProduct) => void;
   productSearchRef: RefObject<HTMLInputElement | null>;
-  getEffectivePrice: (p: Product) => { price: number; isCustom: boolean };
+  getEffectivePrice: (p: POSProduct) => { price: number; isCustom: boolean };
 
-  // Cart & totals
   cart: CartItem[];
   notes: string;
   discount: number;
@@ -53,8 +47,6 @@ interface Props {
   onPrint: () => void;
   onShare: () => void;
   onNewSale: () => void;
-
-  // GST
   onIncludeGSTChange: (v: boolean) => void;
 }
 
@@ -76,17 +68,30 @@ const POSTab: React.FC<Props> = (p) => {
           onOpenQuickAdd={p.onOpenQuickAdd}
         />
 
-        <ProductGrid
-          products={p.products}
-          productSearch={p.productSearch}
-          onSearchChange={p.onProductSearchChange}
-          onAddToCart={p.onAddToCart}
-          cart={p.cart}
-          searchRef={p.productSearchRef}
-          getEffectivePrice={p.getEffectivePrice}
-        />
+        {/* Product area with loading overlay */}
+        <div className="flex-1 relative overflow-hidden">
+          {p.isLoadingProducts && (
+            <div
+              className="absolute inset-0 z-10 flex flex-col items-center
+              justify-center bg-white/70 backdrop-blur-[1px]"
+            >
+              <Spin size="large" />
+              <p className="text-[12px] text-slate-400 mt-3 font-medium">
+                Loading products...
+              </p>
+            </div>
+          )}
+          <ProductGrid
+            products={p.products}
+            productSearch={p.productSearch}
+            onSearchChange={p.onProductSearchChange}
+            onAddToCart={p.onAddToCart}
+            cart={p.cart}
+            searchRef={p.productSearchRef}
+            getEffectivePrice={p.getEffectivePrice}
+          />
+        </div>
 
-        {/* ─── Bottom Bar (GST only) ─── */}
         <div className="bg-white border-t border-gray-100 px-5 py-2.5 flex items-center justify-end">
           <div className="flex items-center gap-2">
             <span className="text-[11px] text-gray-500">GST 18%</span>

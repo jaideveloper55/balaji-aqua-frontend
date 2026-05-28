@@ -97,7 +97,7 @@ const CartPanel: React.FC<Props> = ({
             <div className="flex items-center gap-1">
               <HiOutlineTag className="w-2.5 h-2.5 text-emerald-500" />
               <span className="text-[10px] text-gray-400 line-through">
-                {formatCurrency(r.basePrice)}
+                {formatCurrency(r.basePrice ?? 0)}
               </span>
             </div>
           )}
@@ -111,7 +111,7 @@ const CartPanel: React.FC<Props> = ({
       render: (qty: number, r) => (
         <div className="flex items-center gap-1">
           <button
-            onClick={() => onUpdateQty(r.productId, -1)}
+            onClick={() => onUpdateQty(r.id, -1)} 
             className="w-6 h-6 rounded border border-gray-200 flex items-center justify-center hover:bg-gray-50 text-gray-500 shrink-0"
           >
             <HiOutlineMinus className="w-3 h-3" />
@@ -122,10 +122,10 @@ const CartPanel: React.FC<Props> = ({
             size="small"
             className="w-12 text-center"
             controls={false}
-            onChange={(val) => val && val > 0 && onSetQty(r.productId, val)}
+            onChange={(val) => val && val > 0 && onSetQty(r.id, val)} // ← r.id
           />
           <button
-            onClick={() => onUpdateQty(r.productId, 1)}
+            onClick={() => onUpdateQty(r.id, 1)} // ← r.id
             className="w-6 h-6 rounded border border-gray-200 flex items-center justify-center hover:bg-gray-50 text-gray-500 shrink-0"
           >
             <HiOutlinePlus className="w-3 h-3" />
@@ -149,7 +149,7 @@ const CartPanel: React.FC<Props> = ({
       width: 36,
       render: (_, r) => (
         <button
-          onClick={() => onRemove(r.productId)}
+          onClick={() => onRemove(r.id)} // ← r.id
           className="w-7 h-7 rounded flex items-center justify-center text-gray-300 hover:text-red-500 hover:bg-red-50 transition-colors"
         >
           <HiOutlineTrash className="w-3.5 h-3.5" />
@@ -159,8 +159,8 @@ const CartPanel: React.FC<Props> = ({
   ];
 
   return (
-    <div className="flex-1  flex flex-col m-5 bg-white">
-      {/* ─── Header ─── */}
+    <div className="flex-1 flex flex-col m-5 bg-white">
+      {/* Header */}
       <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <HiOutlineShoppingCart className="w-5 h-5 text-gray-400" />
@@ -183,7 +183,7 @@ const CartPanel: React.FC<Props> = ({
         )}
       </div>
 
-      {/* ─── Cart Items / Empty State ─── */}
+      {/* Cart Items / Empty State */}
       <div className="flex-1 overflow-y-auto">
         {cart.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-gray-300 px-6 py-12">
@@ -201,7 +201,7 @@ const CartPanel: React.FC<Props> = ({
           <Table
             dataSource={cart}
             columns={columns}
-            rowKey="productId"
+            rowKey="id" // ← use id not productId as row key
             pagination={false}
             size="small"
             className="billing-cart-table"
@@ -209,7 +209,7 @@ const CartPanel: React.FC<Props> = ({
         )}
       </div>
 
-      {/* ─── Cart Summary (only when items exist) ─── */}
+      {/* Cart Summary */}
       {cart.length > 0 && (
         <div className="border-t border-gray-100">
           <div className="px-4 py-2 border-b border-gray-50">
@@ -297,7 +297,7 @@ const CartPanel: React.FC<Props> = ({
         </div>
       )}
 
-      {/* ─── Invoice Success Card ─── */}
+      {/* Invoice Success Card */}
       {showInvoiceSuccess && generatedInvoice && (
         <div className="px-4 pb-4">
           <div className="bg-gradient-to-br from-emerald-50 to-green-50 border border-emerald-200 rounded-xl p-3.5">
