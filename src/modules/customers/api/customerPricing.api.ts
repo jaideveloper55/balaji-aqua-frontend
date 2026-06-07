@@ -5,11 +5,6 @@ import {
   Product,
 } from "../types/Customer";
 
-// ─── Helper: unwrap paginated OR flat array responses ─────────────────────
-// Backend may return either:
-//   - { data: T[], meta: {...} }  ← paginated
-//   - T[]                          ← flat
-// This handles both transparently.
 function unwrapList<T>(payload: unknown): T[] {
   if (Array.isArray(payload)) return payload;
   if (payload && typeof payload === "object" && "data" in payload) {
@@ -78,9 +73,6 @@ interface PaginatedResponse<T> {
 const MAX_PAGE_SIZE = 100;
 
 export const productsApi = {
-  /**
-   * Fetch ALL products as a flat list by walking through paginated responses.
-   */
   list: async (): Promise<Product[]> => {
     const first = await api.get<PaginatedResponse<Product>>("/products", {
       params: {

@@ -25,7 +25,7 @@ const CustomStatCard: React.FC<StatCardProps> = ({
       className={`group relative bg-white rounded-2xl border overflow-hidden transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 cursor-default ${
         alert
           ? "border-red-200/60 hover:shadow-red-100/50"
-          : "border-slate-100 hover:shadow-slate-200/50"
+          : "border-slate-200 hover:shadow-slate-200/50"
       }`}
     >
       <div

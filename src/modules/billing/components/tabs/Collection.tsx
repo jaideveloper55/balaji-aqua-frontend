@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useRef } from "react";
 import dayjs, { Dayjs } from "dayjs";
 import { useForm } from "react-hook-form";
 import { Table } from "antd";
@@ -16,10 +16,11 @@ import {
   HiBuildingLibrary,
 } from "react-icons/hi2";
 import { TbAlertCircle } from "react-icons/tb";
-
 import { formatCurrency, getInitials } from "../../utils/Helpers";
 import StatCard from "../StatCard";
 import CustomDateRange from "../../../../components/common/CustomDateRange";
+import CustomInput from "../../../../components/common/CustomInput";
+import CustomSelect from "../../../../components/common/CustomSelect";
 import { Invoice, PaymentEntry } from "../../types/billing";
 
 export type DateRange = [Dayjs | null, Dayjs | null] | null;
@@ -36,12 +37,15 @@ interface Props {
   selectedBank?: number;
   selectedTotal?: number;
   totalOutstanding?: number;
-  // ── Server-side pagination ──
   paymentsTotal?: number;
   page?: number;
   pageSize?: number;
   onPageChange?: (page: number) => void;
-  // ──
+  searchValue?: string;
+  modeFilter?: string;
+  onSearchChange?: (q: string) => void;
+  onModeChange?: (mode: string) => void;
+  isLoading?: boolean;
   onDateRangeChange?: (range: DateRange) => void;
   onExport?: () => void;
 }
@@ -61,6 +65,11 @@ const CollectionTab: React.FC<Props> = ({
   page,
   pageSize,
   onPageChange,
+  searchValue,
+  modeFilter,
+  onSearchChange,
+  onModeChange,
+  isLoading,
   onDateRangeChange,
   onExport,
 }) => {
@@ -92,13 +101,37 @@ const CollectionTab: React.FC<Props> = ({
 
   const isSingleDay = hasRange && from!.isSame(to!, "day");
 
-  // Local RHF so CustomDateRange has a control to bind to
   const {
     control,
+    watch,
     formState: { errors },
   } = useForm({
-    defaultValues: { dateRange },
+    defaultValues: {
+      dateRange,
+      search: searchValue ?? "",
+      mode: modeFilter ?? "all",
+    },
   });
+
+  const searchInput = watch("search") ?? "";
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(
+    undefined
+  );
+  const firstRun = useRef(true);
+
+  useEffect(() => {
+    if (firstRun.current) {
+      firstRun.current = false;
+      return;
+    }
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      onSearchChange?.(searchInput.trim());
+    }, 350);
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, [searchInput, onSearchChange]);
 
   const safeInvoiceCount = invoiceCount ?? 0;
   const safeInvoicedTotal = invoicedTotal ?? 0;
@@ -108,6 +141,15 @@ const CollectionTab: React.FC<Props> = ({
 
   const displayName = (name?: string) =>
     name && name.trim() ? name : "Walk-in";
+
+  const isFiltering = !!searchValue?.trim() || (modeFilter ?? "all") !== "all";
+
+  const modeOptions = [
+    { value: "all", label: "All modes" },
+    { value: "CASH", label: "Cash" },
+    { value: "UPI", label: "UPI" },
+    { value: "BANK_TRANSFER", label: "Bank Transfer" },
+  ];
 
   const modes = [
     {
@@ -308,7 +350,7 @@ const CollectionTab: React.FC<Props> = ({
       </div>
 
       <div className="bg-white rounded-xl border border-gray-100 p-5">
-        <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
           <h3 className="text-[13px] font-semibold text-gray-800">
             {isSingleDay
               ? `Transactions on ${from!.format("DD MMM YYYY")}`
@@ -316,9 +358,34 @@ const CollectionTab: React.FC<Props> = ({
           </h3>
           {(paymentsTotal ?? 0) > 0 && (
             <span className="text-[11px] text-gray-400">
-              {paymentsTotal} entries
+              {isFiltering
+                ? `${paymentsTotal} matching`
+                : `${paymentsTotal} entries`}
             </span>
           )}
+        </div>
+
+        {/* ── Search + mode filter (server-side) ────────────────────────── */}
+        <div className="flex items-end gap-2 flex-wrap mb-4">
+          <div className="flex-1 min-w-[200px]">
+            <CustomInput
+              name="search"
+              control={control}
+              placeholder="Search customer, invoice, or payment no..."
+              size="middle"
+            />
+          </div>
+          <div className="min-w-[160px]">
+            <CustomSelect
+              name="mode"
+              control={control}
+              errors={errors}
+              placeholder="Payment mode"
+              size="middle"
+              options={modeOptions}
+              onChange={(val) => onModeChange?.(val)}
+            />
+          </div>
         </div>
 
         <Table<PaymentEntry>
@@ -326,7 +393,12 @@ const CollectionTab: React.FC<Props> = ({
           dataSource={safePayments}
           rowKey="id"
           size="small"
-          locale={{ emptyText: "No transactions in this period" }}
+          loading={isLoading}
+          locale={{
+            emptyText: isFiltering
+              ? "No transactions match your filters"
+              : "No transactions in this period",
+          }}
           pagination={{
             current: page ?? 1,
             pageSize: pageSize ?? 10,

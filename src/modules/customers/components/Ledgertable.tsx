@@ -33,8 +33,9 @@ import { useLedger } from "../hooks/useLedger";
 
 import InvoiceDrawer from "./InvoiceDrawer";
 import ExportModal from "./ExportModal";
-import SummaryCard from "./ledger/SummaryCard";
+
 import GSTToggle from "./ledger/GSTToggle";
+import CustomStatCard from "../../../components/common/CustomStatCard";
 
 const LedgerTable: React.FC<LedgerTableProps> = ({ customerId }) => {
   const [search, setSearch] = useState("");
@@ -271,30 +272,32 @@ const LedgerTable: React.FC<LedgerTableProps> = ({ customerId }) => {
     <div className="flex flex-col gap-5 mx-auto">
       {/* Summary Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <SummaryCard
-          icon={HiOutlineArrowSmUp}
-          iconColor="text-red-500"
+        <CustomStatCard
+          icon={<HiOutlineArrowSmUp size={22} />}
+          color="#ef4444"
+          bg="#fef2f2"
           value={`₹${fmt(showGST ? totalDebit : totalBaseDebit)}`}
-          label="Total Debit"
-          sublabel={showGST ? "incl. GST" : "excl. GST"}
+          label={`Total Debit · ${showGST ? "incl. GST" : "excl. GST"}`}
         />
-        <SummaryCard
-          icon={HiOutlineArrowSmDown}
-          iconColor="text-emerald-500"
+        <CustomStatCard
+          icon={<HiOutlineArrowSmDown size={22} />}
+          color="#10b981"
+          bg="#ecfdf5"
           value={`₹${fmt(showGST ? totalCredit : totalBaseCredit)}`}
-          label="Total Credit"
-          sublabel={showGST ? "incl. GST" : "excl. GST"}
+          label={`Total Credit · ${showGST ? "incl. GST" : "excl. GST"}`}
         />
-        <SummaryCard
-          icon={HiOutlineCurrencyRupee}
-          iconColor="text-amber-500"
+        <CustomStatCard
+          icon={<HiOutlineCurrencyRupee size={22} />}
+          color="#f59e0b"
+          bg="#fffbeb"
           value={`₹${fmt(showGST ? outstanding : baseOutstanding)}`}
-          label="Outstanding"
-          sublabel={outstanding > 0 ? "Receivable" : "Settled"}
+          label={`Outstanding · ${outstanding > 0 ? "Receivable" : "Settled"}`}
+          alert={outstanding > 0}
         />
-        <SummaryCard
-          icon={HiOutlineClipboardList}
-          iconColor="text-blue-500"
+        <CustomStatCard
+          icon={<HiOutlineClipboardList size={22} />}
+          color="#3b82f6"
+          bg="#eff6ff"
           value={filtered.length}
           label="Total Entries"
         />

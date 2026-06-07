@@ -61,6 +61,7 @@ export interface PaymentFilters {
   customerId?: string;
   dateFrom?: string;
   dateTo?: string;
+  search?: string;
 }
 
 export interface UpdateInvoicePayload {
@@ -71,7 +72,7 @@ export interface UpdateInvoicePayload {
 export interface OutstandingFilters {
   risk?: "HIGH" | "MEDIUM" | "RECENT";
   search?: string;
-  sortBy?: "risk" | "amount" | "days" | "lastPaid";
+  sortBy?: "risk" | "amount" | "days" | "lastPaid" | "newest";
   page?: number;
   limit?: number;
 }
@@ -250,6 +251,11 @@ export const billingApi = {
     paymentMode?: string;
     referenceId?: string;
     amountPaid?: number;
+    payments?: {
+      mode: "CASH" | "UPI" | "BANK_TRANSFER";
+      amount: number;
+      referenceId?: string;
+    }[];
   }) => {
     const response = await api.post("/billing/cart/checkout", data);
     return response.data;

@@ -25,14 +25,14 @@ import {
   fmtShortDate,
   fmtDetailDate,
   fmtFullDate,
-} from "./customerDetailConstants";
+} from "../constants/customerDetailConstants";
 import {
   InfoRow,
-  Metric,
   InfoSection,
   DetailSkeleton,
   NotFound,
 } from "../components/Customerdetailwidgets";
+import CustomStatCard from "../../../components/common/CustomStatCard";
 
 interface CustomerDetailProps {
   customerId: string;
@@ -65,7 +65,6 @@ const CustomerDetail: React.FC<CustomerDetailProps> = ({
     .filter(Boolean)
     .join(", ");
 
-  // Outstanding can come from summary OR top-level (use summary for detail view)
   const outstanding =
     customer.summary?.outstandingBalance ?? customer.outstandingBalance ?? 0;
 
@@ -110,18 +109,20 @@ const CustomerDetail: React.FC<CustomerDetailProps> = ({
 
       {/* Metrics — pulled from backend `summary` object */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <Metric
+        <CustomStatCard
           icon={<HiOutlineShoppingCart size={22} />}
           label="Total Orders"
           value={String(customer.summary?.totalOrders ?? 0)}
           color="#3b82f6"
+          bg="#3b82f614"
           tooltip="Lifetime orders placed by this customer"
         />
-        <Metric
+        <CustomStatCard
           icon={<HiOutlineCurrencyRupee size={22} />}
           label="Outstanding"
           value={fmtCurrency(outstanding)}
           color={outstanding > 0 ? "#ef4444" : "#22c55e"}
+          bg={outstanding > 0 ? "#ef444414" : "#22c55e14"}
           tooltip={
             outstanding > 0
               ? "Amount pending collection"
@@ -129,18 +130,19 @@ const CustomerDetail: React.FC<CustomerDetailProps> = ({
           }
           alert={outstanding > 0}
         />
-        <Metric
+        <CustomStatCard
           icon={<HiOutlineCalendar size={22} />}
           label="Member Since"
           value={fmtShortDate(
             customer.summary?.memberSince ?? customer.createdAt
           )}
           color="#8b5cf6"
+          bg="#8b5cf614"
           tooltip={`Joined on ${fmtFullDate(
             customer.summary?.memberSince ?? customer.createdAt
           )}`}
         />
-        <Metric
+        <CustomStatCard
           icon={<HiOutlineTruck size={22} />}
           label="Last Order"
           value={
@@ -149,6 +151,7 @@ const CustomerDetail: React.FC<CustomerDetailProps> = ({
               : "None"
           }
           color="#f59e0b"
+          bg="#f59e0b14"
           tooltip={
             customer.summary?.lastOrderDate
               ? `Last ordered on ${fmtFullDate(customer.summary.lastOrderDate)}`

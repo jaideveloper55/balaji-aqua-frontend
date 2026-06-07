@@ -24,7 +24,7 @@ import StatCard from "../StatCard";
 import CustomSelect from "../../../../components/common/CustomSelect";
 import { Customer } from "../../types/billing";
 
-type SortKey = "risk" | "amount" | "days" | "lastPaid";
+type SortKey = "risk" | "amount" | "days" | "lastPaid" | "newest";
 
 interface Props {
   customers: Customer[];
@@ -52,6 +52,7 @@ const SORT_OPTIONS = [
   { value: "amount", label: "Sort: Amount (high to low)" },
   { value: "days", label: "Sort: Days overdue (most first)" },
   { value: "lastPaid", label: "Sort: Last paid (oldest first)" },
+  { value: "newest", label: "Sort: Newest first" },
 ];
 
 const sendWhatsAppReminder = (customer: Customer) => {
@@ -96,7 +97,6 @@ const OutstandingTab: React.FC<Props> = ({
     formState: { errors },
   } = useForm({ defaultValues: { sortBy } });
 
-  // ── Table columns ─────────────────────────────────────────────────────────
   const columns: ColumnsType<Customer> = [
     {
       title: "Customer",

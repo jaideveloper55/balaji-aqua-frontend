@@ -15,7 +15,7 @@ import {
 import { useCustomers } from "../hooks/useCustomers";
 import { useDeleteCustomer } from "../hooks/useDeleteCustomer";
 import type { Customer, CustomerStatus, CustomerType } from "../types/Customer";
-import { STATUS_MAP, TYPE_MAP } from "../components/customerDetailConstants";
+import { STATUS_MAP, TYPE_MAP } from "../constants/customerDetailConstants";
 import CustomerTableFilters from "./CustomerTableFilters";
 import { IconType } from "react-icons";
 import DeleteConfirmModal from "../../products/components/Deleteconfirmmodal";

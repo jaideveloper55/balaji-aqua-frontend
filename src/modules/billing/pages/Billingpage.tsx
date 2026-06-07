@@ -1,14 +1,13 @@
 import { useState, useRef, useMemo } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-
 import { HiOutlineExclamation } from "react-icons/hi";
 import {
   HiBanknotes,
   HiClipboardDocumentList,
   HiCreditCard,
   HiMiniChartBarSquare,
+  HiReceiptPercent,
 } from "react-icons/hi2";
-
 import {
   Customer,
   Invoice,
@@ -17,13 +16,11 @@ import {
   TabDef,
   CustomerMode,
 } from "../types/billing";
-
 import {
   formatCurrency,
   getTodayString,
   getCurrentTimeString,
 } from "../utils/Helpers";
-
 import { useCart } from "../../billing/components/hooks/Usecart";
 import { useKeyboardShortcuts } from "../../billing/components/hooks/Usekeyboardshortcuts";
 import PageHeader from "../components/PageHeader";
@@ -39,6 +36,7 @@ import PaymentModal from "../components/modals/Paymentmodal";
 import InvoiceDetailDrawer from "../components/drawers/Invoicedetaildrawer";
 import AddPaymentDrawer from "../components/drawers/Addpaymentdrawer";
 import ExportDrawer from "../components/drawers/Exportdrawer";
+import dayjs from "dayjs";
 import {
   errorNotification,
   successNotification,
@@ -50,6 +48,7 @@ import {
   InvoiceFilters,
   OutstandingFilters,
 } from "../api/billing.api";
+import CustomPageHeader from "../../../components/common/CustomPageHeader";
 
 type ExportType = "invoices" | "payments" | "outstanding" | "summary";
 
@@ -69,6 +68,16 @@ const PAYMENT_MODE_LABEL: Record<string, string> = {
   UPI: "UPI",
   BANK_TRANSFER: "Bank Transfer",
   CREDIT: "Credit",
+};
+
+const COLLECTION_MODE_TO_API: Record<
+  string,
+  PaymentFilters["paymentMode"] | undefined
+> = {
+  all: undefined,
+  CASH: "CASH",
+  UPI: "UPI",
+  BANK_TRANSFER: "BANK_TRANSFER",
 };
 
 const PAYMENTS_TAB_MODE_TO_API: Record<
@@ -91,7 +100,6 @@ const RISK_MAP: Record<string, "HIGH" | "MEDIUM" | "RECENT" | undefined> = {
 const BillingPage = () => {
   const queryClient = useQueryClient();
   const today = getTodayString();
-
   const [, setCustomers] = useState<Customer[]>([]);
   const [activeTab, setActiveTab] = useState<TabKey>("pos");
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(
@@ -114,45 +122,38 @@ const BillingPage = () => {
   const [showExport, setShowExport] = useState(false);
   const [exportDefaultType, setExportDefaultType] =
     useState<ExportType>("invoices");
-
   const [generatedInvoice, setGeneratedInvoice] = useState<Invoice | null>(
     null
   );
   const [showInvoiceSuccess, setShowInvoiceSuccess] = useState(false);
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
-
-  // ── Invoices tab filters ────────────────────────────────────────────────
   const [invoiceStatusFilter, setInvoiceStatusFilter] = useState("all");
   const [invoiceSearch, setInvoiceSearch] = useState("");
   const [invoiceDateRange, setInvoiceDateRange] = useState<DateRange>(null);
-
-  // ── Payments tab filters ────────────────────────────────────────────────
   const [paymentsSearch, setPaymentsSearch] = useState("");
   const [paymentsModeFilter, setPaymentsModeFilter] = useState<string>("all");
   const [paymentsDateRange, setPaymentsDateRange] = useState<DateRange>(null);
-
-  // ── Outstanding tab filters ─────────────────────────────────────────────
   const [outstandingFilter, setOutstandingFilter] = useState("all");
   const [outstandingSearch, setOutstandingSearch] = useState("");
   const [outstandingSortBy, setOutstandingSortBy] = useState<
-    "risk" | "amount" | "days" | "lastPaid"
-  >("risk");
+    "risk" | "amount" | "days" | "lastPaid" | "newest"
+  >("newest");
   const OUTSTANDING_PAGE_SIZE = 10;
   const [outstandingPage, setOutstandingPage] = useState(1);
-
-  // ── Collection (daily summary) tab filters ──────────────────────────────
-  const [collectionDateRange, setCollectionDateRange] =
-    useState<DateRange>(null);
+  const [collectionDateRange, setCollectionDateRange] = useState<DateRange>([
+    dayjs().startOf("day"),
+    dayjs().endOf("day"),
+  ]);
   const COLLECTION_PAGE_SIZE = 10;
   const [collectionPage, setCollectionPage] = useState(1);
-
-  // ── Add Payment drawer state ────────────────────────────────────────────
   const [paymentCustomer, setPaymentCustomer] = useState("");
   const [paymentInvoice, setPaymentInvoice] = useState("");
   const [paymentAmount, setPaymentAmount] = useState(0);
   const [paymentMethod, setPaymentMethod] = useState("cash");
   const [paymentReference, setPaymentReference] = useState("");
   const [paymentNotes, setPaymentNotes] = useState("");
+  const [collectionSearch, setCollectionSearch] = useState("");
+  const [collectionModeFilter, setCollectionModeFilter] = useState("all");
 
   const productSearchRef = useRef<HTMLInputElement>(null);
 
@@ -197,7 +198,6 @@ const BillingPage = () => {
   });
   const filteredProducts: POSProduct[] = posProducts ?? [];
 
-  // ── Invoices query ──────────────────────────────────────────────────────
   const invoiceApiFilters: InvoiceFilters = useMemo(() => {
     const f: InvoiceFilters = {
       limit: 50,
@@ -229,7 +229,11 @@ const BillingPage = () => {
     if (range?.[0]) f.dateFrom = range[0].format("YYYY-MM-DD");
     if (range?.[1]) f.dateTo = range[1].format("YYYY-MM-DD");
 
-    if (activeTab === "payments") {
+    if (onCollection) {
+      if (collectionSearch) f.search = collectionSearch;
+      const apiMode = COLLECTION_MODE_TO_API[collectionModeFilter];
+      if (apiMode) f.paymentMode = apiMode;
+    } else if (activeTab === "payments") {
       const apiMode = PAYMENTS_TAB_MODE_TO_API[paymentsModeFilter];
       if (apiMode) f.paymentMode = apiMode;
     }
@@ -238,6 +242,8 @@ const BillingPage = () => {
     activeTab,
     collectionDateRange,
     collectionPage,
+    collectionSearch,
+    collectionModeFilter,
     paymentsDateRange,
     paymentsModeFilter,
   ]);
@@ -348,10 +354,15 @@ const BillingPage = () => {
       paidAmount: inv.paidAmount ?? 0,
       balanceAmount: balanceDue,
       status: mapStatus(inv),
-      paymentMode: inv.payments?.[0]?.paymentMode
-        ? PAYMENT_MODE_LABEL[inv.payments[0].paymentMode] ??
-          inv.payments[0].paymentMode
-        : "—",
+      paymentMode: (() => {
+        const modes = [
+          ...new Set((inv.payments ?? []).map((p: any) => p.paymentMode)),
+        ];
+        if (modes.length === 0) return "—";
+        if (modes.length === 1)
+          return PAYMENT_MODE_LABEL[modes[0] as string] ?? modes[0];
+        return "Split";
+      })(),
       deliveryMode: "Counter",
       date: new Date(inv.invoiceDate ?? inv.createdAt).toLocaleDateString(
         "en-IN"
@@ -485,11 +496,6 @@ const BillingPage = () => {
       pendingAmount: invoices.reduce((s, i) => s + i.balanceAmount, 0),
     };
   }, [invoices, invoicesData]);
-
-  const collectionPayments = useMemo(
-    () => filteredPayments,
-    [filteredPayments]
-  );
 
   const createPaymentMutation = useMutation({
     mutationFn: billingApi.createPayment,
@@ -755,16 +761,40 @@ const BillingPage = () => {
     setShowPaymentModal(true);
   };
 
-  const handleConfirmPayment = (reference?: string, dueDate?: string) => {
+  const handleConfirmPayment = (
+    reference?: string,
+    dueDate?: string,
+    splits?: {
+      mode: "CASH" | "UPI" | "BANK_TRANSFER";
+      amount: number;
+      referenceId?: string;
+    }[]
+  ) => {
     setIsProcessing(true);
-    const isPartial = amountReceived > 0 && amountReceived < grandTotal;
 
+    // SPLIT PATH
+    if (splits && splits.length > 0) {
+      const paidNow = splits.reduce((s, p) => s + p.amount, 0);
+      const isPartial = paidNow < grandTotal;
+      const finalDueDate = isPartial
+        ? dueDate ??
+          new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
+        : null;
+      setLastDueDate(finalDueDate);
+
+      checkoutMutation.mutate({
+        payments: splits,
+        dueDate: finalDueDate ?? undefined,
+      });
+      return;
+    }
+
+    const isPartial = amountReceived > 0 && amountReceived < grandTotal;
     const finalDueDate =
       paymentMode === "credit" || isPartial
         ? dueDate ??
           new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
         : null;
-
     setLastDueDate(finalDueDate);
 
     checkoutMutation.mutate({
@@ -910,7 +940,13 @@ const BillingPage = () => {
   };
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen space-y-10">
+      <CustomPageHeader
+        icon={<HiReceiptPercent className="text-white" size={20} />}
+        title="Billing & POS"
+        subtitle="Quick billing, invoices, payments & collections"
+        iconBg="bg-blue-500"
+      />
       {/* Print-only invoice receipt */}
       {generatedInvoice && (
         <div className="hidden print:block">
@@ -1040,8 +1076,11 @@ const BillingPage = () => {
           <CollectionTab
             onExport={() => openExport("summary")}
             dateRange={collectionDateRange}
-            onDateRangeChange={setCollectionDateRange}
-            selectedPayments={collectionPayments}
+            onDateRangeChange={(r) => {
+              setCollectionDateRange(r);
+              setCollectionPage(1);
+            }}
+            selectedPayments={payments}
             selectedCash={dailySummary?.payments?.CASH ?? 0}
             selectedUPI={dailySummary?.payments?.UPI ?? 0}
             selectedBank={dailySummary?.payments?.BANK_TRANSFER ?? 0}
@@ -1054,6 +1093,16 @@ const BillingPage = () => {
             page={collectionPage}
             pageSize={COLLECTION_PAGE_SIZE}
             onPageChange={setCollectionPage}
+            searchValue={collectionSearch}
+            modeFilter={collectionModeFilter}
+            onSearchChange={(q) => {
+              setCollectionSearch(q);
+              setCollectionPage(1);
+            }}
+            onModeChange={(m) => {
+              setCollectionModeFilter(m);
+              setCollectionPage(1);
+            }}
           />
         )}
 

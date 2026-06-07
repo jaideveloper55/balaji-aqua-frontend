@@ -1,18 +1,27 @@
-import React, { useState, useMemo, useCallback, useRef } from "react";
+import React, {
+  useState,
+  useMemo,
+  useCallback,
+  useRef,
+  useEffect,
+} from "react";
 import { useForm } from "react-hook-form";
-import { HiOutlineCube, HiOutlineTag } from "react-icons/hi";
-
+import {
+  HiOutlineBell,
+  HiOutlineCube,
+  HiOutlineDownload,
+  HiOutlinePlus,
+  HiOutlineSparkles,
+  HiOutlineTag,
+} from "react-icons/hi";
 import type { ProductFilterFormValues, Product } from "../types/Product";
 import { PRODUCT_STAT_CONFIG } from "../constants/productConstants";
-
 import ProductModal, { ProductModalMode } from "../components/ProductModal";
-import StatCard from "../components/StatCard";
 import AlertBanner from "../components/alerts/AlertBanner";
 import CustomTabs from "../../../components/common/CustomTabs";
 import CategoryManager, {
   CategoryManagerHandle,
 } from "../components/Categorymanager";
-import Productspageheader from "../components/Productspageheader";
 import Productstablesection from "../components/Productstablesection";
 
 import {
@@ -23,6 +32,9 @@ import {
   useDeleteProducts,
 } from "../hooks/Useproducts";
 import DeleteConfirmModal from "../components/Deleteconfirmmodal";
+import CustomStatCard from "../../../components/common/CustomStatCard";
+import CustomPageHeader from "../../../components/common/CustomPageHeader";
+import { Button } from "antd";
 
 const FILTER_DEFAULTS: ProductFilterFormValues = {
   categoryFilter: "all",
@@ -39,8 +51,7 @@ const TABS = [
 
 const PAGE_SIZE = 10;
 
-const ProductsPage: React.FC = () => {
-  // ─── UI state ───
+const ProductsPage = () => {
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(PAGE_SIZE);
@@ -50,11 +61,8 @@ const ProductsPage: React.FC = () => {
   const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([]);
   const [activeTab, setActiveTab] = useState<TabKey>("products");
   const [dismissedAlerts, setDismissedAlerts] = useState<string[]>([]);
-
-  // 🆕 Delete modal state
   const [deleteTarget, setDeleteTarget] = useState<Product | null>(null);
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
-
   const categoryManagerRef = useRef<CategoryManagerHandle>(null);
 
   const {
@@ -105,7 +113,6 @@ const ProductsPage: React.FC = () => {
     (a) => !dismissedAlerts.includes(a.productId)
   );
 
-  // ─── Modal handlers ───
   const handleView = useCallback((product: Product) => {
     setActiveProduct(product);
     setModalMode("view");
@@ -134,9 +141,7 @@ const ProductsPage: React.FC = () => {
     setModalMode("edit");
   }, []);
 
-  // ─── 🆕 DELETE handlers — single + bulk ───
   const handleDelete = useCallback((product: Product) => {
-    // Open ONLY the delete modal — don't open the product modal alongside
     setDeleteTarget(product);
   }, []);
 
@@ -159,7 +164,6 @@ const ProductsPage: React.FC = () => {
     setSelectedRowKeys([]);
   }, [selectedRowKeys, bulkDeleteMutation]);
 
-  // ─── Other handlers ───
   const handleOpenCreateCategory = useCallback(() => {
     if (activeTab !== "categories") setActiveTab("categories");
     requestAnimationFrame(() => {
@@ -196,17 +200,41 @@ const ProductsPage: React.FC = () => {
     []
   );
 
-  React.useEffect(() => {
+  useEffect(() => {
     setPage(1);
   }, [search, categoryFilter, statusFilter, dateRange]);
 
   return (
     <div className="flex flex-col gap-6">
-      <Productspageheader
-        activeTab={activeTab}
-        unreadAlerts={visibleAlerts.length}
-        onAlertsClick={() => {}}
-        onPrimaryAdd={handlePrimaryAdd}
+      <CustomPageHeader
+        icon={<HiOutlineSparkles className="text-white" size={20} />}
+        title="Product Management"
+        subtitle="Manage products, categories, pricing & stock alerts"
+        iconBg="bg-blue-500"
+        actions={
+          <>
+            <Button
+              icon={<HiOutlineBell size={15} />}
+              className="!rounded-xl !h-9"
+            >
+              Alerts{visibleAlerts.length ? ` (${visibleAlerts.length})` : ""}
+            </Button>
+            <Button
+              icon={<HiOutlineDownload size={15} />}
+              className="!rounded-xl !h-9"
+            >
+              Export
+            </Button>
+            <Button
+              type="primary"
+              icon={<HiOutlinePlus size={15} />}
+              onClick={handlePrimaryAdd}
+              className="!bg-blue-600 hover:!bg-blue-700 !rounded-xl !h-9 !font-semibold"
+            >
+              {activeTab === "products" ? "Add Product" : "Add Category"}
+            </Button>
+          </>
+        }
       />
 
       <AlertBanner
@@ -227,7 +255,7 @@ const ProductsPage: React.FC = () => {
             };
             const value = valueMap[s.key] ?? 0;
             return (
-              <StatCard
+              <CustomStatCard
                 key={s.key}
                 icon={s.icon}
                 label={s.label}
