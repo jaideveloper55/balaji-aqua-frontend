@@ -1,403 +1,325 @@
-import React from "react";
-import { Modal, Button, DatePicker, Input, InputNumber, Divider } from "antd";
-import { Controller, useForm } from "react-hook-form";
+import { ReactNode, useEffect, useMemo } from "react";
+import { useForm } from "react-hook-form";
+import { Modal } from "antd";
 import {
-  HiOutlineArrowCircleDown,
-  HiOutlineArrowCircleUp,
+  HiOutlineArrowDown,
+  HiOutlineArrowUp,
   HiOutlineAdjustments,
 } from "react-icons/hi";
+import CustomModal from "../../../components/common/CustomModal";
 import CustomSelect from "../../../components/common/CustomSelect";
-import type { StockEntryFormValues, EntryMode } from "../types/Inventory";
+import CustomInput from "../../../components/common/CustomInput";
+import CustomTabs from "../../../components/common/CustomTabs";
 import {
-  PRODUCT_OPTIONS,
-  SOURCE_IN_OPTIONS,
-  SOURCE_OUT_OPTIONS,
-  ADJUST_REASON_OPTIONS,
-  SUPPLIER_OPTIONS,
+  MovementType,
+  StockEntryFormValues,
+  StockItem,
+  getAvailable,
+} from "../types/Inventory";
+import {
+  MOVEMENT_TYPE_MODAL_CONFIG,
+  SOURCE_OPTIONS,
 } from "../constants/Inventoryconstants";
 
-const MODE_CONFIG: Record<
-  EntryMode,
+interface StockentrymodalProps {
+  open: boolean;
+  mode: MovementType;
+  onModeChange: (mode: MovementType) => void;
+  items: StockItem[];
+  initialProduct?: StockItem | null;
+  onClose: () => void;
+  onSubmit: (values: StockEntryFormValues & { mode: MovementType }) => void;
+  submitting?: boolean;
+}
+
+const MODE_META: Record<
+  MovementType,
   {
-    icon: React.ReactNode;
-    title: string;
-    subtitle: string;
-    iconBg: string;
-    accentBorder: string;
-    btnClass: string;
-    btnLabel: string;
+    icon: ReactNode;
+    tone: "green" | "red" | "purple";
+    verb: string;
+    hint: string;
   }
 > = {
-  in: {
-    icon: <HiOutlineArrowCircleDown size={22} className="text-emerald-500" />,
-    title: "Stock In",
-    subtitle: "Record inward inventory — purchase, production, or return",
-    iconBg: "bg-emerald-50",
-    accentBorder: "border-l-emerald-500",
-    btnClass:
-      "!bg-emerald-600 hover:!bg-emerald-700 !shadow-sm !shadow-emerald-200",
-    btnLabel: "Add Stock",
+  stock_in: {
+    icon: <HiOutlineArrowDown size={22} />,
+    tone: "green",
+    verb: "Add",
+    hint: "Receive stock from production, purchase or returns",
   },
-  out: {
-    icon: <HiOutlineArrowCircleUp size={22} className="text-red-500" />,
-    title: "Stock Out",
-    subtitle: "Record outward inventory — delivery, damage, or internal use",
-    iconBg: "bg-red-50",
-    accentBorder: "border-l-red-500",
-    btnClass: "!bg-red-600 hover:!bg-red-700 !shadow-sm !shadow-red-200",
-    btnLabel: "Remove Stock",
+  stock_out: {
+    icon: <HiOutlineArrowUp size={22} />,
+    tone: "red",
+    verb: "Issue",
+    hint: "Issue stock for delivery, internal use or write-off",
   },
-  adjust: {
-    icon: <HiOutlineAdjustments size={22} className="text-violet-500" />,
-    title: "Stock Adjustment",
-    subtitle: "Correct stock levels — audit, damage write-off, or miscount",
-    iconBg: "bg-violet-50",
-    accentBorder: "border-l-violet-500",
-    btnClass:
-      "!bg-violet-600 hover:!bg-violet-700 !shadow-sm !shadow-violet-200",
-    btnLabel: "Adjust Stock",
+  adjustment: {
+    icon: <HiOutlineAdjustments size={22} />,
+    tone: "purple",
+    verb: "Set",
+    hint: "Correct stock after a physical count — enter the counted quantity",
   },
 };
 
-interface StockEntryModalProps {
-  open: boolean;
-  onClose: () => void;
-  mode: EntryMode;
-  onSubmit: (data: StockEntryFormValues) => void;
-  loading?: boolean;
-}
-
-const FieldLabel: React.FC<{
-  children: React.ReactNode;
-  required?: boolean;
-}> = ({ children, required }) => (
-  <label className="text-[12px] font-semibold text-slate-600 mb-1.5 block">
-    {children}
-    {required && <span className="text-red-500 ml-0.5">*</span>}
-  </label>
-);
-
-const FieldError: React.FC<{ message?: string }> = ({ message }) =>
-  message ? (
-    <p className="text-[11px] text-red-500 font-medium mt-1">{message}</p>
-  ) : null;
-
-const StockEntryModal: React.FC<StockEntryModalProps> = ({
+const Stockentrymodal = ({
   open,
-  onClose,
   mode,
+  onModeChange,
+  items,
+  initialProduct,
+  onClose,
   onSubmit,
-  loading = false,
-}) => {
-  const config = MODE_CONFIG[mode];
+  submitting,
+}: StockentrymodalProps) => {
   const {
     control,
     handleSubmit,
+    watch,
     reset,
-    formState: { errors },
+    setValue,
+    formState: { errors, isDirty },
   } = useForm<StockEntryFormValues>({
     defaultValues: {
       productId: "",
-      quantity: "",
+      qty: "",
       source: "",
-      supplier: "",
-      reason: "",
-      referenceId: "",
-      date: null,
-      notes: "",
-      oldQty: "",
-      newQty: "",
+      refId: "",
+      remarks: "",
     },
   });
 
-  const handleClose = () => {
-    reset();
-    onClose();
-  };
+  useEffect(() => {
+    if (open) {
+      reset({
+        productId: initialProduct?.id ?? "",
+        qty: "",
+        source: "",
+        refId: "",
+        remarks: "",
+      });
+    }
+  }, [open, initialProduct, reset]);
 
-  const handleFormSubmit = (data: StockEntryFormValues) => {
-    onSubmit(data);
-    reset();
-  };
+  useEffect(() => {
+    setValue("source", "");
+  }, [mode, setValue]);
 
-  const sourceOptions =
-    mode === "in"
-      ? SOURCE_IN_OPTIONS
-      : mode === "out"
-      ? SOURCE_OUT_OPTIONS
-      : ADJUST_REASON_OPTIONS;
+  const meta = MODE_META[mode];
+  const cfg = MOVEMENT_TYPE_MODAL_CONFIG[mode];
+
+  const productId = watch("productId");
+  const qtyRaw = watch("qty");
+  const qty = Number(qtyRaw) || 0;
+  const product = useMemo(
+    () => items.find((i) => i.id === productId) ?? null,
+    [items, productId]
+  );
+
+  const newBalance = !product
+    ? null
+    : mode === "stock_in"
+    ? product.current + qty
+    : mode === "stock_out"
+    ? product.current - qty
+    : qty;
+
+  const overdraw =
+    mode === "stock_out" && product !== null && qty > getAvailable(product);
+
+  const beforeClose = () =>
+    !isDirty
+      ? true
+      : new Promise<boolean>((resolve) => {
+          Modal.confirm({
+            title: "Discard this entry?",
+            content: "Your unsaved stock entry will be lost.",
+            okText: "Discard",
+            okButtonProps: { danger: true },
+            cancelText: "Keep editing",
+            onOk: () => resolve(true),
+            onCancel: () => resolve(false),
+          });
+        });
+
+  const submit = handleSubmit((values) =>
+    onSubmit({ ...values, qty: Number(values.qty), mode })
+  );
 
   return (
-    <Modal
+    <CustomModal
       open={open}
-      onCancel={handleClose}
-      footer={null}
-      width={580}
-      centered
-      destroyOnClose
-      className="!rounded-2xl"
+      onClose={onClose}
+      beforeClose={beforeClose}
+      title={`${cfg.label}`}
+      subtitle={meta.hint}
+      icon={meta.icon}
+      iconTone={meta.tone}
+      size="xl"
+      footer={
+        <div className="flex items-center justify-between gap-3">
+          {/* Confirmation summary lives IN the footer — user sees exactly
+              what will happen right next to the button that does it */}
+          <div className="text-[12px] text-slate-500 min-h-[18px]">
+            {product && qty > 0 && !overdraw && (
+              <>
+                {product.name}:{" "}
+                <b className="tabular-nums">{product.current}</b>
+                <span className="mx-1.5 text-slate-300">→</span>
+                <b className="tabular-nums" style={{ color: cfg.color }}>
+                  {newBalance}
+                </b>{" "}
+                {product.unit}
+              </>
+            )}
+            {overdraw && (
+              <span className="text-red-500 font-semibold">
+                Only {getAvailable(product!)} available ({product!.reserved}{" "}
+                reserved)
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 rounded-xl text-[13px] font-semibold text-slate-600 hover:bg-slate-100 transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={submit}
+              disabled={submitting || overdraw}
+              className="px-5 py-2 rounded-xl text-[13px] font-bold text-white transition-all
+                disabled:opacity-50 disabled:cursor-not-allowed hover:opacity-90 active:scale-[0.98]"
+              style={{ background: cfg.color }}
+            >
+              {submitting ? "Saving…" : `${meta.verb} Stock`}
+            </button>
+          </div>
+        </div>
+      }
     >
-      {/* Header with accent border */}
-      <div className={`flex items-center gap-3.5 mb-5`}>
-        <div
-          className={`p-2.5 rounded-xl ${config.iconBg} transition-transform duration-300 hover:scale-105`}
-        >
-          {config.icon}
-        </div>
-        <div>
-          <h3 className="text-[15px] font-bold text-slate-800">
-            {config.title}
-          </h3>
-          <p className="text-[11px] text-slate-400 leading-relaxed">
-            {config.subtitle}
-          </p>
-        </div>
-      </div>
+      <div className="flex flex-col gap-5">
+        {/* Mode switch inside the modal — user never opened the "wrong" modal */}
+        <CustomTabs
+          items={[
+            {
+              key: "stock_in",
+              label: "Stock In",
+              icon: <HiOutlineArrowDown size={14} />,
+            },
+            {
+              key: "stock_out",
+              label: "Stock Out",
+              icon: <HiOutlineArrowUp size={14} />,
+            },
+            {
+              key: "adjustment",
+              label: "Adjust",
+              icon: <HiOutlineAdjustments size={14} />,
+            },
+          ]}
+          activeKey={mode}
+          onChange={(k) => onModeChange(k as MovementType)}
+          accentColor={cfg.color}
+        />
 
-      <form
-        onSubmit={handleSubmit(handleFormSubmit)}
-        className="flex flex-col gap-5"
-      >
-        {/* Section: Product Details */}
-        <div>
-          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">
-            Product Details
-          </p>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="sm:col-span-2">
             <CustomSelect
+              label="Product"
               name="productId"
               control={control}
               errors={errors}
-              label="Product"
-              placeholder="Search & select product..."
-              options={PRODUCT_OPTIONS}
               isrequired
               showSearch
+              placeholder="Select product…"
               rules={{ required: "Product is required" }}
+              options={items.map((i) => ({
+                value: i.id,
+                label: `${i.name}  ·  ${i.sku}`,
+              }))}
             />
-            <CustomSelect
-              name="source"
-              control={control}
-              errors={errors}
-              label={mode === "adjust" ? "Reason" : "Source"}
-              placeholder={
-                mode === "adjust" ? "Select reason..." : "Select source..."
-              }
-              options={sourceOptions}
-              isrequired
-              rules={{ required: "Required" }}
-            />
-          </div>
-        </div>
-
-        <Divider className="!my-0 !border-slate-100" />
-
-        {/* Section: Quantity & Date */}
-        <div>
-          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">
-            {mode === "adjust" ? "Quantity Correction" : "Quantity & Timing"}
-          </p>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-3">
-            {mode === "adjust" ? (
-              <>
-                <div>
-                  <FieldLabel required>Old Qty (System)</FieldLabel>
-                  <Controller
-                    name="oldQty"
-                    control={control}
-                    rules={{ required: "Required" }}
-                    render={({ field }) => (
-                      <InputNumber
-                        {...field}
-                        size="large"
-                        className="!w-full !rounded-lg"
-                        placeholder="Current stock in system"
-                        min={0}
-                        status={errors.oldQty ? "error" : ""}
-                      />
-                    )}
-                  />
-                  <FieldError message={errors.oldQty?.message as string} />
-                </div>
-                <div>
-                  <FieldLabel required>New Qty (Actual)</FieldLabel>
-                  <Controller
-                    name="newQty"
-                    control={control}
-                    rules={{ required: "Required" }}
-                    render={({ field }) => (
-                      <InputNumber
-                        {...field}
-                        size="large"
-                        className="!w-full !rounded-lg"
-                        placeholder="Actual count after check"
-                        min={0}
-                        status={errors.newQty ? "error" : ""}
-                      />
-                    )}
-                  />
-                  <FieldError message={errors.newQty?.message as string} />
-                </div>
-              </>
-            ) : (
-              <>
-                <div>
-                  <FieldLabel required>Quantity</FieldLabel>
-                  <Controller
-                    name="quantity"
-                    control={control}
-                    rules={{ required: "Quantity is required" }}
-                    render={({ field }) => (
-                      <InputNumber
-                        {...field}
-                        size="large"
-                        className="!w-full !rounded-lg"
-                        placeholder="Enter quantity"
-                        min={1}
-                        status={errors.quantity ? "error" : ""}
-                      />
-                    )}
-                  />
-                  <FieldError message={errors.quantity?.message as string} />
-                </div>
-                <div>
-                  <FieldLabel required>Date</FieldLabel>
-                  <Controller
-                    name="date"
-                    control={control}
-                    rules={{ required: "Date is required" }}
-                    render={({ field }) => (
-                      <DatePicker
-                        {...field}
-                        size="large"
-                        className="w-full !rounded-lg"
-                        placeholder="Select date"
-                        status={errors.date ? "error" : ""}
-                      />
-                    )}
-                  />
-                  <FieldError message={errors.date?.message as string} />
-                </div>
-              </>
-            )}
-          </div>
-        </div>
-
-        <Divider className="!my-0 !border-slate-100" />
-
-        {/* Section: Additional Info */}
-        <div>
-          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">
-            Additional Information
-          </p>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-3">
-            {mode === "in" && (
-              <CustomSelect
-                name="supplier"
-                control={control}
-                errors={errors}
-                label="Supplier / Batch"
-                placeholder="Select supplier"
-                options={SUPPLIER_OPTIONS}
-                size="large"
-                showSearch
-              />
-            )}
-            {mode === "out" && (
-              <div>
-                <FieldLabel>Linked Delivery ID</FieldLabel>
-                <Controller
-                  name="referenceId"
-                  control={control}
-                  render={({ field }) => (
-                    <Input
-                      {...field}
-                      size="large"
-                      className="!rounded-lg"
-                      placeholder="e.g. DEL-0326-01"
-                    />
-                  )}
-                />
+            {/* Context strip: show stock the moment a product is chosen */}
+            {product && (
+              <div className="mt-2 flex items-center gap-4 px-3 py-2 rounded-xl bg-slate-50 border border-slate-100 text-[12px]">
+                <span className="text-slate-500">
+                  Current{" "}
+                  <b className="text-slate-800 tabular-nums">
+                    {product.current}
+                  </b>
+                </span>
+                <span className="text-slate-500">
+                  Reserved{" "}
+                  <b className="text-slate-800 tabular-nums">
+                    {product.reserved}
+                  </b>
+                </span>
+                <span className="text-slate-500">
+                  Available{" "}
+                  <b className="text-emerald-600 tabular-nums">
+                    {getAvailable(product)}
+                  </b>
+                </span>
+                <span className="ml-auto text-slate-400">
+                  Reorder at {product.reorderLevel} {product.unit}
+                </span>
               </div>
             )}
-            {mode === "adjust" && (
-              <div>
-                <FieldLabel>Date</FieldLabel>
-                <Controller
-                  name="date"
-                  control={control}
-                  render={({ field }) => (
-                    <DatePicker
-                      {...field}
-                      size="large"
-                      className="w-full !rounded-lg"
-                      placeholder="Select date"
-                    />
-                  )}
-                />
-              </div>
-            )}
-            <div>
-              <FieldLabel>Reference ID</FieldLabel>
-              <Controller
-                name="referenceId"
-                control={control}
-                render={({ field }) => (
-                  <Input
-                    {...field}
-                    size="large"
-                    className="!rounded-lg"
-                    placeholder="e.g. PO-0326-01"
-                  />
-                )}
-              />
-            </div>
           </div>
 
-          {/* Notes - full width */}
-          <div className="mt-3">
-            <FieldLabel>Notes</FieldLabel>
-            <Controller
-              name="notes"
-              control={control}
-              render={({ field }) => (
-                <Input.TextArea
-                  {...field}
-                  placeholder="Any remarks or notes about this entry..."
-                  rows={2}
-                  size="middle"
-                  showCount
-                  maxLength={200}
-                  className="!rounded-lg"
-                />
-              )}
-            />
-          </div>
-        </div>
+          <CustomInput
+            label={mode === "adjustment" ? "Counted Quantity" : "Quantity"}
+            name="qty"
+            control={control}
+            errors={errors}
+            isrequired
+            placeholder={mode === "adjustment" ? "Physical count" : "0"}
+            rules={{
+              required: "Quantity is required",
+              validate: (v: string | number) => {
+                const n = Number(v);
+                if (!Number.isFinite(n)) return "Enter a number";
+                if (mode !== "adjustment" && n <= 0)
+                  return "Must be greater than 0";
+                if (n < 0) return "Cannot be negative";
+                if (!Number.isInteger(n)) return "Whole units only";
+                return true;
+              },
+            }}
+          />
 
-        {/* Actions */}
-        <div className="flex items-center justify-between pt-4 border-t border-slate-100">
-          <p className="text-[10px] text-slate-400">
-            All stock entries are logged in the movement history
-          </p>
-          <div className="flex items-center gap-3">
-            <Button size="middle" onClick={handleClose} className="!rounded-lg">
-              Cancel
-            </Button>
-            <Button
-              type="primary"
-              htmlType="submit"
-              size="middle"
-              loading={loading}
-              className={`!rounded-lg !font-semibold ${config.btnClass}`}
-            >
-              {config.btnLabel}
-            </Button>
-          </div>
+          <CustomSelect
+            label={mode === "stock_in" ? "Source" : "Reason"}
+            name="source"
+            control={control}
+            errors={errors}
+            isrequired
+            placeholder="Select…"
+            rules={{ required: "Required for the audit trail" }}
+            options={SOURCE_OPTIONS[mode]}
+          />
+
+          <CustomInput
+            label="Reference ID"
+            name="refId"
+            control={control}
+            errors={errors}
+            placeholder="e.g. PROD-20260326-A (optional)"
+          />
+
+          <CustomInput
+            label="Remarks"
+            name="remarks"
+            control={control}
+            errors={errors}
+            placeholder="e.g. Morning batch (optional)"
+          />
         </div>
-      </form>
-    </Modal>
+      </div>
+    </CustomModal>
   );
 };
 
-export default StockEntryModal;
+export default Stockentrymodal;

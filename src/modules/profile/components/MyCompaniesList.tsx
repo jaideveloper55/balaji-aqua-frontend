@@ -1,6 +1,7 @@
 import { HiOutlineCheckCircle, HiOutlineOfficeBuilding } from "react-icons/hi";
 import { useAuthStore } from "../../../store/auth.store";
 import { successNotification } from "../../../components/common/Notification";
+import { queryClient } from "../../../lib/queryClient";
 
 const COMPANY_TYPE_LABELS: Record<string, { label: string; color: string }> = {
   WATER_PLANT: {
@@ -21,6 +22,7 @@ const MyCompaniesList = () => {
   const handleSwitch = (id: string, name: string) => {
     if (id === activeCompanyId) return;
     setActiveCompany(id);
+    queryClient.clear();
     successNotification("Company switched", `Now viewing ${name}`);
   };
 

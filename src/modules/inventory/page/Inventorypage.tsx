@@ -1,201 +1,380 @@
-import React, { useState } from "react";
-import { Button, Dropdown } from "antd";
-import type { MenuProps } from "antd";
+import { useMemo, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Button, message } from "antd";
 import {
-  HiOutlineDownload,
-  HiOutlineDotsVertical,
-  HiOutlineCube,
-  HiOutlineSwitchHorizontal,
-  HiOutlineBell,
+  HiOutlineArrowDown,
+  HiOutlineArrowUp,
   HiOutlineAdjustments,
+  HiOutlineCube,
+  HiOutlineBell,
+  HiOutlineSwitchHorizontal,
+  HiOutlineDownload,
+  HiOutlineArchive,
 } from "react-icons/hi";
-import { HiOutlineArrowDownTray, HiOutlineArrowUpTray } from "react-icons/hi2";
 
-import InventoryOverview from "../components/Inventoryoverview";
-import ProductStockTable from "../components/Productstocktable";
-import StockMovementTable from "../components/Stockmovementtable";
-import StockEntryModal from "../components/Stockentrymodal";
-import LowStockAlerts from "../components/Lowstockalerts";
-import InventoryFiltersBar from "../components/Inventoryfiltersbar";
+import Inventoryoverview from "../components/Inventoryoverview";
+import Inventoryfiltersbar from "../components/Inventoryfiltersbar";
+import Productstocktable from "../components/Productstocktable";
+import Lowstockalerts from "../components/Lowstockalerts";
+import Stockmovementtable from "../components/Stockmovementtable";
+import Stockentrymodal from "../components/Stockentrymodal";
 import SectionCard from "../components/SectionCard";
+import CustomTabs from "../../../components/common/CustomTabs";
+import CustomPageHeader from "../../../components/common/CustomPageHeader";
 
-import type {
-  EntryMode,
+import {
+  INVENTORY_TABS,
+  InventoryTabKey,
+} from "../constants/Inventoryconstants";
+import {
+  InventoryFilters,
+  MovementType,
   StockEntryFormValues,
-  LowStockAlertRecord,
+  StockItem,
 } from "../types/Inventory";
 import {
-  MOCK_OVERVIEW,
-  MOCK_PRODUCTS,
-  MOCK_MOVEMENTS,
-  MOCK_LOW_STOCK,
-} from "../data/Inventorymockdata";
+  inventoryApi,
+  StockListFilters,
+  MovementFilters,
+  LowStockRow,
+} from "../api/inventory.api";
 
-const InventoryPage: React.FC = () => {
+const DEFAULT_FILTERS: InventoryFilters = {
+  search: "",
+  status: "all",
+  category: "all",
+  dateRange: null,
+};
+
+const Inventorypage = () => {
+  const queryClient = useQueryClient();
+
+  const [activeTab, setActiveTab] = useState<InventoryTabKey>("stock");
+  const [filters, setFilters] = useState<InventoryFilters>(DEFAULT_FILTERS);
+
   const [modalOpen, setModalOpen] = useState(false);
-  const [entryMode, setEntryMode] = useState<EntryMode>("in");
-  const [loading] = useState(false);
+  const [modalMode, setModalMode] = useState<MovementType>("stock_in");
+  const [modalProduct, setModalProduct] = useState<StockItem | null>(null);
 
-  // ── Modal handlers ──
-  const openModal = (mode: EntryMode) => {
-    setEntryMode(mode);
+  const stockParams: StockListFilters = useMemo(
+    () => ({
+      search: filters.search || undefined,
+      status: filters.status === "all" ? undefined : filters.status,
+      categoryId: filters.category === "all" ? undefined : filters.category,
+      limit: 100,
+    }),
+    [filters.search, filters.status, filters.category]
+  );
+
+  const movementParams: MovementFilters = useMemo(
+    () => ({
+      search: filters.search || undefined,
+      categoryId: filters.category === "all" ? undefined : filters.category,
+      startDate: filters.dateRange?.[0]?.format("YYYY-MM-DD"),
+      endDate: filters.dateRange?.[1]?.format("YYYY-MM-DD"),
+      limit: 100,
+    }),
+    [filters.search, filters.category, filters.dateRange]
+  );
+
+  // KPI summary — always loaded (header cards show on every tab)
+  const { data: summary } = useQuery({
+    queryKey: ["inventory-summary"],
+    queryFn: inventoryApi.getSummary,
+    staleTime: 1000 * 60,
+  });
+
+  // Stock list — only when the Stock tab is active
+  const { data: stockData, isLoading: stockLoading } = useQuery({
+    queryKey: ["inventory-stock", stockParams],
+    queryFn: () => inventoryApi.getStockList(stockParams),
+    enabled: activeTab === "stock",
+    staleTime: 1000 * 30,
+  });
+
+  // Low-stock alerts — only when the Alerts tab is active
+  const { data: lowStockData, isLoading: lowLoading } = useQuery({
+    queryKey: ["inventory-low-stock"],
+    queryFn: inventoryApi.getLowStock,
+    enabled: activeTab === "alerts",
+    staleTime: 1000 * 30,
+  });
+
+  // Movement history — only when the Movements tab is active
+  const { data: movementsData, isLoading: movementsLoading } = useQuery({
+    queryKey: ["inventory-movements", movementParams],
+    queryFn: () => inventoryApi.getMovements(movementParams),
+    enabled: activeTab === "movements",
+    staleTime: 1000 * 30,
+  });
+
+  /* -------------------------- mutations ---------------------------- */
+  // After any stock change these caches are stale -> refetch them all.
+  const invalidateAll = () => {
+    queryClient.invalidateQueries({ queryKey: ["inventory-stock"] });
+    queryClient.invalidateQueries({ queryKey: ["inventory-summary"] });
+    queryClient.invalidateQueries({ queryKey: ["inventory-low-stock"] });
+    queryClient.invalidateQueries({ queryKey: ["inventory-movements"] });
+    // stock changes affect what's sellable in POS too:
+    queryClient.invalidateQueries({ queryKey: ["billing-pos-products"] });
+  };
+
+  const onMutationError = (err: any) =>
+    // Backend throws BadRequestException with a helpful message (e.g.
+    // "Only 12 available") - surface it instead of a generic error.
+    message.error(
+      err?.response?.data?.message ?? "Could not save the stock entry"
+    );
+
+  const stockInMutation = useMutation({
+    mutationFn: inventoryApi.stockIn,
+    onSuccess: () => {
+      invalidateAll();
+      message.success("Stock in recorded");
+      setModalOpen(false);
+    },
+    onError: onMutationError,
+  });
+
+  const stockOutMutation = useMutation({
+    mutationFn: inventoryApi.stockOut,
+    onSuccess: () => {
+      invalidateAll();
+      message.success("Stock out recorded");
+      setModalOpen(false);
+    },
+    onError: onMutationError,
+  });
+
+  const adjustMutation = useMutation({
+    mutationFn: inventoryApi.adjust,
+    onSuccess: () => {
+      invalidateAll();
+      message.success("Adjustment recorded");
+      setModalOpen(false);
+    },
+    onError: onMutationError,
+  });
+
+  const saving =
+    stockInMutation.isPending ||
+    stockOutMutation.isPending ||
+    adjustMutation.isPending;
+
+  /* -------------------------- derived ------------------------------ */
+  const stockItems: StockItem[] = stockData?.data ?? [];
+  const lowStockItems: LowStockRow[] = lowStockData?.data ?? [];
+  const movements = movementsData?.data ?? [];
+  const alertCount = lowStockData?.meta.total ?? 0;
+
+  const kpis = useMemo(
+    () => ({
+      totalStockValue: summary?.totalStockValue ?? 0,
+      lowStockItems: summary?.lowStock ?? 0,
+      outOfStockItems: summary?.outOfStock ?? 0,
+      damagedItems: summary?.damagedItems ?? 0,
+      inwardToday: summary?.inwardToday ?? 0,
+      outwardToday: summary?.outwardToday ?? 0,
+    }),
+    [summary]
+  );
+
+  /* ----------------------------- actions --------------------------- */
+  const openModal = (mode: MovementType, product: StockItem | null = null) => {
+    setModalMode(mode);
+    setModalProduct(product);
     setModalOpen(true);
   };
 
-  const handleSubmit = (data: StockEntryFormValues) => {
-    console.log("Stock entry submitted:", data);
-    setModalOpen(false);
+  // Map the ONE modal form to the THREE backend payloads by action.
+  const handleSubmit = (
+    values: StockEntryFormValues & { mode: MovementType }
+  ) => {
+    const referenceId = values.refId?.trim() || undefined;
+    const remarks = values.remarks?.trim() || undefined;
+    const quantity = Number(values.qty);
+    const common = { productId: values.productId, referenceId, remarks };
+
+    if (values.mode === "stock_in") {
+      stockInMutation.mutate({ ...common, quantity, source: values.source });
+    } else if (values.mode === "stock_out") {
+      stockOutMutation.mutate({ ...common, quantity, source: values.source });
+    } else {
+      // adjustment: backend wants countedQuantity (absolute physical count)
+      adjustMutation.mutate({ ...common, countedQuantity: quantity });
+    }
   };
 
-  const handleReorder = (record: LowStockAlertRecord) => {
-    console.log("Reorder:", record.productName);
+  const handleKpiNavigate = (tab: InventoryTabKey, statusFilter?: string) => {
+    setActiveTab(tab);
+    if (statusFilter)
+      setFilters((f) => ({
+        ...f,
+        status: statusFilter as InventoryFilters["status"],
+      }));
   };
 
-  // ── Filter handlers ──
-  const handleSearchChange = (val: string) => console.log("Search:", val);
-  const handleStatusChange = (val: string) => console.log("Status:", val);
-  const handleCategoryChange = (val: string) => console.log("Category:", val);
-  const handleWarehouseChange = (val: string) => console.log("Warehouse:", val);
-  const handleDateRangeChange = (dates: any) =>
-    console.log("DateRange:", dates);
-  const handleFilterReset = () => console.log("Filters reset");
-
-  // ── More menu ──
-  const moreMenuItems: MenuProps["items"] = [
-    {
-      key: "export-summary",
-      label: "Export Stock Summary",
-      icon: <HiOutlineDownload size={14} />,
-    },
-    {
-      key: "export-movement",
-      label: "Export Movement Report",
-      icon: <HiOutlineDownload size={14} />,
-    },
-    { type: "divider" },
-    {
-      key: "closing-report",
-      label: "Closing Stock Report",
-      icon: <HiOutlineDownload size={14} />,
-    },
-    {
-      key: "loss-report",
-      label: "Loss Report",
-      icon: <HiOutlineDownload size={14} />,
-    },
-  ];
-
+  /* ------------------------------ render ---------------------------- */
   return (
-    <div className="flex flex-col gap-6 ">
-      {/* ── Header ── */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-lg font-bold text-slate-800 tracking-tight">
-            Inventory Management
-          </h1>
-          <p className="text-xs text-slate-400 mt-0.5">
-            Track stock levels, movements & get low-stock alerts
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button
-            type="primary"
-            icon={<HiOutlineArrowDownTray size={15} />}
-            className="!bg-emerald-600 hover:!bg-emerald-700 !flex !items-center !gap-1 !text-[13px] !font-semibold !rounded-lg !shadow-sm !shadow-emerald-200"
-            onClick={() => openModal("in")}
-          >
-            Stock In
-          </Button>
-          <Button
-            icon={<HiOutlineArrowUpTray size={15} />}
-            className="!flex !items-center !gap-1 !text-[13px] !font-semibold !rounded-lg !border-red-200 !text-red-500 hover:!bg-red-50 hover:!border-red-300"
-            onClick={() => openModal("out")}
-          >
-            Stock Out
-          </Button>
-          <Button
-            icon={<HiOutlineAdjustments size={15} />}
-            className="!flex !items-center !gap-1 !text-[13px] !font-semibold !rounded-lg !border-violet-200 !text-violet-500 hover:!bg-violet-50 hover:!border-violet-300"
-            onClick={() => openModal("adjust")}
-          >
-            Adjust
-          </Button>
-          <Dropdown menu={{ items: moreMenuItems }} trigger={["click"]}>
+    <div className="flex flex-col gap-6 mx-auto">
+      <CustomPageHeader
+        icon={<HiOutlineArchive className="text-white" size={20} />}
+        title="Inventory Management"
+        subtitle="Track stock levels, movements & get low-stock alerts"
+        iconBg="bg-blue-500"
+        actions={
+          <>
             <Button
-              icon={<HiOutlineDotsVertical size={15} />}
-              className="!flex !items-center !rounded-lg"
+              icon={<HiOutlineDownload size={15} />}
+              onClick={() => message.info("Export coming soon")}
+              className="!rounded-xl !h-9"
+            >
+              Export
+            </Button>
+            <Button
+              icon={<HiOutlineAdjustments size={15} />}
+              onClick={() => openModal("adjustment")}
+              className="!rounded-xl !h-9 !text-purple-600 !border-purple-200 hover:!bg-purple-50 hover:!border-purple-300"
+            >
+              Adjust
+            </Button>
+            <Button
+              icon={<HiOutlineArrowUp size={15} />}
+              onClick={() => openModal("stock_out")}
+              className="!rounded-xl !h-9 !text-red-600 !border-red-200 hover:!bg-red-50 hover:!border-red-300"
+            >
+              Stock Out
+            </Button>
+            <Button
+              type="primary"
+              icon={<HiOutlineArrowDown size={15} />}
+              onClick={() => openModal("stock_in")}
+              className="!bg-emerald-600 hover:!bg-emerald-700 !rounded-xl !h-9 !font-semibold !border-0 !shadow-sm !shadow-emerald-500/25"
+            >
+              Stock In
+            </Button>
+          </>
+        }
+      />
+
+      {/* KPIs - fed by /inventory/summary */}
+      <Inventoryoverview kpis={kpis} onNavigate={handleKpiNavigate} />
+
+      <CustomTabs
+        className="max-w-xl"
+        items={INVENTORY_TABS.map((t) => ({
+          key: t.key,
+          label:
+            t.key === "alerts" && alertCount > 0
+              ? `${t.label} (${alertCount})`
+              : t.label,
+          icon:
+            t.key === "stock" ? (
+              <HiOutlineCube size={14} />
+            ) : t.key === "alerts" ? (
+              <HiOutlineBell size={14} />
+            ) : (
+              <HiOutlineSwitchHorizontal size={14} />
+            ),
+        }))}
+        activeKey={activeTab}
+        onChange={(k) => setActiveTab(k as InventoryTabKey)}
+        accentColor={activeTab === "alerts" ? "#dc2626" : "#2563eb"}
+      />
+
+      {/* ------------------------- Tab: Stock ------------------------- */}
+      {activeTab === "stock" && (
+        <SectionCard
+          icon={<HiOutlineCube size={19} />}
+          title="Product Stock List"
+          subtitle="Current inventory levels across all products"
+        >
+          <div className="flex flex-col gap-4">
+            <Inventoryfiltersbar
+              filters={filters}
+              onChange={(next) => setFilters((f) => ({ ...f, ...next }))}
+              onReset={() => setFilters(DEFAULT_FILTERS)}
+              resultCount={stockData?.meta.total ?? stockItems.length}
+              categories={[]}
             />
-          </Dropdown>
-        </div>
-      </div>
+            <Productstocktable
+              items={stockItems}
+              loading={stockLoading}
+              onQuickAction={(item, mode) => openModal(mode, item)}
+            />
+          </div>
+        </SectionCard>
+      )}
 
-      {/* ── Overview KPIs ── */}
-      <InventoryOverview data={MOCK_OVERVIEW} />
+      {/* ------------------------- Tab: Alerts ------------------------ */}
+      {activeTab === "alerts" && (
+        <SectionCard
+          icon={<HiOutlineBell size={19} />}
+          iconBg="#fef2f2"
+          iconColor="#dc2626"
+          title="Low Stock Alerts"
+          subtitle={`${alertCount} item${
+            alertCount === 1 ? "" : "s"
+          } need attention - prevent stockouts`}
+          actions={
+            (lowStockData?.meta.critical ?? 0) > 0 && (
+              <span className="px-2.5 py-1 rounded-lg bg-red-50 text-red-600 text-[11px] font-bold border border-red-100">
+                {lowStockData?.meta.critical} Critical
+              </span>
+            )
+          }
+        >
+          {lowLoading ? (
+            <div className="py-10 text-center text-slate-400 text-sm">
+              Loading alerts...
+            </div>
+          ) : (
+            <Lowstockalerts
+              items={lowStockItems}
+              onRestock={(item) => openModal("stock_in", item as StockItem)}
+            />
+          )}
+        </SectionCard>
+      )}
 
-      {/* ── Filters ── */}
-      <div className="bg-white rounded-xl border border-slate-100 shadow-sm shadow-slate-100/50 px-5 py-3">
-        <InventoryFiltersBar
-          onSearchChange={handleSearchChange}
-          onStatusChange={handleStatusChange}
-          onCategoryChange={handleCategoryChange}
-          onWarehouseChange={handleWarehouseChange}
-          onDateRangeChange={handleDateRangeChange}
-          onReset={handleFilterReset}
-        />
-      </div>
+      {activeTab === "movements" && (
+        <SectionCard
+          icon={<HiOutlineSwitchHorizontal size={19} />}
+          iconBg="#f5f3ff"
+          iconColor="#7c3aed"
+          title="Stock Movement History"
+          subtitle="Complete audit trail - every IN, OUT & adjustment"
+        >
+          <div className="flex flex-col gap-4">
+            <Inventoryfiltersbar
+              filters={filters}
+              onChange={(next) => setFilters((f) => ({ ...f, ...next }))}
+              onReset={() => setFilters(DEFAULT_FILTERS)}
+              showDateRange
+              resultCount={movementsData?.meta.total ?? movements.length}
+              categories={[]}
+            />
+            <Stockmovementtable
+              movements={movements}
+              loading={movementsLoading}
+            />
+          </div>
+        </SectionCard>
+      )}
 
-      {/* ── Product Stock Table ── */}
-      <SectionCard
-        icon={<HiOutlineCube size={15} className="text-blue-500" />}
-        title="Product Stock List"
-        subtitle="Current inventory levels across all products"
-
-      >
-        <ProductStockTable data={MOCK_PRODUCTS} loading={loading} />
-      </SectionCard>
-
-      {/* ── Low Stock Alerts ── */}
-      <SectionCard
-        icon={<HiOutlineBell size={15} className="text-red-500" />}
-        title="Low Stock Alerts"
-        subtitle={`${MOCK_LOW_STOCK.length} items need attention — prevent stockouts`}
-        action={
-          <span className="text-[11px] font-bold text-red-600 bg-red-50 px-2.5 py-1 rounded-full">
-            {MOCK_LOW_STOCK.filter((a) => a.status === "critical").length}{" "}
-            Critical
-          </span>
-        }
- 
-      >
-        <LowStockAlerts
-          data={MOCK_LOW_STOCK}
-          loading={loading}
-          onReorder={handleReorder}
-        />
-      </SectionCard>
-
-      {/* ── Stock Movement History ── */}
-      <SectionCard
-        icon={
-          <HiOutlineSwitchHorizontal size={15} className="text-slate-500" />
-        }
-        title="Stock Movement History"
-        subtitle="Complete audit trail — every IN, OUT & adjustment"
-  
-      >
-        <StockMovementTable data={MOCK_MOVEMENTS} loading={loading} />
-      </SectionCard>
-
-      {/* ── Entry Modal ── */}
-      <StockEntryModal
+      {/* One modal serves all three actions */}
+      <Stockentrymodal
         open={modalOpen}
+        mode={modalMode}
+        onModeChange={setModalMode}
+        items={stockItems}
+        initialProduct={modalProduct}
         onClose={() => setModalOpen(false)}
-        mode={entryMode}
         onSubmit={handleSubmit}
-        loading={loading}
+        submitting={saving}
       />
     </div>
   );
 };
 
-export default InventoryPage;
+export default Inventorypage;

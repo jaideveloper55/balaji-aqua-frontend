@@ -80,6 +80,7 @@ export const productsApi = {
         pageSize: MAX_PAGE_SIZE,
         sortBy: "name",
         sortOrder: "asc",
+        isSellable: true,
       },
     });
 
@@ -98,6 +99,7 @@ export const productsApi = {
             pageSize: MAX_PAGE_SIZE,
             sortBy: "name",
             sortOrder: "asc",
+            isSellable: true,
           },
         })
       )

@@ -1,118 +1,79 @@
-import { Dayjs } from "dayjs";
+import type { Dayjs } from "dayjs";
 
-// ── Overview ──
-export interface InventoryOverviewData {
+export type StockStatus = "IN_STOCK" | "LOW_STOCK" | "OUT_OF_STOCK";
+export type MovementType = "stock_in" | "stock_out" | "adjustment";
+export type AlertPriority = "critical" | "warning";
+
+export const STOCK_IN_SOURCES = [
+  "PURCHASE",
+  "PRODUCTION",
+  "RETURN",
+  "OPENING_BALANCE",
+] as const;
+export const STOCK_OUT_SOURCES = [
+  "SALE",
+  "DAMAGE",
+  "TRANSFER",
+  "INTERNAL_USE",
+] as const;
+export type StockSource =
+  | (typeof STOCK_IN_SOURCES)[number]
+  | (typeof STOCK_OUT_SOURCES)[number];
+
+export interface StockItem {
+  id: string;
+  name: string;
+  sku: string;
+  unit: string;
+  category: string | null;
+  categoryId: string | null;
+  current: number;
+  reserved: number;
+  available: number;
+  reorderLevel: number;
+  stockHealth: number;
+  status: StockStatus;
+}
+
+export interface StockMovement {
+  id: string;
+  date: string;
+  product: { name: string; sku: string };
+  type: "STOCK_IN" | "STOCK_OUT" | "ADJUSTMENT";
+  quantity: number;
+  balance: number;
+  source: string;
+  referenceId: string | null;
+  user: string;
+  remarks: string | null;
+}
+
+export interface InventoryKpis {
   totalStockValue: number;
   lowStockItems: number;
-  outOfStock: number;
+  outOfStockItems: number;
   damagedItems: number;
   inwardToday: number;
   outwardToday: number;
 }
 
-// ── Product Stock ──
-export type StockStatus = "in_stock" | "low" | "out";
-
-export interface ProductStockRecord {
-  key: string;
-  productId: string;
-  productName: string;
-  sku: string;
-  category: string;
-  currentStock: number;
-  reservedStock: number;
-  availableStock: number;
-  unit: string;
-  reorderLevel: number;
-  costPrice: number;
-  sellingPrice: number;
-  status: StockStatus;
-  lastUpdated: string;
-}
-
-// ── Stock Movement ──
-export type MovementType = "in" | "out" | "adjust";
-export type MovementSource =
-  | "purchase"
-  | "production"
-  | "return"
-  | "delivery"
-  | "damage"
-  | "internal_use"
-  | "audit_correction";
-
-export interface StockMovementRecord {
-  key: string;
-  id: string;
-  date: string;
-  productId: string;
-  productName: string;
-  sku: string;
-  type: MovementType;
-  quantity: number;
-  source: MovementSource;
-  referenceId: string;
-  user: string;
-  remarks: string;
-  balanceAfter: number;
-}
-
-// ── Stock Entry Form (In / Out / Adjust) ──
-export type EntryMode = "in" | "out" | "adjust";
-
+// ─── Modal form values ───────────────────────────────────────────────
 export interface StockEntryFormValues {
   productId: string;
-  quantity: string;
+  qty: number | string;
   source: string;
-  supplier: string;
-  reason: string;
-  referenceId: string;
-  date: Dayjs | null;
-  notes: string;
-  // adjustment only
-  oldQty: string;
-  newQty: string;
+  refId?: string;
+  remarks?: string;
 }
 
-// ── Low Stock Alert ──
-export interface LowStockAlertRecord {
-  key: string;
-  productId: string;
-  productName: string;
-  sku: string;
+export interface InventoryFilters {
+  search: string;
+  status: "all" | StockStatus;
   category: string;
-  currentStock: number;
-  reorderLevel: number;
-  deficit: number;
-  unit: string;
-  status: "critical" | "low";
-  lastOrdered: string | null;
+  dateRange: [Dayjs | null, Dayjs | null] | null;
 }
 
-// ── Category / Unit ──
-export interface CategoryRecord {
-  key: string;
-  id: string;
-  name: string;
-  productCount: number;
-  description: string;
-}
-
-export interface UnitRecord {
-  key: string;
-  id: string;
-  name: string;
-  symbol: string;
-  productCount: number;
-}
-
-// ── Warehouse ──
-export interface WarehouseRecord {
-  key: string;
-  id: string;
-  name: string;
-  location: string;
-  stockValue: number;
-  itemCount: number;
-  type: "plant" | "storage" | "vehicle";
-}
+// ─── Helpers: return backend-computed fields (one source of truth) ───
+export const getAvailable = (item: StockItem): number => item.available;
+export const getStockStatus = (item: StockItem): StockStatus => item.status;
+export const getStockHealth = (item: StockItem): number => item.stockHealth;

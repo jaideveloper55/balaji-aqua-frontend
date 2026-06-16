@@ -10,6 +10,6 @@ export const useProducts = () => {
     queryKey: ["products", "list", activeCompanyId],
     queryFn: () => productsApi.list(),
     enabled: !!activeCompanyId,
-    staleTime: 1000 * 60 * 5, // 5 min — products change less often
+    staleTime: 1000 * 60 * 5, 
   });
 };

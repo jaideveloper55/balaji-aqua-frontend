@@ -1,83 +1,126 @@
-export const STOCK_STATUS_OPTIONS = [
+// src/modules/inventory/constants/Inventoryconstants.ts
+import { AlertPriority, MovementType, StockStatus } from "../types/Inventory";
+
+/* ------------------------------ Tabs ------------------------------ */
+
+export const INVENTORY_TABS = [
+  { key: "stock", label: "Stock Overview" },
+  { key: "alerts", label: "Low Stock Alerts" },
+  { key: "movements", label: "Movement History" },
+] as const;
+
+export type InventoryTabKey = (typeof INVENTORY_TABS)[number]["key"];
+
+/* --------------------------- Stock status -------------------------- */
+// CHANGED: keyed by backend StockStatus (UPPERCASE), so STOCK_STATUS_CONFIG[row.status] works.
+
+export const STOCK_STATUS_CONFIG: Record<
+  StockStatus,
+  { label: string; color: string; bg: string; border: string }
+> = {
+  IN_STOCK: {
+    label: "In Stock",
+    color: "#059669",
+    bg: "#ecfdf5",
+    border: "#a7f3d0",
+  },
+  LOW_STOCK: {
+    label: "Low Stock",
+    color: "#d97706",
+    bg: "#fffbeb",
+    border: "#fde68a",
+  },
+  OUT_OF_STOCK: {
+    label: "Out of Stock",
+    color: "#dc2626",
+    bg: "#fef2f2",
+    border: "#fecaca",
+  },
+};
+
+// CHANGED: filter values uppercase to match backend
+export const STATUS_FILTER_OPTIONS = [
   { value: "all", label: "All Status" },
-  { value: "in_stock", label: "In Stock" },
-  { value: "low", label: "Low Stock" },
-  { value: "out", label: "Out of Stock" },
+  { value: "IN_STOCK", label: "In Stock" },
+  { value: "LOW_STOCK", label: "Low Stock" },
+  { value: "OUT_OF_STOCK", label: "Out of Stock" },
 ];
+
+/* ------------------------- Movement config ------------------------- */
+// Two separate maps for two separate enums:
+
+// (1) Keyed by BACKEND record type (UPPERCASE) — used by Stockmovementtable
+//     via row.type. This is the one that was erroring.
+export const MOVEMENT_TYPE_CONFIG: Record<
+  "STOCK_IN" | "STOCK_OUT" | "ADJUSTMENT",
+  { label: string; color: string; bg: string; sign: 1 | -1 | 0 }
+> = {
+  STOCK_IN: { label: "Stock In", color: "#059669", bg: "#ecfdf5", sign: 1 },
+  STOCK_OUT: { label: "Stock Out", color: "#dc2626", bg: "#fef2f2", sign: -1 },
+  ADJUSTMENT: { label: "Adjustment", color: "#7c3aed", bg: "#f5f3ff", sign: 0 },
+};
+
+// (2) Keyed by MODAL action (lowercase) — used by Stockentrymodal via `mode`.
+export const MOVEMENT_TYPE_MODAL_CONFIG: Record<
+  MovementType,
+  { label: string; color: string }
+> = {
+  stock_in: { label: "Stock In", color: "#059669" },
+  stock_out: { label: "Stock Out", color: "#dc2626" },
+  adjustment: { label: "Stock Adjustment", color: "#7c3aed" },
+};
+
+export const SOURCE_OPTIONS: Record<
+  MovementType,
+  { value: string; label: string }[]
+> = {
+  stock_in: [
+    { value: "PRODUCTION", label: "Production" },
+    { value: "PURCHASE", label: "Purchase" },
+    { value: "CUSTOMER_RETURN", label: "Customer Return" },
+    { value: "OPENING_STOCK", label: "Opening Stock" },
+  ],
+  stock_out: [
+    { value: "DELIVERY", label: "Delivery" },
+    { value: "INTERNAL_USE", label: "Internal Use" },
+    { value: "DAMAGE", label: "Damage / Breakage" },
+  ],
+  adjustment: [
+    { value: "STOCK_COUNT_CORRECTION", label: "Stock Count Correction" },
+  ],
+};
+
+export const SOURCE_LABELS: Record<string, string> = {
+  PRODUCTION: "Production",
+  PURCHASE: "Purchase",
+  CUSTOMER_RETURN: "Customer Return",
+  OPENING_STOCK: "Opening Stock",
+  DELIVERY: "Delivery",
+  INTERNAL_USE: "Internal Use",
+  DAMAGE: "Damage / Breakage",
+  STOCK_COUNT_CORRECTION: "Stock Count Correction",
+};
+
+/* --------------------------- Categories ---------------------------- */
 
 export const CATEGORY_OPTIONS = [
-  { value: "", label: "All Categories" },
-  { value: "water", label: "Water Products" },
-  { value: "accessories", label: "Accessories" },
-  { value: "spare_parts", label: "Spare Parts" },
-  { value: "packaging", label: "Packaging" },
-  { value: "consumables", label: "Consumables" },
+  { value: "all", label: "All Categories" },
+  { value: "Water Products", label: "Water Products" },
+  { value: "Accessories", label: "Accessories" },
+  { value: "Spare Parts", label: "Spare Parts" },
 ];
 
-export const UNIT_OPTIONS = [
-  { value: "can", label: "Can" },
-  { value: "bottle", label: "Bottle" },
-  { value: "liter", label: "Liter" },
-  { value: "pcs", label: "Pieces" },
-  { value: "kg", label: "Kilogram" },
-  { value: "pack", label: "Pack" },
-  { value: "box", label: "Box" },
-];
+/* ---------------------------- Priorities --------------------------- */
 
-export const MOVEMENT_TYPE_OPTIONS = [
-  { value: "all", label: "All Types" },
-  { value: "in", label: "Stock In" },
-  { value: "out", label: "Stock Out" },
-  { value: "adjust", label: "Adjustment" },
-];
+export const ALERT_PRIORITY_CONFIG: Record<
+  AlertPriority,
+  { label: string; color: string; bg: string }
+> = {
+  critical: { label: "Critical", color: "#dc2626", bg: "#fef2f2" },
+  warning: { label: "Warning", color: "#d97706", bg: "#fffbeb" },
+};
 
-export const SOURCE_IN_OPTIONS = [
-  { value: "purchase", label: "Purchase" },
-  { value: "production", label: "Production" },
-  { value: "return", label: "Customer Return" },
-];
+/* ---------------------------- Pagination ---------------------------- */
 
-export const SOURCE_OUT_OPTIONS = [
-  { value: "delivery", label: "Delivery" },
-  { value: "damage", label: "Damage" },
-  { value: "internal_use", label: "Internal Use" },
-];
-
-export const ADJUST_REASON_OPTIONS = [
-  { value: "audit_correction", label: "Audit Correction" },
-  { value: "damage", label: "Damaged Goods" },
-  { value: "expired", label: "Expired" },
-  { value: "miscounted", label: "Miscount Correction" },
-];
-
-export const PRODUCT_OPTIONS = [
-  { value: "prod_01", label: "20L Water Can" },
-  { value: "prod_02", label: "10L Water Can" },
-  { value: "prod_03", label: "1L Packaged Water" },
-  { value: "prod_04", label: "500ml Water Bottle" },
-  { value: "prod_05", label: "Water Dispenser" },
-  { value: "prod_06", label: "Can Cap (Blue)" },
-  { value: "prod_07", label: "Can Cap (White)" },
-  { value: "prod_08", label: "Delivery Crate" },
-  { value: "prod_09", label: "RO Filter Cartridge" },
-  { value: "prod_10", label: "Sediment Filter" },
-  { value: "prod_11", label: "UV Lamp Replacement" },
-  { value: "prod_12", label: "Shrink Wrap Roll" },
-];
-
-export const SUPPLIER_OPTIONS = [
-  { value: "sup_01", label: "AquaPure Supplies" },
-  { value: "sup_02", label: "PackRight Pvt Ltd" },
-  { value: "sup_03", label: "In-House Production" },
-  { value: "sup_04", label: "FilterTech India" },
-  { value: "sup_05", label: "PlastiCo Manufacturers" },
-];
-
-export const WAREHOUSE_OPTIONS = [
-  { value: "", label: "All Locations" },
-  { value: "main_plant", label: "Main Plant" },
-  { value: "secondary", label: "Secondary Storage" },
-  { value: "vehicle", label: "Vehicle Stock" },
-];
-
-export const LOW_STOCK_THRESHOLD_MULTIPLIER = 1.2; // 120% of reorder level
+export const TABLE_PAGE_SIZE = 10;
+export const MOVEMENTS_PAGE_SIZE = 8;

@@ -1,100 +1,57 @@
-import React, { useState } from "react";
-import { HiOutlineChevronDown } from "react-icons/hi";
+// src/modules/inventory/components/SectionCard.tsx
+import { ReactNode } from "react";
 
 interface SectionCardProps {
-  icon?: React.ReactNode;
+  icon: ReactNode;
+  iconBg?: string;
+  iconColor?: string;
   title: string;
   subtitle?: string;
-  action?: React.ReactNode;
-  children: React.ReactNode;
+  /** Right-aligned actions (buttons, badges, filters) */
+  actions?: ReactNode;
+  children: ReactNode;
   className?: string;
-  noPadding?: boolean;
-  collapsible?: boolean;
-  defaultExpanded?: boolean;
-  count?: number;
 }
 
-const SectionCard: React.FC<SectionCardProps> = ({
+/**
+ * Consistent section shell: header (icon + title + actions) and body.
+ * Every inventory section lives inside one of these so the page rhythm
+ * stays identical across tabs.
+ */
+const SectionCard = ({
   icon,
+  iconBg = "#eff6ff",
+  iconColor = "#2563eb",
   title,
   subtitle,
-  action,
+  actions,
   children,
   className = "",
-  noPadding = false,
-  collapsible = false,
-  defaultExpanded = true,
-  count,
-}) => {
-  const [expanded, setExpanded] = useState(defaultExpanded);
-
-  return (
-    <div
-      className={`bg-white rounded-2xl border border-slate-100 shadow-sm shadow-slate-100/60 transition-shadow duration-300 hover:shadow-md hover:shadow-slate-100/80 ${className}`}
-    >
-      {/* Header */}
-      <div
-        className={`flex items-center justify-between px-5 py-4 ${
-          collapsible ? "cursor-pointer select-none" : ""
-        }`}
-        onClick={collapsible ? () => setExpanded(!expanded) : undefined}
-      >
-        <div className="flex items-center gap-3">
-          {icon && (
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-slate-50 to-slate-100/80 border border-slate-100/80 flex items-center justify-center shadow-sm shadow-slate-100/50">
-              {icon}
-            </div>
-          )}
-          <div className="flex items-center gap-2.5">
-            <div>
-              <div className="flex items-center gap-2">
-                <h3 className="text-[13.5px] font-bold text-slate-800 leading-tight">
-                  {title}
-                </h3>
-                {count !== undefined && (
-                  <span className="text-[10px] font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full tabular-nums">
-                    {count}
-                  </span>
-                )}
-              </div>
-              {subtitle && (
-                <p className="text-[11px] text-slate-400 mt-0.5 leading-relaxed">
-                  {subtitle}
-                </p>
-              )}
-            </div>
-          </div>
+}: SectionCardProps) => (
+  <section
+    className={`bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden ${className}`}
+  >
+    <header className="flex flex-wrap items-center justify-between gap-3 px-5 py-4 border-b border-slate-100">
+      <div className="flex items-center gap-3 min-w-0">
+        <div
+          className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
+          style={{ background: iconBg, color: iconColor }}
+        >
+          {icon}
         </div>
-
-        <div className="flex items-center gap-2">
-          {action && <div className="flex items-center gap-2">{action}</div>}
-          {collapsible && (
-            <div
-              className={`w-7 h-7 rounded-lg bg-slate-50 border border-slate-100 flex items-center justify-center transition-transform duration-300 ${
-                expanded ? "rotate-0" : "-rotate-90"
-              }`}
-            >
-              <HiOutlineChevronDown size={14} className="text-slate-400" />
-            </div>
+        <div className="min-w-0">
+          <h2 className="text-[15px] font-bold text-slate-800 leading-tight truncate">
+            {title}
+          </h2>
+          {subtitle && (
+            <p className="text-xs text-slate-400 mt-0.5 truncate">{subtitle}</p>
           )}
         </div>
       </div>
-
-      {/* Divider */}
-      {expanded && (
-        <div className="h-px bg-gradient-to-r from-transparent via-slate-200/80 to-transparent mx-3" />
-      )}
-
-      {/* Content with smooth expand/collapse */}
-      <div
-        className={`transition-all duration-300 ease-in-out overflow-hidden ${
-          expanded ? "max-h-[2000px] opacity-100" : "max-h-0 opacity-0"
-        }`}
-      >
-        <div className={noPadding ? "" : "p-5"}>{children}</div>
-      </div>
-    </div>
-  );
-};
+      {actions && <div className="flex items-center gap-2">{actions}</div>}
+    </header>
+    <div className="p-5">{children}</div>
+  </section>
+);
 
 export default SectionCard;

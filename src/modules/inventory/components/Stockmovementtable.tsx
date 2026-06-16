@@ -1,248 +1,198 @@
-import React from "react";
-import { Table, Tag, Tooltip } from "antd";
+import { Table } from "antd";
 import type { ColumnsType } from "antd/es/table";
+import { HiOutlineInbox } from "react-icons/hi";
+import { StockMovement } from "../types/Inventory";
 import {
-  HiOutlineArrowCircleDown,
-  HiOutlineArrowCircleUp,
-  HiOutlineAdjustments,
-} from "react-icons/hi";
-import type {
-  StockMovementRecord,
-  MovementType,
-  MovementSource,
-} from "../types/Inventory";
+  MOVEMENT_TYPE_CONFIG,
+  MOVEMENTS_PAGE_SIZE,
+  SOURCE_LABELS,
+} from "../constants/Inventoryconstants";
 
-const TYPE_CONFIG: Record<
-  MovementType,
-  {
-    label: string;
-    color: string;
-    icon: React.ReactNode;
-    prefix: string;
-    qtyColor: string;
-    qtyBg: string;
-  }
-> = {
-  in: {
-    label: "Stock In",
-    color: "green",
-    icon: <HiOutlineArrowCircleDown size={13} className="text-emerald-500" />,
-    prefix: "+",
-    qtyColor: "text-emerald-700",
-    qtyBg: "bg-emerald-50",
-  },
-  out: {
-    label: "Stock Out",
-    color: "red",
-    icon: <HiOutlineArrowCircleUp size={13} className="text-red-500" />,
-    prefix: "−",
-    qtyColor: "text-red-700",
-    qtyBg: "bg-red-50",
-  },
-  adjust: {
-    label: "Adjusted",
-    color: "purple",
-    icon: <HiOutlineAdjustments size={13} className="text-violet-500" />,
-    prefix: "±",
-    qtyColor: "text-violet-700",
-    qtyBg: "bg-violet-50",
-  },
-};
-
-const SOURCE_LABEL: Record<MovementSource, string> = {
-  purchase: "Purchase",
-  production: "Production",
-  return: "Return",
-  delivery: "Delivery",
-  damage: "Damage",
-  internal_use: "Internal Use",
-  audit_correction: "Audit Correction",
-};
-
-interface StockMovementTableProps {
-  data: StockMovementRecord[];
+interface StockmovementtableProps {
+  movements: StockMovement[];
   loading?: boolean;
 }
 
-const StockMovementTable: React.FC<StockMovementTableProps> = ({
-  data,
-  loading = false,
-}) => {
-  const columns: ColumnsType<StockMovementRecord> = [
+const Stockmovementtable = ({
+  movements,
+  loading,
+}: StockmovementtableProps) => {
+  const columns: ColumnsType<StockMovement> = [
     {
       title: "Date",
       dataIndex: "date",
-      key: "date",
-      width: 115,
+      width: 150,
       sorter: (a, b) => a.date.localeCompare(b.date),
       defaultSortOrder: "descend",
-      render: (date: string) => (
-        <span className="text-[12px] font-semibold text-slate-600 tabular-nums">
-          {date}
+
+      render: (v: string) => (
+        <span className="text-[12px] text-slate-600 tabular-nums">
+          {new Date(v).toLocaleString("en-IN", {
+            day: "2-digit",
+            month: "short",
+            hour: "2-digit",
+            minute: "2-digit",
+          })}
         </span>
       ),
     },
     {
       title: "Product",
-      dataIndex: "productName",
-      key: "productName",
-      width: 250,
-      render: (name: string, record) => (
-        <div className="flex flex-col">
-          <span className="text-[13px] font-medium text-slate-700 leading-tight">
-            {name}
-          </span>
-          <span className="text-[10px] font-mono text-slate-400 mt-0.5">
-            {record.sku}
-          </span>
+      key: "product",
+      align: "center",
+      render: (_, r) => (
+        <div className="min-w-0">
+          <p className="text-[13px] font-semibold text-slate-800 truncate">
+            {r.product.name}
+          </p>
+          <p className="text-[11px] font-mono text-slate-400">
+            {r.product.sku}
+          </p>
         </div>
       ),
     },
     {
       title: "Type",
       dataIndex: "type",
-      key: "type",
-      width: 115,
       align: "center",
-      filters: [
-        { text: "Stock In", value: "in" },
-        { text: "Stock Out", value: "out" },
-        { text: "Adjusted", value: "adjust" },
-      ],
-      onFilter: (value, record) => record.type === value,
-      render: (type: MovementType) => {
-        const config = TYPE_CONFIG[type];
+      width: 130,
+      filters: Object.entries(MOVEMENT_TYPE_CONFIG).map(([k, v]) => ({
+        text: v.label,
+        value: k,
+      })),
+      onFilter: (value, r) => r.type === value,
+      render: (t: StockMovement["type"]) => {
+        const cfg = MOVEMENT_TYPE_CONFIG[t];
         return (
-          <Tag
-            color={config.color}
-            icon={config.icon}
-            className="!flex !items-center !gap-1 !w-fit !text-[11px] !font-bold !m-0 !rounded-md"
+          <span
+            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-bold"
+            style={{ color: cfg.color, background: cfg.bg }}
           >
-            {config.label}
-          </Tag>
+            {cfg.label}
+          </span>
         );
       },
     },
     {
       title: "Qty",
-      dataIndex: "quantity",
-      key: "quantity",
-      width: 100,
+      key: "qty",
       align: "center",
-      sorter: (a, b) => Math.abs(a.quantity) - Math.abs(b.quantity),
-      render: (qty: number, record) => {
-        const config = TYPE_CONFIG[record.type];
-        const displayQty =
-          record.type === "adjust"
-            ? qty > 0
-              ? `+${qty}`
-              : `${qty}`
-            : `${config.prefix}${Math.abs(qty)}`;
+      width: 90,
 
+      sorter: (a, b) => a.quantity - b.quantity,
+      render: (_, r) => {
+        const cfg = MOVEMENT_TYPE_CONFIG[r.type];
+        const mag = Math.abs(r.quantity);
+        const symbol =
+          r.type === "ADJUSTMENT"
+            ? r.quantity >= 0
+              ? "+"
+              : "−"
+            : cfg.sign > 0
+            ? "+"
+            : "−";
         return (
           <span
-            className={`text-[13px] font-bold tabular-nums px-2.5 py-1 rounded-lg ${config.qtyColor} ${config.qtyBg}`}
+            className="inline-block px-2 py-0.5 rounded-md text-[13px] font-bold tabular-nums"
+            style={{ color: cfg.color, background: cfg.bg }}
           >
-            {displayQty}
+            {`${symbol}${mag.toLocaleString("en-IN")}`}
           </span>
         );
       },
     },
     {
       title: "Balance",
-      dataIndex: "balanceAfter",
-      key: "balanceAfter",
-      width: 100,
+      dataIndex: "balance",
       align: "center",
-      render: (val: number) => (
-        <Tooltip title={`Stock balance after this movement: ${val}`}>
-          <span className="text-[12px] font-semibold text-slate-500 tabular-nums">
-            {val.toLocaleString("en-IN")}
-          </span>
-        </Tooltip>
+      width: 90,
+      render: (v: number) => (
+        <span className="text-[13px] text-slate-600 font-semibold tabular-nums">
+          {v.toLocaleString("en-IN")}
+        </span>
       ),
     },
     {
       title: "Source",
       dataIndex: "source",
-      key: "source",
-      width: 130,
+      width: 140,
       align: "center",
-      render: (source: MovementSource) => (
-        <span className="text-[12px] text-slate-500 font-medium">
-          {SOURCE_LABEL[source]}
+      render: (s: string) => (
+        <span className="text-[12px] text-slate-500">
+          {SOURCE_LABELS[s] ?? s}
         </span>
       ),
     },
     {
       title: "Ref ID",
       dataIndex: "referenceId",
-      key: "referenceId",
-      width: 150,
+      width: 170,
       align: "center",
-      render: (ref: string) => (
-        <Tooltip title={`Reference: ${ref}`}>
-          <span className="text-[11px] font-mono text-slate-400 bg-slate-50 px-1.5 py-0.5 rounded cursor-default">
-            {ref}
+      render: (v: string | null) =>
+        v ? (
+          <span className="inline-block px-2 py-0.5 rounded bg-slate-50 border border-slate-100 text-[11px] font-mono text-slate-500">
+            {v}
           </span>
-        </Tooltip>
-      ),
+        ) : (
+          <span className="text-slate-200">—</span>
+        ),
     },
     {
       title: "User",
       dataIndex: "user",
-      key: "user",
-      width: 120,
+      width: 130,
       align: "center",
-      render: (user: string) => (
+      render: (v: string) => (
         <div className="flex items-center gap-2">
-          <div className="w-6 h-6 rounded-full bg-slate-100 flex items-center justify-center">
-            <span className="text-[10px] font-bold text-slate-500">
-              {user
-                .split(" ")
-                .map((n) => n[0])
-                .join("")
-                .toUpperCase()}
-            </span>
-          </div>
-          <span className="text-[12px] text-slate-600 font-medium">{user}</span>
+          <span className="w-6 h-6 rounded-full bg-slate-200 text-slate-500 text-[10px] font-bold flex items-center justify-center">
+            {v
+              .split(" ")
+              .map((p) => p[0])
+              .slice(0, 2)
+              .join("")
+              .toUpperCase()}
+          </span>
+          <span className="text-[12px] text-slate-600">{v}</span>
         </div>
       ),
     },
     {
       title: "Remarks",
       dataIndex: "remarks",
-      key: "remarks",
       align: "center",
-      width: 100,
-      ellipsis: true,
-      render: (remarks: string) => (
-        <span className="text-[11px] text-slate-400 italic">
-          {remarks || "—"}
-        </span>
-      ),
+      render: (v: string | null) =>
+        v ? (
+          <span className="text-[12px] font-medium  text-slate-600">{v}</span>
+        ) : (
+          <span className="text-slate-200">—</span>
+        ),
     },
   ];
 
   return (
-    <Table
+    <Table<StockMovement>
+      rowKey="id"
       columns={columns}
-      dataSource={data}
+      dataSource={movements}
       loading={loading}
-      size="small"
+      size="middle"
+      scroll={{ x: 1050 }}
       pagination={{
-        pageSize: 6,
-        showSizeChanger: true,
-        pageSizeOptions: ["6", "12", "20"],
-        showTotal: (total, range) => (
-          <span className="text-[11px] text-slate-400">
-            Showing {range[0]}–{range[1]} of {total} movements
-          </span>
+        pageSize: MOVEMENTS_PAGE_SIZE,
+        showTotal: (t, range) =>
+          `Showing ${range[0]}–${range[1]} of ${t} movements`,
+      }}
+      locale={{
+        emptyText: (
+          <div className="py-10 flex flex-col items-center gap-2 text-slate-400">
+            <HiOutlineInbox size={32} />
+            <p className="text-sm font-medium">No movements in this range</p>
+            <p className="text-xs">Adjust the date range or filters</p>
+          </div>
         ),
       }}
-      scroll={{ x: 1000 }}
     />
   );
 };
 
-export default StockMovementTable;
+export default Stockmovementtable;

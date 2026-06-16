@@ -1,192 +1,145 @@
-import React from "react";
-import { Table, Tag, Tooltip } from "antd";
-import type { ColumnsType } from "antd/es/table";
-import { HiOutlineExclamationCircle } from "react-icons/hi";
-import type { LowStockAlertRecord } from "../types/Inventory";
+// src/modules/inventory/components/Lowstockalerts.tsx
+import { Tooltip } from "antd";
+import { HiOutlineArrowDown, HiOutlineCheckCircle } from "react-icons/hi";
+import type { LowStockRow } from "../api/inventory.api";
+import { STOCK_STATUS_CONFIG } from "../constants/Inventoryconstants";
 
-interface LowStockAlertsProps {
-  data: LowStockAlertRecord[];
-  loading?: boolean;
-  onReorder?: (record: LowStockAlertRecord) => void;
+interface LowstockalertsProps {
+  // Takes the backend's pre-computed alert rows (not the full list)
+  items: LowStockRow[];
+  /** One-click restock → opens StockEntryModal in stock_in mode, prefilled */
+  onRestock: (item: LowStockRow) => void;
 }
 
-const LowStockAlerts: React.FC<LowStockAlertsProps> = ({
-  data,
-  loading = false,
-}) => {
-  const columns: ColumnsType<LowStockAlertRecord> = [
-    {
-      title: "Priority",
-      key: "priority",
-      width: 80,
-      align: "center",
-      sorter: (a, b) => {
-        const order = { critical: 0, low: 1 };
-        return order[a.status] - order[b.status];
-      },
-      defaultSortOrder: "ascend",
-      render: (_, record) => {
-        const isCritical = record.status === "critical";
+const ALERT_PRIORITY = {
+  critical: {
+    label: "Critical — out of stock",
+    color: "#dc2626",
+    bg: "#fef2f2",
+  },
+  warning: {
+    label: "Warning — below reorder level",
+    color: "#d97706",
+    bg: "#fffbeb",
+  },
+};
+
+const Lowstockalerts = ({ items, onRestock }: LowstockalertsProps) => {
+  // Backend already filtered to low/out and added critical/deficit.
+  // We only sort for display: critical first, then biggest shortfall.
+  const alerts = [...items].sort((a, b) =>
+    a.critical === b.critical ? a.deficit - b.deficit : a.critical ? -1 : 1
+  );
+
+  if (alerts.length === 0) {
+    return (
+      <div className="py-14 flex flex-col items-center gap-3 text-center">
+        <div className="w-14 h-14 rounded-2xl bg-emerald-50 text-emerald-500 flex items-center justify-center">
+          <HiOutlineCheckCircle size={30} />
+        </div>
+        <p className="text-sm font-bold text-slate-700">
+          All stock levels are healthy
+        </p>
+        <p className="text-xs text-slate-400 max-w-xs">
+          Nothing is at or below its reorder level. Alerts will appear here
+          automatically when stock runs low.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="divide-y divide-slate-100">
+      {alerts.map((item) => {
+        const priority = item.critical ? "critical" : "warning";
+        const pCfg = ALERT_PRIORITY[priority];
+        const sCfg = STOCK_STATUS_CONFIG[item.status];
+        const pct =
+          item.reorderLevel > 0
+            ? Math.min(
+                Math.round((item.current / item.reorderLevel) * 100),
+                100
+              )
+            : 0;
+
         return (
-          <Tooltip
-            title={
-              isCritical
-                ? "Critical — Out of stock or severely low. Reorder immediately!"
-                : "Warning — Below reorder level. Plan to reorder soon."
-            }
+          <div
+            key={item.id}
+            className="flex flex-wrap items-center gap-4 py-4 first:pt-1 last:pb-1"
           >
-            <div className="flex items-center justify-center gap-1.5">
-              <div
-                className={`w-8 h-8 rounded-lg flex items-center justify-center ${
-                  isCritical ? "bg-red-100" : "bg-amber-100"
-                }`}
+            <Tooltip title={pCfg.label}>
+              <span
+                className="w-8 h-8 rounded-xl flex items-center justify-center text-[15px] font-black shrink-0"
+                style={{ background: pCfg.bg, color: pCfg.color }}
               >
-                <HiOutlineExclamationCircle
-                  size={17}
-                  className={`${
-                    isCritical ? "text-red-500 animate-pulse" : "text-amber-500"
-                  }`}
+                !
+              </span>
+            </Tooltip>
+
+            <div className="min-w-[180px] flex-1">
+              <p className="text-[13px] font-semibold text-slate-800">
+                {item.name}
+              </p>
+              <p className="text-[11px] text-slate-400">
+                <span className="font-mono">{item.sku}</span>
+                <span className="mx-1.5">·</span>
+                {item.category ?? "—"}
+              </p>
+            </div>
+
+            <div className="w-44">
+              {item.current <= 0 ? (
+                <span
+                  className="inline-block px-2 py-0.5 rounded-md text-[11px] font-bold"
+                  style={{ background: sCfg.bg, color: sCfg.color }}
+                >
+                  OUT OF STOCK
+                </span>
+              ) : (
+                <p
+                  className="text-[14px] font-bold tabular-nums"
+                  style={{ color: sCfg.color }}
+                >
+                  {item.current}
+                  <span className="text-slate-300 font-medium text-[12px]">
+                    {" "}
+                    / {item.reorderLevel}
+                  </span>
+                </p>
+              )}
+              <div className="mt-1 h-1.5 rounded-full bg-slate-100 overflow-hidden">
+                <div
+                  className="h-full rounded-full"
+                  style={{ width: `${pct}%`, background: sCfg.color }}
                 />
               </div>
             </div>
-          </Tooltip>
-        );
-      },
-    },
-    {
-      title: "Product",
-      dataIndex: "productName",
-      key: "productName",
-      width:200,
-      render: (name: string, record) => (
-        <div className="flex flex-col py-0.5">
-          <span className="text-[13px] font-semibold text-slate-800 leading-tight">
-            {name}
-          </span>
-          <div className="flex items-center gap-2 mt-1">
-            <span className="text-[10px] font-mono text-slate-400 bg-slate-50 px-1.5 py-0.5 rounded">
-              {record.sku}
-            </span>
-            <span className="text-[10px] text-slate-400">
-              {record.category}
-            </span>
-          </div>
-        </div>
-      ),
-    },
-    {
-      title: "Stock Level",
-      key: "stockLevel",
-      width: 160,
-      align:"center",
-      render: (_, record) => {
-        const ratio =
-          record.reorderLevel > 0
-            ? (record.currentStock / record.reorderLevel) * 100
-            : 0;
-        const clampedRatio = Math.min(ratio, 100);
-        return (
-          <div className="flex flex-col  gap-1.5">
-            <div className="flex items-center justify-between">
-              <span
-                className={`text-[13px] font-bold tabular-nums ${
-                  record.currentStock === 0 ? "text-red-600" : "text-amber-600"
-                }`}
-              >
-                {record.currentStock === 0 ? (
-                  <Tag
-                    color="red"
-                    className="!text-[10px] !font-bold !m-0 !px-2"
-                  >
-                    OUT OF STOCK
-                  </Tag>
-                ) : (
-                  record.currentStock
-                )}
-              </span>
-              <span className="text-[10px] text-slate-400 tabular-nums">
-                / {record.reorderLevel}
-              </span>
-            </div>
-            <div className="w-full h-[4px] bg-slate-100 rounded-full overflow-hidden">
-              <div
-                className={`h-full rounded-full transition-all duration-500 ${
-                  ratio === 0
-                    ? "bg-red-500"
-                    : ratio < 30
-                    ? "bg-red-400"
-                    : "bg-amber-400"
-                }`}
-                style={{ width: `${clampedRatio}%` }}
-              />
-            </div>
-          </div>
-        );
-      },
-    },
-    {
-      title: "Deficit",
-      dataIndex: "deficit",
-      key: "deficit",
-      width: 120,
-      align: "center",
-      sorter: (a, b) => a.deficit - b.deficit,
-      render: (val: number) => (
-        <span className="text-[13px] font-bold text-red-600 tabular-nums bg-red-50 px-2.5 py-1 rounded-lg inline-block">
-          −{val}
-        </span>
-      ),
-    },
-    {
-      title: "Unit",
-      dataIndex: "unit",
-      key: "unit",
-      width: 80,
-      align: "center",
-      render: (unit: string) => (
-        <span className="text-[11px] text-slate-400 uppercase font-medium">
-          {unit}
-        </span>
-      ),
-    },
-    {
-      title: "Last Ordered",
-      dataIndex: "lastOrdered",
-      key: "lastOrdered",
-      width: 120,
-      align: "center",
-      render: (date: string | null) => (
-        <span
-          className={`text-[12px] tabular-nums font-medium ${
-            date ? "text-slate-500" : "text-red-400"
-          }`}
-        >
-          {date || (
-            <span className="italic flex items-center justify-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-red-400" />
-              Never
-            </span>
-          )}
-        </span>
-      ),
-    },
-  ];
 
-  return (
-    <Table
-      columns={columns}
-      dataSource={data}
-      loading={loading}
-      size="middle"
-      pagination={false}
-      rowClassName={(record) =>
-        record.status === "critical"
-          ? "!bg-red-50/30 hover:!bg-red-50/50"
-          : "!bg-amber-50/20 hover:!bg-amber-50/40"
-      }
-      scroll={{ x: 750 }}
-    />
+            <div className="w-20 text-right">
+              <span className="inline-block px-2 py-0.5 rounded-md bg-red-50 text-red-600 text-[13px] font-bold tabular-nums">
+                {item.deficit}
+              </span>
+              <p className="text-[10px] text-slate-400 mt-0.5">
+                vs reorder · {item.unit}
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => onRestock(item)}
+              className="ml-auto flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-[12px] font-bold
+                text-emerald-700 bg-emerald-50 border border-emerald-200
+                hover:bg-emerald-600 hover:text-white hover:border-emerald-600
+                transition-colors"
+            >
+              <HiOutlineArrowDown size={14} />
+              Restock
+            </button>
+          </div>
+        );
+      })}
+    </div>
   );
 };
 
-export default LowStockAlerts;
+export default Lowstockalerts;

@@ -1,287 +1,246 @@
-import React from "react";
-import { Table, Tag, Tooltip } from "antd";
+// src/modules/inventory/components/Productstocktable.tsx
+import { Table, Tooltip } from "antd";
 import type { ColumnsType } from "antd/es/table";
-import type { ProductStockRecord, StockStatus } from "../types/Inventory";
+import {
+  HiOutlineArrowDown,
+  HiOutlineArrowUp,
+  HiOutlineAdjustments,
+  HiOutlineInbox,
+} from "react-icons/hi";
+import {
+  StockItem,
+  MovementType,
+  getAvailable,
+  getStockStatus,
+  getStockHealth,
+} from "../types/Inventory";
+import {
+  STOCK_STATUS_CONFIG,
+  TABLE_PAGE_SIZE,
+} from "../constants/Inventoryconstants";
 
-const STATUS_CONFIG: Record<
-  StockStatus,
-  { label: string; color: string; dotColor: string; rowClass: string }
-> = {
-  in_stock: {
-    label: "In Stock",
-    color: "green",
-    dotColor: "bg-emerald-500",
-    rowClass: "",
-  },
-  low: {
-    label: "Low Stock",
-    color: "orange",
-    dotColor: "bg-amber-500",
-    rowClass: "!bg-amber-50/30 hover:!bg-amber-50/50",
-  },
-  out: {
-    label: "Out of Stock",
-    color: "red",
-    dotColor: "bg-red-500",
-    rowClass: "!bg-red-50/25 hover:!bg-red-50/40",
-  },
-};
-
-interface ProductStockTableProps {
-  data: ProductStockRecord[];
+interface ProductstocktableProps {
+  items: StockItem[];
   loading?: boolean;
+  /** Row-level quick action → opens StockEntryModal pre-filled */
+  onQuickAction: (item: StockItem, mode: MovementType) => void;
 }
 
-const ProductStockTable: React.FC<ProductStockTableProps> = ({
-  data,
-  loading = false,
-}) => {
-  const columns: ColumnsType<ProductStockRecord> = [
+const Productstocktable = ({
+  items,
+  loading,
+  onQuickAction,
+}: ProductstocktableProps) => {
+  const columns: ColumnsType<StockItem> = [
     {
       title: "Product",
-      dataIndex: "productName",
-      key: "productName",
-      sorter: (a, b) => a.productName.localeCompare(b.productName),
+      key: "product",
+      width: 200,
       fixed: "left",
-      width: 220,
-      render: (name: string, record) => (
-        <div className="flex items-center gap-3 py-1">
-          {/* Status dot */}
-          <div className="flex-shrink-0">
-            <div
-              className={`w-2 h-2 rounded-full ${
-                STATUS_CONFIG[record.status].dotColor
-              } ${record.status === "out" ? "animate-pulse" : ""}`}
+      sorter: (a, b) => a.name.localeCompare(b.name),
+      render: (_, r) => {
+        const status = getStockStatus(r);
+        return (
+          <div className="flex items-center gap-2.5 min-w-0">
+            <span
+              className="w-2 h-2 rounded-full shrink-0"
+              style={{ background: STOCK_STATUS_CONFIG[status].color }}
             />
+            <div className="min-w-0">
+              <p className="text-[13px] font-semibold text-slate-800 truncate">
+                {r.name}
+              </p>
+              <p className="text-[11px] font-mono text-slate-400">{r.sku}</p>
+            </div>
           </div>
-          <div className="flex flex-col">
-            <span className="text-[13px] font-semibold text-slate-800 leading-tight">
-              {name}
-            </span>
-            <span className="text-[10px] font-mono text-slate-400 bg-slate-50 px-1.5 py-0.5 rounded w-fit mt-0.5">
-              {record.sku}
-            </span>
-          </div>
-        </div>
-      ),
+        );
+      },
     },
     {
       title: "Category",
       dataIndex: "category",
-      key: "category",
       width: 140,
-      filters: [
-        { text: "Water Products", value: "Water Products" },
-        { text: "Accessories", value: "Accessories" },
-        { text: "Spare Parts", value: "Spare Parts" },
-        { text: "Packaging", value: "Packaging" },
-      ],
-      onFilter: (value, record) => record.category === value,
-      render: (cat: string) => (
-        <span className="text-[12px] text-slate-500 font-medium">{cat}</span>
-      ),
+      align: "center",
+      render: (v) => <span className="text-[12px] text-slate-500">{v}</span>,
     },
     {
       title: "Current",
-      dataIndex: "currentStock",
-      key: "currentStock",
-      width: 90,
+      dataIndex: "current",
       align: "center",
-      sorter: (a, b) => a.currentStock - b.currentStock,
-      render: (val: number, record) => (
-        <span
-          className={`text-[13px] font-bold tabular-nums ${
-            val === 0
-              ? "text-red-600"
-              : val <= record.reorderLevel
-              ? "text-amber-600"
-              : "text-slate-700"
-          }`}
-        >
-          {val.toLocaleString("en-IN")}
+      width: 90,
+      sorter: (a, b) => a.current - b.current,
+      render: (v) => (
+        <span className="text-[13px] font-bold text-slate-800 tabular-nums">
+          {v.toLocaleString("en-IN")}
         </span>
       ),
     },
     {
-      title: "Reserved",
-      dataIndex: "reservedStock",
-      key: "reservedStock",
-      width: 90,
-      align: "center",
-      render: (val: number) => (
-        <span className="text-[12px] text-slate-400 tabular-nums">
-          {val > 0 ? val.toLocaleString("en-IN") : "—"}
-        </span>
-      ),
-    },
-    {
-      title: "Available",
-      dataIndex: "availableStock",
-      key: "availableStock",
-      width: 110,
-      align: "center",
-      sorter: (a, b) => a.availableStock - b.availableStock,
-      render: (val: number) => (
-        <Tooltip
-          title={
-            val === 0
-              ? "No stock available — consider reordering"
-              : `${val} units ready for dispatch`
-          }
-        >
-          <span
-            className={`inline-flex items-center justify-center min-w-[44px] text-[13px] font-bold px-3 py-1 rounded-lg transition-colors ${
-              val === 0
-                ? "text-red-700 bg-red-100 ring-1 ring-red-200/60"
-                : val < 50
-                ? "text-amber-700 bg-amber-50"
-                : "text-emerald-700 bg-emerald-50"
-            }`}
-          >
-            {val.toLocaleString("en-IN")}
+      title: (
+        <Tooltip title="Committed to pending orders / deliveries">
+          <span className="cursor-help border-b border-dashed border-slate-300">
+            Reserved
           </span>
         </Tooltip>
+      ),
+      dataIndex: "reserved",
+      align: "center",
+      width: 95,
+      render: (v) => (
+        <span className="text-[13px] text-slate-500 tabular-nums">
+          {v.toLocaleString("en-IN")}
+        </span>
+      ),
+    },
+    {
+      title: (
+        <Tooltip title="Current − Reserved: what you can actually promise">
+          <span className="cursor-help border-b border-dashed border-slate-300">
+            Available
+          </span>
+        </Tooltip>
+      ),
+      key: "available",
+      align: "center",
+      width: 100,
+      sorter: (a, b) => getAvailable(a) - getAvailable(b),
+      render: (_, r) => (
+        <span className="inline-block px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 text-[13px] font-bold tabular-nums">
+          {getAvailable(r).toLocaleString("en-IN")}
+        </span>
       ),
     },
     {
       title: "Unit",
       dataIndex: "unit",
-      key: "unit",
       width: 70,
       align: "center",
-      render: (unit: string) => (
-        <span className="text-[11px] text-slate-400 font-medium uppercase">
-          {unit}
-        </span>
+      render: (v) => (
+        <span className="text-[11px] font-mono text-slate-400">{v}</span>
       ),
     },
     {
       title: "Reorder Lvl",
       dataIndex: "reorderLevel",
-      key: "reorderLevel",
-      width: 100,
       align: "center",
-      render: (val: number) => (
-        <span className="text-[12px] text-slate-400 tabular-nums font-medium">
-          {val}
-        </span>
+      width: 105,
+      render: (v) => (
+        <span className="text-[12px] text-slate-500 tabular-nums">{v}</span>
       ),
     },
     {
       title: "Stock Health",
-      key: "stockHealth",
-      width: 130,
+      key: "health",
       align: "center",
-      render: (_, record) => {
-        const ratio =
-          record.reorderLevel > 0
-            ? record.currentStock / record.reorderLevel
-            : record.currentStock > 0
-            ? 999
-            : 0;
-        const percent = Math.min(Math.round(ratio * 100), 100);
-        const barColor =
-          ratio === 0
-            ? "bg-red-500"
-            : ratio < 0.5
-            ? "bg-red-400"
-            : ratio < 1
-            ? "bg-amber-500"
-            : ratio < 1.5
-            ? "bg-emerald-400"
-            : "bg-emerald-500";
-        const trackColor =
-          ratio === 0
-            ? "bg-red-100"
-            : ratio < 1
-            ? "bg-amber-100"
-            : "bg-emerald-100";
-        const label =
-          ratio === 0
-            ? "Empty"
-            : ratio < 0.5
-            ? "Critical"
-            : ratio < 1
-            ? "Low"
-            : ratio < 1.5
-            ? "Good"
-            : "Healthy";
-
+      width: 130,
+      render: (_, r) => {
+        const status = getStockStatus(r);
+        const health = getStockHealth(r);
+        const cfg = STOCK_STATUS_CONFIG[status];
         return (
-          <Tooltip
-            title={`${label} — ${record.currentStock} of ${record.reorderLevel} reorder level (${percent}%)`}
-          >
-            <div className="flex items-center gap-2.5">
-              <div
-                className={`w-20 h-[6px] ${trackColor} rounded-full overflow-hidden`}
-              >
-                <div
-                  className={`h-full ${barColor} rounded-full transition-all duration-700 ease-out`}
-                  style={{ width: `${percent}%` }}
-                />
-              </div>
-              <span
-                className={`text-[11px] font-bold tabular-nums min-w-[32px] text-right ${
-                  ratio === 0
-                    ? "text-red-500"
-                    : ratio < 1
-                    ? "text-amber-500"
-                    : "text-emerald-500"
-                }`}
-              >
-                {percent}%
-              </span>
-            </div>
-          </Tooltip>
+          <div className="text-center">
+            <span
+              className="text-[15px] font-black tabular-nums w-9 text-right"
+              style={{ color: cfg.color }}
+            >
+              {health}%
+            </span>
+          </div>
         );
       },
     },
     {
       title: "Status",
-      dataIndex: "status",
       key: "status",
-      width: 115,
       align: "center",
-      filters: [
-        { text: "In Stock", value: "in_stock" },
-        { text: "Low Stock", value: "low" },
-        { text: "Out of Stock", value: "out" },
-      ],
-      onFilter: (value, record) => record.status === value,
-      render: (status: StockStatus) => {
-        const config = STATUS_CONFIG[status];
+      width: 120,
+      filters: Object.entries(STOCK_STATUS_CONFIG).map(([k, v]) => ({
+        text: v.label,
+        value: k,
+      })),
+      onFilter: (value, r) => getStockStatus(r) === value,
+      render: (_, r) => {
+        const cfg = STOCK_STATUS_CONFIG[getStockStatus(r)];
         return (
-          <Tag
-            color={config.color}
-            className="!text-[11px] !font-bold !px-2.5 !py-0.5 !m-0 !rounded-md"
+          <span
+            className="inline-block px-2.5 py-1 rounded-lg text-[11px] font-bold border"
+            style={{
+              color: cfg.color,
+              background: cfg.bg,
+              borderColor: cfg.border,
+            }}
           >
-            {config.label}
-          </Tag>
+            {cfg.label}
+          </span>
         );
       },
+    },
+    {
+      title: "Action",
+      key: "actions",
+      align: "center",
+      width: 110,
+      render: (_, r) => (
+        <div className="flex items-center gap-1 opacity-60 hover:opacity-100 transition-opacity">
+          <Tooltip title="Stock In">
+            <button
+              type="button"
+              onClick={() => onQuickAction(r, "stock_in")}
+              className="p-1.5 rounded-lg text-emerald-600 hover:bg-emerald-50 transition-colors"
+              aria-label={`Stock in ${r.name}`}
+            >
+              <HiOutlineArrowDown size={15} />
+            </button>
+          </Tooltip>
+          <Tooltip title="Stock Out">
+            <button
+              type="button"
+              onClick={() => onQuickAction(r, "stock_out")}
+              className="p-1.5 rounded-lg text-red-600 hover:bg-red-50 transition-colors"
+              aria-label={`Stock out ${r.name}`}
+            >
+              <HiOutlineArrowUp size={15} />
+            </button>
+          </Tooltip>
+          <Tooltip title="Adjust">
+            <button
+              type="button"
+              onClick={() => onQuickAction(r, "adjustment")}
+              className="p-1.5 rounded-lg text-purple-600 hover:bg-purple-50 transition-colors"
+              aria-label={`Adjust ${r.name}`}
+            >
+              <HiOutlineAdjustments size={15} />
+            </button>
+          </Tooltip>
+        </div>
+      ),
     },
   ];
 
   return (
-    <Table
+    <Table<StockItem>
+      rowKey="id"
       columns={columns}
-      dataSource={data}
+      dataSource={items}
       loading={loading}
       size="middle"
+      scroll={{ x: 1100 }}
       pagination={{
-        pageSize: 8,
+        pageSize: TABLE_PAGE_SIZE,
         showSizeChanger: true,
-        pageSizeOptions: ["8", "15", "25"],
-        showTotal: (total, range) => (
-          <span className="text-[11px] text-slate-400">
-            Showing {range[0]}–{range[1]} of {total} products
-          </span>
+        showTotal: (t, range) => `Showing ${range[0]}–${range[1]} of ${t}`,
+      }}
+      locale={{
+        emptyText: (
+          <div className="py-10 flex flex-col items-center gap-2 text-slate-400">
+            <HiOutlineInbox size={32} />
+            <p className="text-sm font-medium">No products match the filters</p>
+            <p className="text-xs">Try clearing search or filters above</p>
+          </div>
         ),
       }}
-      rowClassName={(record) => STATUS_CONFIG[record.status].rowClass}
-      scroll={{ x: 1050 }}
     />
   );
 };
 
-export default ProductStockTable;
+export default Productstocktable;

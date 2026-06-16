@@ -427,7 +427,6 @@ const PricingTable: React.FC<PricingTableProps> = ({ customerId }) => {
             control={control}
             errors={errors}
             placeholder="Select a product"
-            size="large"
             isrequired
             disabled={!!editingId}
             rules={{ required: "Product is required" }}
@@ -441,7 +440,6 @@ const PricingTable: React.FC<PricingTableProps> = ({ customerId }) => {
               control={control}
               errors={errors}
               placeholder="Enter price"
-              size="large"
               isrequired
               rules={{
                 required: "Price is required",
@@ -482,7 +480,6 @@ const PricingTable: React.FC<PricingTableProps> = ({ customerId }) => {
             errors={errors}
             placeholder={["Start date", "End date (optional)"]}
             isrequired
-            size="large"
             rules={{
               validate: (val: [Dayjs | null, Dayjs | null]) =>
                 (val && val[0] !== null) || "Start date is required",
