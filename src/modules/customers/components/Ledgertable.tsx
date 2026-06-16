@@ -29,7 +29,6 @@ import {
   ENTRY_MAP,
 } from "../constants/ledgerConstants";
 import { fmt, fmtDate } from "../../../utils/helpers";
-import { useLedger } from "../hooks/useLedger";
 
 import InvoiceDrawer from "./InvoiceDrawer";
 import ExportModal from "./ExportModal";

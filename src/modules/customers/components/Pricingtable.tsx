@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Table, Button, Popconfirm, Tooltip, Divider } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import {
@@ -9,23 +9,28 @@ import {
 } from "react-icons/hi";
 import dayjs, { Dayjs } from "dayjs";
 import { useForm } from "react-hook-form";
-import {
-  useCustomerPricing,
-  useCreatePricing,
-  useUpdatePricing,
-  useDeletePricing,
-} from "../hooks/useCustomerPricing";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
-import { errorNotification } from "../../../components/common/Notification";
+import {
+  getCustomerPricingApi,
+  createCustomerPricingApi,
+  updateCustomerPricingApi,
+  removeCustomerPricingApi,
+} from "../api/customerPricing.api";
+import { getProductsApi } from "../api/customerPricing.api";
+import {
+  successNotification,
+  errorNotification,
+} from "../../../components/common/Notification";
 import type {
   CustomerPricing,
   CustomerPricingFormValues,
+  Product,
 } from "../types/Customer";
 import CustomInput from "../../../components/common/CustomInput";
 import CustomSelect from "../../../components/common/CustomSelect";
 import CustomDateRange from "../../../components/common/CustomDateRange";
 import CustomModal from "../../../components/common/CustomModal";
-import { useProducts } from "../hooks/useProducts";
 
 interface PricingTableProps {
   customerId: string;
@@ -46,27 +51,117 @@ const DEFAULT_FORM_VALUES: PricingFormValues = {
 const FORM_ID = "customer-pricing-form";
 
 const PricingTable: React.FC<PricingTableProps> = ({ customerId }) => {
-  // ─── Server state via TanStack Query ──────────────────────────────────
-  const { data: pricingData, isLoading: pricingLoading } =
-    useCustomerPricing(customerId);
-  const { data: productsData } = useProducts();
+  const queryClient = useQueryClient();
 
-  const createPricing = useCreatePricing(customerId);
-  const updatePricing = useUpdatePricing(customerId);
-  const deletePricing = useDeletePricing(customerId);
-
-  // ─── Local UI state ───────────────────────────────────────────────────
   const [modalOpen, setModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
 
-  // Defensive: API may return [] OR { data: [] } OR undefined while loading
+  //  Fetch Pricing
+  const {
+    data: pricingData,
+    isLoading: pricingLoading,
+    isError: pricingError,
+    error: pricingErrorData,
+  } = useQuery({
+    queryKey: ["getCustomerPricing", { customerId }],
+    queryFn: () => getCustomerPricingApi(customerId).then((res) => res.data),
+    enabled: !!customerId,
+    refetchOnWindowFocus: false,
+  });
+
+  useEffect(() => {
+    if (pricingError && pricingErrorData) {
+      errorNotification(
+        "Error",
+        (pricingErrorData as any).message ?? "Failed to load pricing"
+      );
+    }
+  }, [pricingError, pricingErrorData]);
+
+  //  Fetch Products
+  const { data: productsData } = useQuery<Product[]>({
+    queryKey: ["getProducts"],
+    queryFn: () =>
+      getProductsApi(1, 100).then((res) => {
+        const d = res.data;
+        return Array.isArray(d) ? d : Array.isArray(d?.data) ? d.data : [];
+      }),
+    refetchOnWindowFocus: false,
+  });
+
+  // Create Pricing
+  const createPricing = useMutation({
+    mutationKey: ["createCustomerPricing", { customerId }],
+    mutationFn: (data: CustomerPricingFormValues) =>
+      createCustomerPricingApi(customerId, data),
+    onSuccess: (response) => {
+      successNotification(
+        "Success",
+        response.data.message ?? "Price rule added"
+      );
+      queryClient.invalidateQueries({
+        queryKey: ["getCustomerPricing", { customerId }],
+      });
+      closeModal();
+    },
+    onError: (error: any) => {
+      errorNotification("Error", error.message);
+    },
+  });
+
+  //  Update Pricing
+  const updatePricing = useMutation({
+    mutationKey: ["updateCustomerPricing"],
+    mutationFn: ({
+      pricingId,
+      data,
+    }: {
+      pricingId: string;
+      data: Partial<CustomerPricingFormValues>;
+    }) => updateCustomerPricingApi(customerId, pricingId, data),
+    onSuccess: (response) => {
+      successNotification(
+        "Success",
+        response.data.message ?? "Price rule updated"
+      );
+      queryClient.invalidateQueries({
+        queryKey: ["getCustomerPricing", { customerId }],
+      });
+      closeModal();
+    },
+    onError: (error: any) => {
+      errorNotification("Error", error.message);
+    },
+  });
+
+  // Delete Pricing
+  const deletePricing = useMutation({
+    mutationKey: ["deleteCustomerPricing"],
+    mutationFn: (pricingId: string) =>
+      removeCustomerPricingApi(customerId, pricingId),
+    onSuccess: (response) => {
+      successNotification(
+        "Success",
+        response.data.message ?? "Price rule removed"
+      );
+      queryClient.invalidateQueries({
+        queryKey: ["getCustomerPricing", { customerId }],
+      });
+    },
+    onError: (error: any) => {
+      errorNotification("Error", error.message);
+    },
+  });
+
+  const isSaving = createPricing.isPending || updatePricing.isPending;
+
   const data: CustomerPricing[] = Array.isArray(pricingData)
     ? pricingData
     : Array.isArray((pricingData as any)?.data)
     ? (pricingData as any).data
     : [];
 
-  const products = Array.isArray(productsData) ? productsData : [];
+  const products: Product[] = productsData ?? [];
 
   const {
     control,
@@ -81,7 +176,6 @@ const PricingTable: React.FC<PricingTableProps> = ({ customerId }) => {
   const productId = watch("productId");
   const customerPrice = watch("customerPrice");
 
-  // ─── Modal handlers ────────────────────────────────────────────────────
   const openAdd = () => {
     setEditingId(null);
     reset(DEFAULT_FORM_VALUES);
@@ -107,14 +201,12 @@ const PricingTable: React.FC<PricingTableProps> = ({ customerId }) => {
     reset(DEFAULT_FORM_VALUES);
   };
 
-  // Discard-changes guard for X / overlay / ESC
   const beforeClose = async () => {
     if (isSaving) return false;
     if (isDirty) return window.confirm("Discard your changes?");
     return true;
   };
 
-  // ─── Submit ────────────────────────────────────────────────────────────
   const onSubmit = (values: PricingFormValues) => {
     const [from, to] = values.effectiveRange;
     if (!from) {
@@ -135,12 +227,9 @@ const PricingTable: React.FC<PricingTableProps> = ({ customerId }) => {
     };
 
     if (editingId) {
-      updatePricing.mutate(
-        { pricingId: editingId, data: payload },
-        { onSuccess: closeModal }
-      );
+      updatePricing.mutate({ pricingId: editingId, data: payload });
     } else {
-      createPricing.mutate(payload, { onSuccess: closeModal });
+      createPricing.mutate(payload);
     }
   };
 
@@ -174,7 +263,6 @@ const PricingTable: React.FC<PricingTableProps> = ({ customerId }) => {
     ),
   }));
 
-  // ─── Columns ───────────────────────────────────────────────────────────
   const columns: ColumnsType<CustomerPricing> = [
     {
       title: "Product",
@@ -331,7 +419,6 @@ const PricingTable: React.FC<PricingTableProps> = ({ customerId }) => {
     },
   ];
 
-  const isSaving = createPricing.isPending || updatePricing.isPending;
   const activeCount = data.filter((d) => d.isActive).length;
 
   return (
@@ -374,7 +461,6 @@ const PricingTable: React.FC<PricingTableProps> = ({ customerId }) => {
         rowClassName={(r) => (r.isActive ? "" : "opacity-50")}
       />
 
-      {/* ─── Add / Edit Modal — uses CustomModal ─── */}
       <CustomModal
         open={modalOpen}
         onClose={closeModal}

@@ -12,10 +12,11 @@ import {
   HiOutlineShoppingCart,
   HiOutlineCurrencyRupee,
 } from "react-icons/hi";
+import { useQuery } from "@tanstack/react-query";
 import CustomerTabs, { type CustomerTabKey } from "./Customertabs";
 import PricingTable from "./Pricingtable";
 import LedgerTable from "./Ledgertable";
-import { useCustomer } from "../hooks/useCustomer";
+import { getCustomerDetailApi } from "../api/customers.api";
 import {
   STATUS_MAP,
   TYPE_MAP,
@@ -33,6 +34,7 @@ import {
   NotFound,
 } from "../components/Customerdetailwidgets";
 import CustomStatCard from "../../../components/common/CustomStatCard";
+import type { CustomerDetail } from "../types/Customer";
 
 interface CustomerDetailProps {
   customerId: string;
@@ -40,21 +42,31 @@ interface CustomerDetailProps {
   onEdit?: (id: string) => void;
 }
 
-const CustomerDetail: React.FC<CustomerDetailProps> = ({
+const CustomerDetailPage: React.FC<CustomerDetailProps> = ({
   customerId,
   onBack,
   onEdit,
 }) => {
   const [tab, setTab] = useState<CustomerTabKey>("overview");
 
-  // ─── Server state via TanStack Query ────────────────────────────────────
-  // Auto-refetches on company switch, caches between visits, handles all states
-  const { data: customer, isLoading, isError } = useCustomer(customerId);
+  //  Fetch Customer Detail
+  const {
+    data: customer,
+    isLoading,
+    isError,
+  } = useQuery({
+    queryKey: ["getCustomerDetail", { customerId }],
+    queryFn: () =>
+      getCustomerDetailApi(customerId).then(
+        (res) => res.data as CustomerDetail
+      ),
+    enabled: !!customerId,
+    refetchOnWindowFocus: false,
+  });
 
   if (isLoading) return <DetailSkeleton />;
   if (isError || !customer) return <NotFound onBack={onBack} />;
 
-  // Build address from flat fields (backend sends addressLine1/2, not nested)
   const address = [
     customer.addressLine1,
     customer.addressLine2,
@@ -107,7 +119,7 @@ const CustomerDetail: React.FC<CustomerDetailProps> = ({
         </Tooltip>
       </div>
 
-      {/* Metrics — pulled from backend `summary` object */}
+      {/* Metrics */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <CustomStatCard
           icon={<HiOutlineShoppingCart size={22} />}
@@ -223,4 +235,4 @@ const CustomerDetail: React.FC<CustomerDetailProps> = ({
   );
 };
 
-export default CustomerDetail;
+export default CustomerDetailPage;

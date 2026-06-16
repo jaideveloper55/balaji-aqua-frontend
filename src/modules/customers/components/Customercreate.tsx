@@ -1,9 +1,14 @@
 import React from "react";
 import { Button } from "antd";
 import { HiOutlineArrowLeft } from "react-icons/hi";
+import { useMutation } from "@tanstack/react-query";
 import CustomerForm from "./Customerform";
-import { useCreateCustomer } from "../hooks/useCreateCustomer";
+import { createCustomerApi } from "../api/customers.api";
 import type { CustomerFormValues } from "../types/Customer";
+import {
+  errorNotification,
+  successNotification,
+} from "../../../components/common/Notification";
 
 interface CustomerCreateProps {
   onBack?: () => void;
@@ -14,19 +19,23 @@ const CustomerCreate: React.FC<CustomerCreateProps> = ({
   onBack,
   onSuccess,
 }) => {
-  // ─── Mutation hook ──────────────────────────────────────────────────────
-  // Handles: API call, loading state, notifications, query invalidation
-  const createCustomer = useCreateCustomer();
+  const createCustomer = useMutation({
+    mutationKey: ["createCustomer"],
+    mutationFn: (data: CustomerFormValues) => createCustomerApi(data),
+    onSuccess: (response) => {
+      successNotification(
+        "Success",
+        response.data.message ?? "Customer created successfully"
+      );
+      onSuccess?.(response.data.id);
+    },
+    onError: (error: any) => {
+      errorNotification("Error", error.message);
+    },
+  });
 
   const handleSubmit = (data: CustomerFormValues) => {
-    createCustomer.mutate(data, {
-      onSuccess: (created) => {
-        // Hook already shows success toast and invalidates the list
-        // We just navigate to the new customer's detail page
-        onSuccess?.(created.id);
-      },
-      // onError already handled inside the hook (shows error toast)
-    });
+    createCustomer.mutate(data);
   };
 
   return (

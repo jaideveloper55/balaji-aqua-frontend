@@ -1,6 +1,6 @@
 import React from "react";
-import { Input, Button, Divider } from "antd";
-import { Controller, useForm } from "react-hook-form";
+import { Button, Divider } from "antd";
+import { useForm } from "react-hook-form";
 import {
   HiOutlineUser,
   HiOutlineLocationMarker,
@@ -18,6 +18,7 @@ import {
   STATE_OPTIONS,
   CUSTOMER_FORM_DEFAULTS,
 } from "../constants/customerConstants";
+import CustomTextArea from "../../../components/common/Customtextarea";
 
 interface CustomerFormProps {
   defaultValues?: Partial<CustomerFormValues>;
@@ -221,20 +222,14 @@ const CustomerForm: React.FC<CustomerFormProps> = ({
       {/* ── Notes ── */}
       <section>
         <SectionLabel icon={HiOutlineAnnotation} title="Notes" />
-        <Controller
+        <CustomTextArea
           name="notes"
           control={control}
-          render={({ field }) => (
-            <Input.TextArea
-              {...field}
-              placeholder="Special delivery instructions, gate codes, preferred timing..."
-              rows={2}
-              size="middle"
-              showCount
-              maxLength={500}
-              className="!rounded-lg"
-            />
-          )}
+          placeholder="Special delivery instructions, gate codes, preferred timing..."
+          rows={2}
+          maxLength={500}
+          showCount
+          errors={errors}
         />
       </section>
 

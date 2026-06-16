@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { Table, Dropdown, Tooltip } from "antd";
 import type { ColumnsType, TablePaginationConfig } from "antd/es/table";
 import {
@@ -12,9 +12,18 @@ import {
   HiOutlineOfficeBuilding,
   HiOutlineCog,
 } from "react-icons/hi";
-import { useCustomers } from "../hooks/useCustomers";
-import { useDeleteCustomer } from "../hooks/useDeleteCustomer";
-import type { Customer, CustomerStatus, CustomerType } from "../types/Customer";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { getCustomersApi, removeCustomerApi } from "../api/customers.api";
+import {
+  successNotification,
+  errorNotification,
+} from "../../../components/common/Notification";
+import type {
+  Customer,
+  CustomerStatus,
+  CustomerType,
+  CustomerQuery,
+} from "../types/Customer";
 import { STATUS_MAP, TYPE_MAP } from "../constants/customerDetailConstants";
 import CustomerTableFilters from "./CustomerTableFilters";
 import { IconType } from "react-icons";
@@ -31,35 +40,61 @@ const CustomerTable: React.FC<CustomerTableProps> = ({
   onEdit,
   onDelete,
 }) => {
-  // ─── Pagination ──────────────────────────────────────────────────────────
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
 
-  // ─── Filters ─────────────────────────────────────────────────────────────
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState<CustomerType | undefined>();
   const [fromDate, setFromDate] = useState<string | undefined>(undefined);
   const [toDate, setToDate] = useState<string | undefined>(undefined);
 
-  // ─── Delete confirmation state ───────────────────────────────────────────
   const [deleteTarget, setDeleteTarget] = useState<Customer | null>(null);
 
-  // ─── Server data via TanStack Query ──────────────────────────────────────
-  const { data, isLoading, isFetching } = useCustomers({
+  // Query params
+  const query: CustomerQuery = {
     page,
     limit: pageSize,
     search: search || undefined,
     type: typeFilter,
     fromDate,
     toDate,
+  };
+
+  //  Fetch Customers
+  const { data, isLoading, isFetching, isError, error } = useQuery({
+    queryKey: ["getCustomers", query],
+    queryFn: () => getCustomersApi(query).then((res) => res.data),
+    refetchOnWindowFocus: false,
   });
 
-  const deleteCustomer = useDeleteCustomer();
+  useEffect(() => {
+    if (isError && error) {
+      errorNotification(
+        "Error",
+        (error as any).message ?? "Failed to load customers"
+      );
+    }
+  }, [isError, error]);
+
+  //  Delete Customer
+  const deleteCustomer = useMutation({
+    mutationKey: ["deleteCustomer"],
+    mutationFn: (id: string) => removeCustomerApi(id),
+    onSuccess: (response) => {
+      successNotification(
+        "Success",
+        response.data.message ?? "Customer deleted successfully"
+      );
+      setDeleteTarget(null);
+    },
+    onError: (error: any) => {
+      errorNotification("Error", error.message);
+    },
+  });
 
   const customers = data?.data ?? [];
   const total = data?.pagination.total ?? 0;
 
-  // ─── Reset to page 1 whenever filters change ─────────────────────────────
   const handleSearchChange = useCallback((value: string) => {
     setSearch(value);
     setPage(1);
@@ -79,13 +114,11 @@ const CustomerTable: React.FC<CustomerTableProps> = ({
     []
   );
 
-  // ─── Pagination handler ──────────────────────────────────────────────────
   const handleTableChange = (pagination: TablePaginationConfig) => {
     setPage(pagination.current ?? 1);
     setPageSize(pagination.pageSize ?? 10);
   };
 
-  // ─── Style maps ──────────────────────────────────────────────────────────
   const STATUS_BADGE_STYLES: Record<
     CustomerStatus,
     { bg: string; text: string; dot: string; ring: string }
@@ -134,7 +167,6 @@ const CustomerTable: React.FC<CustomerTableProps> = ({
     },
   };
 
-  // ─── Columns ─────────────────────────────────────────────────────────────
   const columns: ColumnsType<Customer> = [
     {
       title: "Customer",
@@ -143,7 +175,7 @@ const CustomerTable: React.FC<CustomerTableProps> = ({
       width: 280,
       render: (_, r) => (
         <div className="flex items-center gap-3 py-1">
-          <div className="w-10 h-10 rounded-xl bg-blue-500 flex items-center justify-center shrink-0 shadow-sm ">
+          <div className="w-10 h-10 rounded-xl bg-blue-500 flex items-center justify-center shrink-0 shadow-sm">
             <span className="text-[12px] font-bold text-white">
               {r.name
                 .split(" ")
@@ -153,7 +185,6 @@ const CustomerTable: React.FC<CustomerTableProps> = ({
                 .slice(0, 2)}
             </span>
           </div>
-
           <div className="flex flex-col gap-1 min-w-0">
             <span className="text-[14px] font-bold text-slate-900 leading-tight truncate capitalize">
               {r.name}
@@ -365,6 +396,7 @@ const CustomerTable: React.FC<CustomerTableProps> = ({
             deleteCustomer.mutate(deleteTarget.id, {
               onSuccess: () => {
                 onDelete?.(deleteTarget);
+                setDeleteTarget(null);
                 resolve();
               },
               onError: (err) => reject(err),

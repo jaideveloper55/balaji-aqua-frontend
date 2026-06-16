@@ -1,6 +1,7 @@
 import React, { useState, useCallback, useEffect } from "react";
 import { Button, Steps, Input } from "antd";
 import { useForm, Controller } from "react-hook-form";
+import { useMutation } from "@tanstack/react-query";
 import {
   HiOutlineUser,
   HiOutlineTruck,
@@ -14,8 +15,7 @@ import {
 import CustomModal from "../../../components/common/CustomModal";
 import CustomInput from "../../../components/common/CustomInput";
 import CustomSelect from "../../../components/common/CustomSelect";
-import { useCreateCustomer } from "../hooks/useCreateCustomer";
-import { useUpdateCustomer } from "../hooks/useUpdateCustomer";
+import { createCustomerApi, updateCustomerApi } from "../api/customers.api";
 import type {
   Customer,
   CustomerFormValues,
@@ -23,6 +23,11 @@ import type {
   DeliveryFrequency,
   PaymentMode,
 } from "../types/Customer";
+import {
+  errorNotification,
+  successNotification,
+} from "../../../components/common/Notification";
+import CustomTextArea from "../../../components/common/Customtextarea";
 
 const TYPE_OPTS: { value: CustomerType; label: string }[] = [
   { value: "RESIDENTIAL", label: "Residential" },
@@ -69,8 +74,36 @@ const CustomerModal: React.FC<CustomerModalProps> = ({
   const [step, setStep] = useState(0);
   const [success, setSuccess] = useState(false);
   const [savedName, setSavedName] = useState("");
-  const createCustomer = useCreateCustomer();
-  const updateCustomer = useUpdateCustomer();
+
+  const createCustomer = useMutation({
+    mutationKey: ["createCustomer"],
+    mutationFn: (data: CustomerFormValues) => createCustomerApi(data),
+    onSuccess: (response) => {
+      successNotification(
+        "Success",
+        response.data.message ?? "Customer created successfully"
+      );
+    },
+    onError: (error: any) => {
+      errorNotification("Error", error.message);
+    },
+  });
+
+  const updateCustomer = useMutation({
+    mutationKey: ["updateCustomer"],
+    mutationFn: ({ id, data }: { id: string; data: CustomerFormValues }) =>
+      updateCustomerApi(id, data),
+    onSuccess: (response) => {
+      successNotification(
+        "Success",
+        response.data.message ?? "Customer updated successfully"
+      );
+    },
+    onError: (error: any) => {
+      errorNotification("Error", error.message);
+    },
+  });
+
   const isSaving = createCustomer.isPending || updateCustomer.isPending;
 
   const {
@@ -150,27 +183,25 @@ const CustomerModal: React.FC<CustomerModalProps> = ({
       };
 
       if (isEditMode && customer) {
-        // ─── EDIT MODE ───
         updateCustomer.mutate(
           { id: customer.id, data: payload },
           {
-            onSuccess: (updated) => {
-              setSavedName(updated.name);
+            onSuccess: (response) => {
+              setSavedName(response.data.name);
               setSuccess(true);
               setTimeout(() => {
-                onSuccess?.(updated.id);
+                onSuccess?.(response.data.id);
               }, 1500);
             },
           }
         );
       } else {
-        // ─── CREATE MODE ───
         createCustomer.mutate(payload, {
-          onSuccess: (created) => {
-            setSavedName(created.name);
+          onSuccess: (response) => {
+            setSavedName(response.data.name);
             setSuccess(true);
             setTimeout(() => {
-              onSuccess?.(created.id);
+              onSuccess?.(response.data.id);
             }, 1500);
           },
         });
@@ -265,7 +296,6 @@ const CustomerModal: React.FC<CustomerModalProps> = ({
     </div>
   );
 
-  // ─── Wizard ──────────────────────────────────────────────────────────────
   return (
     <CustomModal
       open={open}
@@ -394,7 +424,7 @@ const CustomerModal: React.FC<CustomerModalProps> = ({
                 />
               </div>
 
-              {/* Opening Balance — outstanding amount at onboarding */}
+              {/* Opening Balance */}
               <div className="flex flex-col gap-1.5">
                 <label className="text-xs font-semibold text-slate-600">
                   Opening Balance{" "}
@@ -405,9 +435,7 @@ const CustomerModal: React.FC<CustomerModalProps> = ({
                 <Controller
                   name="outstandingBalance"
                   control={control}
-                  rules={{
-                    min: { value: 0, message: "Cannot be negative" },
-                  }}
+                  rules={{ min: { value: 0, message: "Cannot be negative" } }}
                   render={({ field, fieldState }) => (
                     <>
                       <Input
@@ -438,27 +466,17 @@ const CustomerModal: React.FC<CustomerModalProps> = ({
                 />
               </div>
 
-              {/* Notes — Input.TextArea (no CustomInput equivalent, so inline Controller) */}
-              <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-semibold text-slate-600">
-                  Notes
-                </label>
-                <Controller
-                  name="notes"
-                  control={control}
-                  render={({ field }) => (
-                    <Input.TextArea
-                      {...field}
-                      placeholder="Any special delivery instructions..."
-                      rows={4}
-                      size="large"
-                      showCount
-                      maxLength={300}
-                      className="!rounded-lg"
-                    />
-                  )}
-                />
-              </div>
+              {/* Notes */}
+              <CustomTextArea
+                name="notes"
+                control={control}
+                label="Notes"
+                placeholder="Any special delivery instructions..."
+                rows={4}
+                maxLength={300}
+                showCount
+                errors={errors}
+              />
             </div>
           )}
 
@@ -482,7 +500,6 @@ const CustomerModal: React.FC<CustomerModalProps> = ({
                 placeholder="Area, locality (optional)"
                 errors={errors}
               />
-
               <div className="grid grid-cols-2 gap-4">
                 <CustomInput
                   name="city"
@@ -503,7 +520,6 @@ const CustomerModal: React.FC<CustomerModalProps> = ({
                   rules={{ required: "State is required" }}
                 />
               </div>
-
               <div className="grid grid-cols-2 gap-4">
                 <CustomInput
                   name="pincode"

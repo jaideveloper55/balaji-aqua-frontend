@@ -1,113 +1,55 @@
-import api from "../../../lib/axios";
-import {
-  CustomerPricing,
-  CustomerPricingFormValues,
-  Product,
-} from "../types/Customer";
+import authAxios from "../../../lib/axios";
+import type { CustomerPricingFormValues } from "../types/Customer";
 
-function unwrapList<T>(payload: unknown): T[] {
-  if (Array.isArray(payload)) return payload;
-  if (payload && typeof payload === "object" && "data" in payload) {
-    const inner = (payload as { data: unknown }).data;
-    if (Array.isArray(inner)) return inner as T[];
-  }
-  return [];
-}
+// Customer Pricing API
 
-// ─── Customer Pricing API ─────────────────────────────────────────────────
-export const customerPricingApi = {
-  // GET /customers/:customerId/pricing
-  list: async (customerId: string): Promise<CustomerPricing[]> => {
-    const response = await api.get(`/customers/${customerId}/pricing`);
-    return unwrapList<CustomerPricing>(response.data);
-  },
-
-  // POST /customers/:customerId/pricing
-  create: async (
-    customerId: string,
-    data: CustomerPricingFormValues
-  ): Promise<CustomerPricing> => {
-    const response = await api.post<CustomerPricing>(
-      `/customers/${customerId}/pricing`,
-      data
-    );
-    return response.data;
-  },
-
-  // PATCH /customers/:customerId/pricing/:pricingId
-  update: async (
-    customerId: string,
-    pricingId: string,
-    data: Partial<CustomerPricingFormValues>
-  ): Promise<CustomerPricing> => {
-    const response = await api.patch<CustomerPricing>(
-      `/customers/${customerId}/pricing/${pricingId}`,
-      data
-    );
-    return response.data;
-  },
-
-  // DELETE /customers/:customerId/pricing/:pricingId
-  remove: async (
-    customerId: string,
-    pricingId: string
-  ): Promise<{ message: string }> => {
-    const response = await api.delete<{ message: string }>(
-      `/customers/${customerId}/pricing/${pricingId}`
-    );
-    return response.data;
-  },
+// GET /customers/:customerId/pricing
+export const getCustomerPricingApi = (customerId: string) => {
+  return authAxios.get(`/customers/${customerId}/pricing`);
 };
 
-// ─── Products API (paginated, capped at pageSize=100) ─────────────────────
-interface PaginatedResponse<T> {
-  data: T[];
-  meta: {
-    page: number;
-    pageSize: number;
-    total: number;
-    totalPages: number;
-  };
-}
+// POST /customers/:customerId/pricing
+export const createCustomerPricingApi = (
+  customerId: string,
+  data: CustomerPricingFormValues
+) => {
+  return authAxios.post(`/customers/${customerId}/pricing`, data);
+};
 
-const MAX_PAGE_SIZE = 100;
+// PATCH /customers/:customerId/pricing/:pricingId
+export const updateCustomerPricingApi = (
+  customerId: string,
+  pricingId: string,
+  data: Partial<CustomerPricingFormValues>
+) => {
+  return authAxios.patch(`/customers/${customerId}/pricing/${pricingId}`, data);
+};
 
-export const productsApi = {
-  list: async (): Promise<Product[]> => {
-    const first = await api.get<PaginatedResponse<Product>>("/products", {
-      params: {
-        page: 1,
-        pageSize: MAX_PAGE_SIZE,
-        sortBy: "name",
-        sortOrder: "asc",
-        isSellable: true,
-      },
-    });
+// DELETE /customers/:customerId/pricing/:pricingId
+export const removeCustomerPricingApi = (
+  customerId: string,
+  pricingId: string
+) => {
+  return authAxios.delete(`/customers/${customerId}/pricing/${pricingId}`);
+};
 
-    const firstData = unwrapList<Product>(first.data);
-    const meta = first.data?.meta;
+// ─── Products API ──────────────────────────────────────────────────────────
 
-    if (!meta || meta.totalPages <= 1) {
-      return firstData;
-    }
-
-    const remaining = await Promise.all(
-      Array.from({ length: meta.totalPages - 1 }, (_, i) =>
-        api.get<PaginatedResponse<Product>>("/products", {
-          params: {
-            page: i + 2,
-            pageSize: MAX_PAGE_SIZE,
-            sortBy: "name",
-            sortOrder: "asc",
-            isSellable: true,
-          },
-        })
-      )
-    );
-
-    return [
-      ...firstData,
-      ...remaining.flatMap((res) => unwrapList<Product>(res.data)),
-    ];
-  },
+// GET /products
+export const getProductsApi = (
+  page: number,
+  pageSize: number,
+  sortBy: string = "name",
+  sortOrder: string = "asc",
+  isSellable: boolean = true
+) => {
+  return authAxios.get("/products", {
+    params: {
+      page,
+      pageSize,
+      sortBy,
+      sortOrder,
+      isSellable,
+    },
+  });
 };

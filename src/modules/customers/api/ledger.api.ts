@@ -1,8 +1,8 @@
-import api from "../../../lib/axios";
-import type { LedgerEntry, LedgerResponse, EntryType } from "../types/Customer";
+import authAxios from "../../../lib/axios";
+import type { EntryType } from "../types/Customer";
 
 export interface CreateLedgerEntryRequest {
-  entryDate: string; // ISO date
+  entryDate: string;
   entryType: EntryType;
   referenceNo?: string;
   description?: string;
@@ -21,40 +21,26 @@ export interface LedgerQuery {
   limit?: number;
 }
 
-export const ledgerApi = {
-  // GET /customers/:id/ledger
-  list: async (
-    customerId: string,
-    query: LedgerQuery = {}
-  ): Promise<LedgerResponse> => {
-    const response = await api.get<LedgerResponse>(
-      `/customers/${customerId}/ledger`,
-      { params: query }
-    );
-    return response.data;
-  },
+// GET /customers/:id/ledger
+export const getLedgerApi = (customerId: string, query: LedgerQuery = {}) => {
+  return authAxios.get(`/customers/${customerId}/ledger`, { params: query });
+};
 
-  // POST /customers/:id/ledger
-  create: async (
-    customerId: string,
-    data: CreateLedgerEntryRequest
-  ): Promise<LedgerEntry> => {
-    const response = await api.post<LedgerEntry>(
-      `/customers/${customerId}/ledger`,
-      data
-    );
-    return response.data;
-  },
+// POST /customers/:id/ledger
+export const createLedgerEntryApi = (
+  customerId: string,
+  data: CreateLedgerEntryRequest
+) => {
+  return authAxios.post(`/customers/${customerId}/ledger`, data);
+};
 
-  // GET /customers/:id/ledger/export
-  export: async (
-    customerId: string,
-    query: LedgerQuery = {}
-  ): Promise<Blob> => {
-    const response = await api.get(`/customers/${customerId}/ledger/export`, {
-      params: query,
-      responseType: "blob",
-    });
-    return response.data;
-  },
+// GET /customers/:id/ledger/export
+export const exportLedgerApi = (
+  customerId: string,
+  query: LedgerQuery = {}
+) => {
+  return authAxios.get(`/customers/${customerId}/ledger/export`, {
+    params: query,
+    responseType: "blob",
+  });
 };

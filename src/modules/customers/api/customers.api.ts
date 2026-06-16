@@ -1,61 +1,41 @@
-import api from "../../../lib/axios";
+import authAxios from "../../../lib/axios";
 import type {
-  Customer,
-  CustomerDetail,
-  CustomerListResponse,
   CustomerQuery,
-  CustomerStatsResponse,
   CreateCustomerRequest,
   UpdateCustomerRequest,
-} from "../../customers/types/Customer";
+} from "../types/Customer";
 
-export const customersApi = {
-  // GET /customers — paginated + filtered list
-  list: async (query: CustomerQuery = {}): Promise<CustomerListResponse> => {
-    const response = await api.get<CustomerListResponse>("/customers", {
-      params: query,
-    });
-    return response.data;
-  },
+// GET /customers — paginated + filtered list
+export const getCustomersApi = (query: CustomerQuery = {}) => {
+  return authAxios.get("/customers", { params: query });
+};
 
-  // GET /customers/:id — basic info
-  getOne: async (id: string): Promise<Customer> => {
-    const response = await api.get<Customer>(`/customers/${id}`);
-    return response.data;
-  },
+// GET /customers/:id — basic info
+export const getCustomerApi = (id: string) => {
+  return authAxios.get(`/customers/${id}`);
+};
 
-  // GET /customers/:id/detail — full info with summary cards
-  getDetail: async (id: string): Promise<CustomerDetail> => {
-    const response = await api.get<CustomerDetail>(`/customers/${id}/detail`);
-    return response.data;
-  },
+// GET /customers/:id/detail — full info with summary cards
+export const getCustomerDetailApi = (id: string) => {
+  return authAxios.get(`/customers/${id}/detail`);
+};
 
-  // GET /customers/stats — high-level stats
-  getStats: async (): Promise<CustomerStatsResponse> => {
-    const response = await api.get<CustomerStatsResponse>("/customers/stats");
-    return response.data;
-  },
+// GET /customers/stats — high-level stats
+export const getCustomerStatsApi = () => {
+  return authAxios.get("/customers/stats");
+};
 
-  // POST /customers
-  create: async (data: CreateCustomerRequest): Promise<Customer> => {
-    const response = await api.post<Customer>("/customers", data);
-    return response.data;
-  },
+// POST /customers
+export const createCustomerApi = (data: CreateCustomerRequest) => {
+  return authAxios.post("/customers", data);
+};
 
-  // PATCH /customers/:id
-  update: async (
-    id: string,
-    data: UpdateCustomerRequest
-  ): Promise<Customer> => {
-    const response = await api.patch<Customer>(`/customers/${id}`, data);
-    return response.data;
-  },
+// PATCH /customers/:id
+export const updateCustomerApi = (id: string, data: UpdateCustomerRequest) => {
+  return authAxios.patch(`/customers/${id}`, data);
+};
 
-  // DELETE /customers/:id
-  remove: async (id: string): Promise<{ message: string; id: string }> => {
-    const response = await api.delete<{ message: string; id: string }>(
-      `/customers/${id}`
-    );
-    return response.data;
-  },
+// DELETE /customers/:id
+export const removeCustomerApi = (id: string) => {
+  return authAxios.delete(`/customers/${id}`);
 };

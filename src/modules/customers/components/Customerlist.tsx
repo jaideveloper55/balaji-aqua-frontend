@@ -1,9 +1,11 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
 import CustomerTable from "./Customertable";
 import CustomerModal from "./Customermodal";
 import { CUSTOMER_STAT_CONFIG } from "../constants/customerConstants";
-import { useCustomerStats } from "../hooks/useCustomerStats";
-import type { Customer } from "../types/Customer";
+import { getCustomerStatsApi } from "../api/customers.api";
+import { errorNotification } from "../../../components/common/Notification";
+import type { Customer, CustomerStatsResponse } from "../types/Customer";
 import CustomStatCard from "../../../components/common/CustomStatCard";
 
 interface CustomerListProps {
@@ -25,8 +27,28 @@ const CustomerList: React.FC<CustomerListProps> = ({
   const [modalOpen, setModalOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<Customer | null>(null);
 
-  const { data: statsData, isLoading: statsLoading } = useCustomerStats();
-  const stats: typeof EMPTY_STATS = {
+  //  Fetch Customer Stats
+  const {
+    data: statsData,
+    isLoading: statsLoading,
+    isError: statsError,
+    error: statsErrorData,
+  } = useQuery<CustomerStatsResponse>({
+    queryKey: ["getCustomerStats"],
+    queryFn: () => getCustomerStatsApi().then((res) => res.data),
+    refetchOnWindowFocus: false,
+  });
+
+  useEffect(() => {
+    if (statsError && statsErrorData) {
+      errorNotification(
+        "Error",
+        (statsErrorData as any).message ?? "Failed to load stats"
+      );
+    }
+  }, [statsError, statsErrorData]);
+
+  const stats = {
     total: statsData?.total ?? EMPTY_STATS.total,
     totalOutstanding:
       statsData?.totalOutstanding ?? EMPTY_STATS.totalOutstanding,

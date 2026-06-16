@@ -11,8 +11,6 @@ import type {
   PaymentMode,
 } from "../types/Customer";
 
-// ─── Status Badge Styling ──────────────────────────────────────────────────
-
 export type StatusConfig = {
   label: string;
   dot: string;
@@ -62,10 +60,6 @@ export const TYPE_OPTIONS: { value: CustomerType; label: string }[] = [
   { value: "COMMERCIAL", label: "Commercial" },
   { value: "INDUSTRIAL", label: "Industrial" },
 ];
-
-// ─── Stat Cards Config ─────────────────────────────────────────────────────
-// Money-focused KPIs that match the backend's findAll stats response.
-// Backend returns: { total, totalOutstanding, customersWithDues, newThisMonth }
 
 export const CUSTOMER_STAT_CONFIG = [
   {
