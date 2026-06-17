@@ -3,8 +3,7 @@ import { useForm } from "react-hook-form";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { HiUserPlus } from "react-icons/hi2";
 import { HiOutlineCheckCircle, HiOutlineLocationMarker } from "react-icons/hi";
-
-import { customersApi } from "../../../customers/api/customers.api";
+import { createCustomerApi } from "../../../customers/api/customers.api";
 import {
   errorNotification,
   successNotification,
@@ -12,9 +11,6 @@ import {
 import CustomInput from "../../../../components/common/CustomInput";
 import CustomModal from "../../../../components/common/CustomModal";
 import CustomSelect from "../../../../components/common/CustomSelect";
-
-// ─── Types ──────────────────────────────────────────────────────────────────
-
 export type CustomerType = "RESIDENTIAL" | "COMMERCIAL" | "INDUSTRIAL";
 export type DeliveryFrequency = "DAILY" | "WEEKLY" | "MONTHLY" | "ON_DEMAND";
 export type PaymentMode = "CASH" | "UPI" | "BANK_TRANSFER" | "CREDIT";
@@ -39,11 +35,8 @@ export interface CustomerFormValues {
 interface Props {
   open: boolean;
   onClose: () => void;
-  /** Called after a successful create — receives the new customer from the API. */
   onCreated: (customer: any) => void;
 }
-
-// ─── Defaults ───────────────────────────────────────────────────────────────
 
 const DEFAULT_VALUES: CustomerFormValues = {
   name: "",
@@ -61,8 +54,6 @@ const DEFAULT_VALUES: CustomerFormValues = {
   landmark: "",
   notes: "",
 };
-
-// ─── Component ──────────────────────────────────────────────────────────────
 
 const QuickAddCustomerModal: React.FC<Props> = ({
   open,
@@ -87,11 +78,13 @@ const QuickAddCustomerModal: React.FC<Props> = ({
   }, [open, reset]);
 
   const createMutation = useMutation({
-    mutationFn: (data: CustomerFormValues) => customersApi.create(data as any),
+    mutationKey: ["quickAddCustomer"],
+    mutationFn: (data: CustomerFormValues) =>
+      createCustomerApi(data as any).then((res) => res.data),
     onSuccess: (customer) => {
       successNotification(
-        "Customer Added",
-        `${(customer as any)?.name ?? "Customer"} created successfully`
+        "Success",
+        `${customer?.name ?? "Customer"} created successfully`
       );
       queryClient.invalidateQueries({ queryKey: ["customers"] });
       queryClient.invalidateQueries({
@@ -101,11 +94,8 @@ const QuickAddCustomerModal: React.FC<Props> = ({
       onClose();
     },
     onError: (err: any) => {
-      const msg =
-        err?.response?.data?.message ??
-        err?.message ??
-        "Could not create customer";
-      errorNotification("Create Failed", Array.isArray(msg) ? msg[0] : msg);
+      const msg = err?.message ?? "Could not create customer";
+      errorNotification("Error", Array.isArray(msg) ? msg[0] : msg);
     },
   });
 
@@ -113,7 +103,6 @@ const QuickAddCustomerModal: React.FC<Props> = ({
     createMutation.mutate(data);
   };
 
-  // Block close mid-edit
   const beforeClose = async () => {
     if (createMutation.isPending) return false;
     if (isDirty) {
@@ -173,7 +162,7 @@ const QuickAddCustomerModal: React.FC<Props> = ({
         className="space-y-5"
         autoComplete="off"
       >
-        {/* ── Section: Identity ─────────────────────────────────────────── */}
+        {/* Section: Identity */}
         <div>
           <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-3">
             Customer Identity
@@ -241,7 +230,7 @@ const QuickAddCustomerModal: React.FC<Props> = ({
           </div>
         </div>
 
-        {/* ── Section: Billing preferences ──────────────────────────────── */}
+        {/* Section: Billing preferences  */}
         <div>
           <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-3">
             Billing Preferences
@@ -295,7 +284,7 @@ const QuickAddCustomerModal: React.FC<Props> = ({
           </div>
         </div>
 
-        {/* ── Section: Address ──────────────────────────────────────────── */}
+        {/* Section: Address */}
         <div>
           <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-3 flex items-center gap-1.5">
             <HiOutlineLocationMarker className="w-3.5 h-3.5" />
@@ -365,7 +354,7 @@ const QuickAddCustomerModal: React.FC<Props> = ({
           </div>
         </div>
 
-        {/* ── Section: Notes ────────────────────────────────────────────── */}
+        {/*  Section: Notes */}
         <div>
           <CustomInput
             name="notes"

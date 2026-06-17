@@ -3,7 +3,6 @@ import { HiOutlineChevronDown, HiOutlineCheck } from "react-icons/hi";
 import { TENANT_CONFIG, TENANT_LIST } from "../constants/constants";
 import type { TenantId } from "../types/Auth";
 
-// Brand logo icon (custom SVG — not available in react-icons)
 const IconDroplet = ({
   size = 20,
   ...props

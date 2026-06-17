@@ -20,8 +20,9 @@ import type { LedgerEntry } from "../types/Customer";
 import { ENTRY_MAP } from "../constants/ledgerConstants";
 import { fmt, fmtDate } from "../../../utils/helpers";
 import { generateInvoicePDF } from "../../../utils/generators";
-import { billingApi } from "../../billing/api/billing.api";
+
 import InfoCard from "./ledger/InfoCard";
+import { getInvoicesApi } from "../../billing/api/billing.api";
 
 interface InvoiceItem {
   id: string;
@@ -63,18 +64,21 @@ const InvoiceDrawer: React.FC<InvoiceDrawerProps> = ({
 
   const { data: invoiceData, isLoading: invoiceLoading } = useQuery({
     queryKey: ["invoice-by-ref", entry.referenceNo],
-    queryFn: async () => {
-      if (!entry.referenceNo) return null;
-      const res = await billingApi.listInvoices({
+    queryFn: () => {
+      if (!entry.referenceNo) return Promise.resolve(null);
+      return getInvoicesApi({
         search: entry.referenceNo,
         limit: 1,
+      }).then((res) => {
+        const invoices = res.data?.data ?? [];
+        return (
+          invoices.find(
+            (inv: any) => inv.invoiceNumber === entry.referenceNo
+          ) ??
+          invoices[0] ??
+          null
+        );
       });
-      const invoices = (res as any)?.data ?? [];
-      return (
-        invoices.find((inv: any) => inv.invoiceNumber === entry.referenceNo) ??
-        invoices[0] ??
-        null
-      );
     },
     enabled: isInvoice && !!entry.referenceNo,
     staleTime: 60_000,

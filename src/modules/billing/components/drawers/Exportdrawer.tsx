@@ -12,7 +12,13 @@ import {
 } from "react-icons/hi";
 import { HiDocumentArrowDown, HiTableCells } from "react-icons/hi2";
 import { COMPANY_INFO } from "../../constants/Mockdata";
-import { billingApi, ExportFilters } from "../../api/billing.api";
+import {
+  exportInvoicesApi,
+  exportPaymentsApi,
+  exportOutstandingApi,
+  exportDailySummaryApi,
+  ExportFilters,
+} from "../../api/billing.api";
 
 const { RangePicker } = DatePicker;
 
@@ -182,48 +188,49 @@ const ExportDrawer: React.FC<Props> = ({
     URL.revokeObjectURL(url);
   };
 
-  const handleExport = async () => {
+  const handleExport = () => {
     setIsExporting(true);
-    try {
-      const filters: ExportFilters = { format };
-      if (currentReport.supportsDateRange) {
-        if (fromDate) filters.dateFrom = fromDate.format("YYYY-MM-DD");
-        if (toDate) filters.dateTo = toDate.format("YYYY-MM-DD");
-      }
 
-      let blob: Blob;
-      if (reportType === "invoices") {
-        blob = await billingApi.exportInvoices(filters);
-      } else if (reportType === "payments") {
-        blob = await billingApi.exportPayments(filters);
-      } else if (reportType === "outstanding") {
-        blob = await billingApi.exportOutstanding({ format });
-      } else {
-        blob = await billingApi.exportDailySummary(filters);
-      }
-
-      const timestamp = dayjs().format("YYYYMMDD_HHmmss");
-      downloadBlob(blob, `${reportType}_${timestamp}.${format}`);
-
-      message.success(`${currentReport.title} downloaded`);
-      onClose();
-    } catch (err: any) {
-      console.error(err);
-      // If the backend returned a JSON error inside the blob, try to read it
-      if (err?.response?.data instanceof Blob) {
-        try {
-          const text = await err.response.data.text();
-          const parsed = JSON.parse(text);
-          message.error(parsed.message ?? "Export failed");
-        } catch {
-          message.error("Export failed. Please try again.");
-        }
-      } else {
-        message.error(err?.message ?? "Export failed. Please try again.");
-      }
-    } finally {
-      setIsExporting(false);
+    const filters: ExportFilters = { format };
+    if (currentReport.supportsDateRange) {
+      if (fromDate) filters.dateFrom = fromDate.format("YYYY-MM-DD");
+      if (toDate) filters.dateTo = toDate.format("YYYY-MM-DD");
     }
+
+    const exportFn =
+      reportType === "invoices"
+        ? exportInvoicesApi(filters)
+        : reportType === "payments"
+        ? exportPaymentsApi(filters)
+        : reportType === "outstanding"
+        ? exportOutstandingApi({ format })
+        : exportDailySummaryApi(filters);
+
+    exportFn
+      .then((response) => {
+        const blob = response.data;
+        const timestamp = dayjs().format("YYYYMMDD_HHmmss");
+        downloadBlob(blob, `${reportType}_${timestamp}.${format}`);
+        message.success(`${currentReport.title} downloaded`);
+        onClose();
+      })
+      .catch(async (err: any) => {
+        console.error(err);
+        if (err?.response?.data instanceof Blob) {
+          try {
+            const text = await err.response.data.text();
+            const parsed = JSON.parse(text);
+            message.error(parsed.message ?? "Export failed");
+          } catch {
+            message.error("Export failed. Please try again.");
+          }
+        } else {
+          message.error(err?.message ?? "Export failed. Please try again.");
+        }
+      })
+      .finally(() => {
+        setIsExporting(false);
+      });
   };
 
   return (
@@ -371,7 +378,7 @@ const ExportDrawer: React.FC<Props> = ({
           </div>
         </div>
 
-        {/* Preview — shows only what we know without hitting the server */}
+        {/* Preview */}
         <div className="bg-gradient-to-br from-blue-50/40 to-gray-50 border border-blue-100 rounded-xl p-4">
           <div className="flex items-center gap-2 mb-2.5">
             <HiOutlineDocumentText className="w-4 h-4 text-blue-500" />

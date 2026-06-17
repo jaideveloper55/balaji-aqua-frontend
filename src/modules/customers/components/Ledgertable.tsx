@@ -1,7 +1,8 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { Table } from "antd";
 import type { ColumnsType } from "antd/es/table";
+import { useQuery } from "@tanstack/react-query";
 import {
   HiOutlineDocumentText,
   HiOutlineDownload,
@@ -16,11 +17,14 @@ import {
 
 import CustomSelect from "../../../components/common/CustomSelect";
 import CustomDateRange from "../../../components/common/CustomDateRange";
+import { getLedgerApi } from "../api/ledger.api";
+import { errorNotification } from "../../../components/common/Notification";
 
 import type {
   FilterFormValues,
   LedgerEntry,
   LedgerTableProps,
+  LedgerResponse,
   EntryType,
 } from "../types/Customer";
 import {
@@ -73,11 +77,26 @@ const LedgerTable: React.FC<LedgerTableProps> = ({ customerId }) => {
     return f;
   }, [typeFilter, dateRange]);
 
-  // ── Fetch from API via TanStack Query ──────────────────────
-  const { data, isLoading, isFetching } = useLedger(customerId, {
-    ...apiFilters,
-    limit: 100, // get many — client-side search filters further
-  });
+  // ── Fetch Ledger
+  const { data, isLoading, isFetching, isError, error } =
+    useQuery<LedgerResponse>({
+      queryKey: ["getLedger", { customerId, ...apiFilters }],
+      queryFn: () =>
+        getLedgerApi(customerId!, { ...apiFilters, limit: 100 }).then(
+          (res) => res.data
+        ),
+      enabled: !!customerId,
+      refetchOnWindowFocus: false,
+    });
+
+  useEffect(() => {
+    if (isError && error) {
+      errorNotification(
+        "Error",
+        (error as any).message ?? "Failed to load ledger"
+      );
+    }
+  }, [isError, error]);
 
   const entries = data?.data ?? [];
 
@@ -92,16 +111,11 @@ const LedgerTable: React.FC<LedgerTableProps> = ({ customerId }) => {
     );
   }, [entries, search]);
 
-  // ── Use backend's pre-computed summary OR derive client-side ──
-  // Backend gives accurate totals across ALL filtered entries.
-  // For the "incl./excl. GST" toggle and search, derive from `filtered`.
   const totalDebit = filtered.reduce((s, e) => s + e.debitAmount, 0);
   const totalCredit = filtered.reduce((s, e) => s + e.creditAmount, 0);
   const totalCGST = filtered.reduce((s, e) => s + e.cgst, 0);
   const totalSGST = filtered.reduce((s, e) => s + e.sgst, 0);
-  // const totalIGST = filtered.reduce((s, e) => s + e.igst, 0);
 
-  // baseAmount derived: debit/credit minus the GST embedded in it
   const totalBaseDebit = filtered.reduce(
     (s, e) =>
       s + (e.debitAmount > 0 ? e.debitAmount - (e.cgst + e.sgst + e.igst) : 0),

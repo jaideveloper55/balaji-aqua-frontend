@@ -1,9 +1,11 @@
 import React from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { useMutation } from "@tanstack/react-query";
 import { AiOutlineLogout, AiOutlineUser } from "react-icons/ai";
 import type { OrgConfig } from "../../config/orgConfig";
+import { logoutApi } from "../../modules/auth/api/auth.api";
+import { useAuthStore } from "../../store/auth.store";
 import OrgSwitcher from "./OrgSwitcher";
-import { useLogout } from "../../modules/auth/hooks/useLogout";
 
 interface ProfileMenuProps {
   open: boolean;
@@ -34,7 +36,20 @@ const ProfileMenu = React.forwardRef<HTMLDivElement, ProfileMenuProps>(
   ) => {
     const { theme } = config;
     const navigate = useNavigate();
-    const logout = useLogout();
+
+    // Logout mutation
+    const logout = useMutation({
+      mutationKey: ["logout"],
+      mutationFn: () => logoutApi().then((res) => res.data),
+      onSuccess: () => {
+        useAuthStore.getState().logout();
+        navigate("/login");
+      },
+      onError: () => {
+        useAuthStore.getState().logout();
+        navigate("/login");
+      },
+    });
 
     const handleProfileClick = () => {
       onCloseMenu();

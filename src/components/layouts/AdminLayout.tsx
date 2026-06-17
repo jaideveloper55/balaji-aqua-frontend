@@ -1,8 +1,10 @@
 import React, { useEffect, useState, useRef } from "react";
 import { useLocation, useNavigate, Outlet } from "react-router-dom";
+import { useMutation } from "@tanstack/react-query";
 import { getOrgConfig, ORG_CONFIGS } from "../../config/orgConfig";
 import { useAuthStore } from "../../store/auth.store";
-import { useLogout } from "../../modules/auth/hooks/useLogout";
+import { logoutApi } from "../../modules/auth/api/auth.api";
+
 import DesktopSidebar from "./DesktopSidebar";
 import MobileSidebar from "./MobileSidebar";
 import AppHeader from "./AppHeader";
@@ -29,7 +31,20 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({
 
   // Real user from auth store
   const user = useAuthStore((s) => s.user);
-  const logout = useLogout();
+
+  // Logout mutation
+  const logout = useMutation({
+    mutationKey: ["logout"],
+    mutationFn: () => logoutApi().then((res) => res.data),
+    onSuccess: () => {
+      useAuthStore.getState().logout();
+      navigate("/login");
+    },
+    onError: () => {
+      useAuthStore.getState().logout();
+      navigate("/login");
+    },
+  });
 
   const userName = user
     ? `${user.firstName} ${user.lastName}`.trim() || "User"

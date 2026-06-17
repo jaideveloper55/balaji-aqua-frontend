@@ -51,7 +51,7 @@ export const useAuthStore = create<AuthState>()(
       setActiveCompany: (companyId) => {
         const { companies } = get();
         const exists = companies.some((c) => c.id === companyId);
-        if (!exists) return; // Ignore invalid switches
+        if (!exists) return;
         set({ activeCompanyId: companyId });
       },
 

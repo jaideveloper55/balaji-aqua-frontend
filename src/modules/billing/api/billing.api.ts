@@ -1,4 +1,4 @@
-import api from "../../../lib/axios";
+import authAxios from "../../../lib/axios";
 
 export interface POSProduct {
   id: string;
@@ -83,181 +83,152 @@ export interface DailySummaryFilters {
   dateTo?: string;
 }
 
-// ── Export ─────────────────────────────────────────────────────────────────
 export interface ExportFilters {
   dateFrom?: string;
   dateTo?: string;
   format?: "csv" | "pdf";
 }
 
-export const billingApi = {
-  getPOSProducts: async (search?: string): Promise<POSProduct[]> => {
-    const response = await api.get<POSProduct[]>("/billing/pos/products", {
-      params: search ? { search } : {},
-    });
-    return response.data;
-  },
+// POS
 
-  getCustomerPrice: async (
-    customerId: string,
-    productId: string
-  ): Promise<{ price: number }> => {
-    const response = await api.get<{ price: number }>(
-      `/billing/pos/customer-price/${customerId}/${productId}`
-    );
-    return response.data;
-  },
+export const getPOSProductsApi = (search?: string) => {
+  return authAxios.get("/billing/pos/products", {
+    params: search ? { search } : {},
+  });
+};
 
-  // ── Invoices ───────────────────────────────────────────────────────────
+export const getCustomerPriceApi = (customerId: string, productId: string) => {
+  return authAxios.get(
+    `/billing/pos/customer-price/${customerId}/${productId}`
+  );
+};
 
-  createInvoice: async (data: CreateInvoicePayload) => {
-    const response = await api.post("/billing/invoices", data);
-    return response.data;
-  },
+// Invoices
 
-  listInvoices: async (filters: InvoiceFilters = {}) => {
-    const response = await api.get("/billing/invoices", { params: filters });
-    return response.data;
-  },
+export const createInvoiceApi = (data: CreateInvoicePayload) => {
+  return authAxios.post("/billing/invoices", data);
+};
 
-  getInvoice: async (id: string) => {
-    const response = await api.get(`/billing/invoices/${id}`);
-    return response.data;
-  },
+export const getInvoicesApi = (filters: InvoiceFilters = {}) => {
+  return authAxios.get("/billing/invoices", { params: filters });
+};
 
-  cancelInvoice: async (id: string) => {
-    const response = await api.patch(`/billing/invoices/${id}/cancel`);
-    return response.data;
-  },
+export const getInvoiceApi = (id: string) => {
+  return authAxios.get(`/billing/invoices/${id}`);
+};
 
-  updateInvoice: async (id: string, data: UpdateInvoicePayload) => {
-    const response = await api.patch(`/billing/invoices/${id}`, data);
-    return response.data;
-  },
+export const cancelInvoiceApi = (id: string) => {
+  return authAxios.patch(`/billing/invoices/${id}/cancel`);
+};
 
-  // ── Payments ───────────────────────────────────────────────────────────
+export const updateInvoiceApi = (id: string, data: UpdateInvoicePayload) => {
+  return authAxios.patch(`/billing/invoices/${id}`, data);
+};
 
-  createPayment: async (data: CreatePaymentPayload) => {
-    const response = await api.post("/billing/payments", data);
-    return response.data;
-  },
+// Payments
 
-  listPayments: async (filters: PaymentFilters = {}) => {
-    const response = await api.get("/billing/payments", { params: filters });
-    return response.data;
-  },
+export const createPaymentApi = (data: CreatePaymentPayload) => {
+  return authAxios.post("/billing/payments", data);
+};
 
-  // ── Outstanding ────────────────────────────────────────────────────────
+export const getPaymentsApi = (filters: PaymentFilters = {}) => {
+  return authAxios.get("/billing/payments", { params: filters });
+};
 
-  getOutstanding: async (filters: OutstandingFilters = {}) => {
-    const response = await api.get("/billing/outstanding", { params: filters });
-    return response.data;
-  },
+// ─── Outstanding ──────────────────────────────────────────────────────────
 
-  // ── Daily Summary ──────────────────────────────────────────────────────
+export const getOutstandingApi = (filters: OutstandingFilters = {}) => {
+  return authAxios.get("/billing/outstanding", { params: filters });
+};
 
-  getDailySummary: async (filters: DailySummaryFilters = {}) => {
-    const response = await api.get("/billing/daily-summary", {
-      params: filters,
-    });
-    return response.data;
-  },
+// ─── Daily Summary ────────────────────────────────────────────────────────
 
-  // ── Export ─────────────────────────────────────────────────────────────
-  // All four return a Blob. The caller triggers the browser download.
+export const getDailySummaryApi = (filters: DailySummaryFilters = {}) => {
+  return authAxios.get("/billing/daily-summary", { params: filters });
+};
 
-  exportInvoices: async (filters: ExportFilters = {}): Promise<Blob> => {
-    const response = await api.get("/billing/export/invoices", {
-      params: filters,
-      responseType: "blob",
-    });
-    return response.data;
-  },
+// ─── Export (all return Blob via responseType) ─────────────────────────────
 
-  exportPayments: async (filters: ExportFilters = {}): Promise<Blob> => {
-    const response = await api.get("/billing/export/payments", {
-      params: filters,
-      responseType: "blob",
-    });
-    return response.data;
-  },
+export const exportInvoicesApi = (filters: ExportFilters = {}) => {
+  return authAxios.get("/billing/export/invoices", {
+    params: filters,
+    responseType: "blob",
+  });
+};
 
-  exportOutstanding: async (filters: ExportFilters = {}): Promise<Blob> => {
-    const response = await api.get("/billing/export/outstanding", {
-      params: filters,
-      responseType: "blob",
-    });
-    return response.data;
-  },
+export const exportPaymentsApi = (filters: ExportFilters = {}) => {
+  return authAxios.get("/billing/export/payments", {
+    params: filters,
+    responseType: "blob",
+  });
+};
 
-  exportDailySummary: async (filters: ExportFilters = {}): Promise<Blob> => {
-    const response = await api.get("/billing/export/daily-summary", {
-      params: filters,
-      responseType: "blob",
-    });
-    return response.data;
-  },
+export const exportOutstandingApi = (filters: ExportFilters = {}) => {
+  return authAxios.get("/billing/export/outstanding", {
+    params: filters,
+    responseType: "blob",
+  });
+};
 
-  // ── Cart ───────────────────────────────────────────────────────────────
+export const exportDailySummaryApi = (filters: ExportFilters = {}) => {
+  return authAxios.get("/billing/export/daily-summary", {
+    params: filters,
+    responseType: "blob",
+  });
+};
 
-  getCart: async () => {
-    const response = await api.get("/billing/cart");
-    return response.data;
-  },
+// ─── Cart ───────────────────────────────────────────────────────────────────
 
-  addCartItem: async (data: {
-    productId: string;
-    quantity: number;
-    unitPrice?: number;
-  }) => {
-    const response = await api.post("/billing/cart/items", data);
-    return response.data;
-  },
+export const getCartApi = () => {
+  return authAxios.get("/billing/cart");
+};
 
-  updateCartItem: async (
-    itemId: string,
-    data: { quantity: number; unitPrice?: number }
-  ) => {
-    const response = await api.patch(`/billing/cart/items/${itemId}`, data);
-    return response.data;
-  },
+export const addCartItemApi = (data: {
+  productId: string;
+  quantity: number;
+  unitPrice?: number;
+}) => {
+  return authAxios.post("/billing/cart/items", data);
+};
 
-  removeCartItem: async (itemId: string) => {
-    const response = await api.delete(`/billing/cart/items/${itemId}`);
-    return response.data;
-  },
+export const updateCartItemApi = (
+  itemId: string,
+  data: { quantity: number; unitPrice?: number }
+) => {
+  return authAxios.patch(`/billing/cart/items/${itemId}`, data);
+};
 
-  updateCartSettings: async (data: {
-    customerId?: string;
-    walkInName?: string;
-    walkInPhone?: string;
-    invoiceType?: "SALE" | "WALK_IN";
-    gstEnabled?: boolean;
-    gstRate?: number;
-    discount?: number;
-    notes?: string;
-  }) => {
-    const response = await api.patch("/billing/cart/settings", data);
-    return response.data;
-  },
+export const removeCartItemApi = (itemId: string) => {
+  return authAxios.delete(`/billing/cart/items/${itemId}`);
+};
 
-  clearCart: async () => {
-    const response = await api.delete("/billing/cart");
-    return response.data;
-  },
+export const updateCartSettingsApi = (data: {
+  customerId?: string;
+  walkInName?: string;
+  walkInPhone?: string;
+  invoiceType?: "SALE" | "WALK_IN";
+  gstEnabled?: boolean;
+  gstRate?: number;
+  discount?: number;
+  notes?: string;
+}) => {
+  return authAxios.patch("/billing/cart/settings", data);
+};
 
-  checkout: async (data: {
-    dueDate?: string;
-    paymentMode?: string;
+export const clearCartApi = () => {
+  return authAxios.delete("/billing/cart");
+};
+
+export const checkoutApi = (data: {
+  dueDate?: string;
+  paymentMode?: string;
+  referenceId?: string;
+  amountPaid?: number;
+  payments?: {
+    mode: "CASH" | "UPI" | "BANK_TRANSFER";
+    amount: number;
     referenceId?: string;
-    amountPaid?: number;
-    payments?: {
-      mode: "CASH" | "UPI" | "BANK_TRANSFER";
-      amount: number;
-      referenceId?: string;
-    }[];
-  }) => {
-    const response = await api.post("/billing/cart/checkout", data);
-    return response.data;
-  },
+  }[];
+}) => {
+  return authAxios.post("/billing/cart/checkout", data);
 };

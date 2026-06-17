@@ -1,5 +1,6 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { Spin, Tag, Input } from "antd";
+import { useQuery } from "@tanstack/react-query";
 import {
   HiOutlineSearch,
   HiOutlineX,
@@ -8,7 +9,7 @@ import {
 } from "react-icons/hi";
 import { HiSparkles } from "react-icons/hi2";
 
-import { useCustomerSearch } from "../hooks/useCustomerSearch";
+import { getCustomersApi } from "../../../customers/api/customers.api";
 import {
   formatCurrency,
   getCustomerTypeColor,
@@ -24,14 +25,85 @@ interface Props {
   onOpenQuickAdd: () => void;
 }
 
+// Map backend customer shape to billing module's Customer type
+function mapToBillingCustomer(c: any): Customer {
+  const typeMap: Record<string, Customer["type"]> = {
+    RESIDENTIAL: "Residential",
+    COMMERCIAL: "Commercial",
+    INDUSTRIAL: "Industrial",
+  };
+  return {
+    id: c.id,
+    customerId: c.customerCode,
+    name: c.name,
+    phone: c.phone,
+    email: c.email ?? "",
+    type: typeMap[c.type] ?? "Residential",
+    status:
+      c.status === "ACTIVE"
+        ? "Active"
+        : c.status === "PENDING"
+        ? "Pending"
+        : "Inactive",
+    outstanding: c.outstandingBalance ?? 0,
+    address: "",
+    pricing: [],
+    depositJars: 0,
+    depositCans: 0,
+    isWalkIn: false,
+  };
+}
+
 const CustomerPickerModal: React.FC<Props> = ({ open, onSelect, onClose }) => {
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [page, setPage] = useState(1);
 
-  const { customers, loading, error, total, hasMore, loadMore } =
-    useCustomerSearch(search);
+  // Debounce search input
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setDebouncedSearch(search);
+      setPage(1);
+    }, 300);
+    return () => clearTimeout(t);
+  }, [search]);
+
+  // ── Fetch customers ────────────────────────────────────────────────────
+  const { data, isLoading, isFetching, isError, error } = useQuery({
+    queryKey: ["customer-picker", debouncedSearch, page],
+    queryFn: () =>
+      getCustomersApi({
+        search: debouncedSearch || undefined,
+        status: "ACTIVE",
+        page,
+        limit: 20,
+        sortBy: "name",
+        sortOrder: "asc",
+      }).then((res) => res.data),
+    enabled: open,
+    staleTime: 1000 * 30,
+  });
+
+  const customers: Customer[] = useMemo(
+    () => (data?.data ?? []).map(mapToBillingCustomer),
+    [data]
+  );
+
+  const total = data?.pagination.total ?? 0;
+  const totalPages = data?.pagination.totalPages ?? 1;
+  const hasMore = page < totalPages;
+  const loading = isLoading || isFetching;
+  const errorMessage = isError
+    ? (error as any)?.message ?? "Failed to load customers"
+    : null;
+
+  const loadMore = () => {
+    if (!loading && hasMore) setPage((p) => p + 1);
+  };
 
   const handleClose = () => {
     setSearch("");
+    setPage(1);
     onClose();
   };
 
@@ -98,18 +170,18 @@ const CustomerPickerModal: React.FC<Props> = ({ open, onSelect, onClose }) => {
         )}
 
         {/* Error state */}
-        {error && (
+        {errorMessage && (
           <div className="flex flex-col items-center py-10 text-center">
             <HiOutlineExclamationCircle className="w-9 h-9 text-rose-400 mb-2" />
             <p className="text-[13px] font-semibold text-slate-700">
               Failed to load customers
             </p>
-            <p className="text-[12px] text-slate-400 mt-1">{error}</p>
+            <p className="text-[12px] text-slate-400 mt-1">{errorMessage}</p>
           </div>
         )}
 
         {/* Empty state */}
-        {!loading && !error && customers.length === 0 && (
+        {!loading && !errorMessage && customers.length === 0 && (
           <div className="flex flex-col items-center py-10 text-center">
             <div className="w-12 h-12 rounded-xl bg-slate-100 flex items-center justify-center mb-3">
               <HiOutlineSearch className="w-5 h-5 text-slate-400" />

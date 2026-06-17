@@ -12,7 +12,6 @@ import {
   IoPeopleOutline,
 } from "react-icons/io5";
 
-// Type for each feature shown in the panel
 export interface TenantFeature {
   icon: keyof typeof ICON_MAP;
   title: string;

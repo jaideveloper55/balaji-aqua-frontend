@@ -9,13 +9,11 @@ import {
   HiOutlineExclamationCircle,
 } from "react-icons/hi";
 import { HiMiniQrCode, HiBuildingLibrary } from "react-icons/hi2";
-
 import { formatCurrency } from "../../utils/Helpers";
-
-import { billingApi } from "../../api/billing.api";
-import { customersApi } from "../../../customers/api/customers.api";
+import { getCustomersApi } from "../../../customers/api/customers.api";
 import CustomInput from "../../../../components/common/CustomInput";
 import CustomSelect from "../../../../components/common/CustomSelect";
+import { getInvoicesApi } from "../../api/billing.api";
 
 export interface PaymentFormValues {
   paymentCustomer: string;
@@ -94,18 +92,19 @@ const AddPaymentDrawer: React.FC<Props> = ({
     return () => clearTimeout(t);
   }, [customerSearch]);
 
-  // ── Fetch customers from API (server-side search) ─────────────────────────
+  //  Fetch customers
+
   const { data: customersData, isLoading: isLoadingCustomers } = useQuery({
     queryKey: ["billing-payment-customers", debouncedSearch],
     queryFn: () =>
-      customersApi.list({
+      getCustomersApi({
         search: debouncedSearch || undefined,
         status: "ACTIVE",
         page: 1,
         limit: 50,
         sortBy: "name",
         sortOrder: "asc",
-      }),
+      }).then((res) => res.data),
     enabled: open,
     staleTime: 1000 * 30,
   });
@@ -132,15 +131,15 @@ const AddPaymentDrawer: React.FC<Props> = ({
     [customers]
   );
 
-  // ── Fetch invoices for the selected customer ──────────────────────────────
+  // ── Fetch invoices for the selected customer
   const { data: customerInvoicesData, isLoading: isLoadingInvoices } = useQuery(
     {
       queryKey: ["billing-invoices-for-payment", paymentCustomer],
       queryFn: () =>
-        billingApi.listInvoices({
+        getInvoicesApi({
           customerId: paymentCustomer,
           limit: 100,
-        }),
+        }).then((res) => res.data),
       enabled: open && !!paymentCustomer,
       staleTime: 1000 * 30,
     }

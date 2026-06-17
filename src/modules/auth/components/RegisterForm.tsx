@@ -1,6 +1,7 @@
 import React, { useState, useCallback, useMemo } from "react";
 import { useForm } from "react-hook-form";
-import { Link } from "react-router-dom";
+import { useMutation } from "@tanstack/react-query";
+import { Link, useNavigate } from "react-router-dom";
 import {
   HiOutlineExclamationCircle,
   HiOutlineArrowRight,
@@ -10,6 +11,8 @@ import CustomInput from "../../../components/common/CustomInput";
 import TenantSelector, { IconDroplet } from "./TenantSelector";
 import { TENANT_CONFIG } from "../constants/constants";
 import type { TenantId } from "../types/Auth";
+import { registerApi } from "../api/auth.api";
+import { useAuthStore } from "../../../store/auth.store";
 
 interface RegisterFormValues {
   firstName: string;
@@ -47,8 +50,30 @@ const RegisterForm: React.FC<RegisterFormProps> = ({
 }) => {
   const config = TENANT_CONFIG[tenant];
   const [agree, setAgree] = useState(false);
-  const [loading, setLoading] = useState(false);
   const [submitError, setSubmitError] = useState("");
+  const navigate = useNavigate();
+
+  // ─── Register mutation ──────────────────────────────────────────────────
+  const register = useMutation({
+    mutationKey: ["register"],
+    mutationFn: (data: Parameters<typeof registerApi>[0]) =>
+      registerApi(data).then((res) => res.data),
+    onSuccess: (data) => {
+      // If backend logs the user in immediately on register, store auth
+      // and redirect. If it instead requires email verification / admin
+      // approval, swap this for a navigate("/login") + success message.
+      if (data?.accessToken) {
+        useAuthStore.getState().setAuth(data);
+        navigate("/dashboard");
+      } else {
+        navigate("/login");
+      }
+    },
+    onError: (err: any) => {
+      const msg = err?.message ?? "Registration failed. Please try again.";
+      setSubmitError(Array.isArray(msg) ? msg[0] : msg);
+    },
+  });
 
   const {
     control,
@@ -95,33 +120,19 @@ const RegisterForm: React.FC<RegisterFormProps> = ({
       }
 
       // ── Exact API payload — matches RegisterDto ──────────────────────────
-      const apiPayload = {
+      register.mutate({
         email: data.email.trim(),
         password: data.password,
         firstName: data.firstName.trim(),
         lastName: data.lastName.trim(),
-        phone: data.phone.trim() || undefined, // send undefined if empty (optional)
+        phone: data.phone.trim() || undefined,
         company: {
-          name: config.name, // e.g. "Sri Balaji Aqua Water"
-          type: TENANT_TO_COMPANY_TYPE[tenant], // "WATER_PLANT" | "BEVERAGE"
+          name: config.name,
+          type: TENANT_TO_COMPANY_TYPE[tenant],
         },
-      };
-
-      console.log("📤 Register payload:", apiPayload); // remove in production
-
-      setLoading(true);
-      // TODO: connect to real API
-      // const response = await authApi.register(apiPayload)
-      // tokenStorage.setTokens(response.accessToken, response.refreshToken)
-      // navigate("/dashboard")
-      setTimeout(() => {
-        setLoading(false);
-        setSubmitError(
-          "Registration is currently by invitation only. Please contact your administrator."
-        );
-      }, 1800);
+      });
     },
-    [strength, agree, setError, config, tenant]
+    [strength, agree, setError, config, tenant, register]
   );
 
   const handleFormSubmit = useCallback(
@@ -179,7 +190,6 @@ const RegisterForm: React.FC<RegisterFormProps> = ({
         <TenantSelector value={tenant} onChange={onTenantChange} />
 
         <div className="flex flex-col gap-3.5">
-          {/* First + Last name in a row — API expects them as separate fields */}
           <div className="grid grid-cols-2 gap-3">
             <CustomInput
               name="firstName"
@@ -210,7 +220,6 @@ const RegisterForm: React.FC<RegisterFormProps> = ({
             iconType="mail"
           />
 
-          {/* Phone is optional in API — label makes this clear */}
           <CustomInput
             name="phone"
             control={control}
@@ -231,7 +240,6 @@ const RegisterForm: React.FC<RegisterFormProps> = ({
               iconType="lock"
             />
 
-            {/* Password strength — matches API @Matches regex requirements */}
             {watched.password ? (
               <>
                 <div className="flex items-center gap-2 mt-2">
@@ -333,21 +341,21 @@ const RegisterForm: React.FC<RegisterFormProps> = ({
 
         <button
           type="submit"
-          disabled={isDisabled || loading}
+          disabled={isDisabled || register.isPending}
           className={`w-full flex items-center justify-center gap-2.5 py-3.5 px-6 rounded-xl text-sm font-semibold mt-1 transition-all duration-200 ${
-            isDisabled || loading
+            isDisabled || register.isPending
               ? "bg-slate-200 text-slate-400 cursor-not-allowed"
               : "text-white shadow-lg hover:shadow-xl hover:scale-[1.01] active:scale-[0.99]"
           }`}
           style={
-            !isDisabled && !loading
+            !isDisabled && !register.isPending
               ? {
                   background: `linear-gradient(135deg, ${config.gradientFrom}, ${config.gradientTo})`,
                 }
               : {}
           }
         >
-          {loading ? (
+          {register.isPending ? (
             <>
               <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
               Creating account...

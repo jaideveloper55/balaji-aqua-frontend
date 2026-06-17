@@ -9,11 +9,9 @@ import {
   HiOutlineExclamationCircle,
 } from "react-icons/hi";
 import { HiMiniQrCode, HiBuildingLibrary } from "react-icons/hi2";
-
 import { formatCurrency } from "../../utils/Helpers";
-
-import { billingApi } from "../../api/billing.api";
-import { customersApi } from "../../../customers/api/customers.api";
+import { getInvoicesApi } from "../../api/billing.api";
+import { getCustomersApi } from "../../../customers/api/customers.api";
 import CustomInput from "../../../../components/common/CustomInput";
 import CustomSelect from "../../../../components/common/CustomSelect";
 
@@ -106,14 +104,14 @@ const AddPaymentDrawer: React.FC<Props> = ({
   const { data: customersData, isLoading: isLoadingCustomers } = useQuery({
     queryKey: ["billing-payment-customers", debouncedSearch],
     queryFn: () =>
-      customersApi.list({
+      getCustomersApi({
         search: debouncedSearch || undefined,
         status: "ACTIVE",
         page: 1,
         limit: 50,
         sortBy: "name",
         sortOrder: "asc",
-      }),
+      }).then((res) => res.data),
     enabled: open,
     staleTime: 1000 * 30,
   });
@@ -145,10 +143,10 @@ const AddPaymentDrawer: React.FC<Props> = ({
     {
       queryKey: ["billing-invoices-for-payment", paymentCustomer],
       queryFn: () =>
-        billingApi.listInvoices({
+        getInvoicesApi({
           customerId: paymentCustomer,
           limit: 100,
-        }),
+        }).then((res) => res.data),
       enabled: open && !!paymentCustomer,
       staleTime: 1000 * 30,
     }
@@ -231,7 +229,7 @@ const AddPaymentDrawer: React.FC<Props> = ({
             </p>
           )}
 
-        {/* ── Amount (stays as InputNumber — CustomInput doesn't do numeric) ── */}
+        {/* ── Amount ── */}
         <div className="flex flex-col gap-1.5">
           <label className="flex justify-start py-1 text-sm text-text-primary">
             Amount<span className="text-red-500 ml-1">*</span>

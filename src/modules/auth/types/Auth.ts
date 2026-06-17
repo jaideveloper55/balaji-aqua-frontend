@@ -1,7 +1,4 @@
-// ─── TENANT (frontend-only — for branding/theming) ─────────────────────────
 export type TenantId = "sri-balaji-aqua" | "royal-beverage";
-
-// ─── BACKEND TYPES (match the API exactly) ─────────────────────────────────
 
 export type Role = "SUPER_ADMIN" | "ADMIN" | "STAFF" | "DELIVERY_BOY";
 
@@ -48,9 +45,6 @@ export interface MeResponse {
   companies: Company[];
 }
 
-// ─── COMPANY TYPE ↔ TENANT ID MAPPING ──────────────────────────────────────
-// Backend uses CompanyType (WATER_PLANT/BEVERAGE) for theming context
-// Frontend uses TenantId for branding lookup
 export const COMPANY_TYPE_TO_TENANT: Record<CompanyType, TenantId> = {
   WATER_PLANT: "sri-balaji-aqua",
   BEVERAGE: "royal-beverage",

@@ -1,6 +1,7 @@
 import React, { useState, useCallback, useMemo } from "react";
 import { useForm } from "react-hook-form";
-import { Link } from "react-router-dom";
+import { useMutation } from "@tanstack/react-query";
+import { Link, useNavigate } from "react-router-dom";
 import {
   HiOutlineExclamationCircle,
   HiOutlineArrowRight,
@@ -10,7 +11,8 @@ import CustomInput from "../../../components/common/CustomInput";
 import TenantSelector, { IconDroplet } from "./TenantSelector";
 import { TENANT_CONFIG } from "../constants/constants";
 import type { TenantId } from "../types/Auth";
-import { useLogin } from "../hooks/useLogin";
+import { loginApi } from "../api/auth.api";
+import { useAuthStore } from "../../../store/auth.store";
 
 interface LoginFormValues {
   email: string;
@@ -25,10 +27,18 @@ interface LoginFormProps {
 const LoginForm: React.FC<LoginFormProps> = ({ tenant, onTenantChange }) => {
   const config = TENANT_CONFIG[tenant];
   const [remember, setRemember] = useState(false);
+  const navigate = useNavigate();
 
-  // ─── TanStack Query mutation ────────────────────────────────────────────
-  // login.mutate(data) → calls API → on success: stores in Zustand + redirects
-  const login = useLogin();
+  // Login mutation
+  const login = useMutation({
+    mutationKey: ["login"],
+    mutationFn: (data: { email: string; password: string }) =>
+      loginApi(data).then((res) => res.data),
+    onSuccess: (data) => {
+      useAuthStore.getState().setAuth(data);
+      navigate("/dashboard");
+    },
+  });
 
   const {
     control,
@@ -64,10 +74,8 @@ const LoginForm: React.FC<LoginFormProps> = ({ tenant, onTenantChange }) => {
     [watched]
   );
 
-  // Extract API error message — backend returns { message: "..." } on errors
   const apiErrorMessage = login.isError
-    ? (login.error as any)?.response?.data?.message ||
-      "Login failed. Please try again."
+    ? (login.error as any)?.message || "Login failed. Please try again."
     : "";
 
   return (

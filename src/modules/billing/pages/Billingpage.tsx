@@ -1,4 +1,4 @@
-import { useState, useRef, useMemo } from "react";
+import { useState, useRef, useMemo, useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { HiOutlineExclamation } from "react-icons/hi";
 import {
@@ -21,8 +21,7 @@ import {
   getTodayString,
   getCurrentTimeString,
 } from "../utils/Helpers";
-import { useCart } from "../../billing/components/hooks/Usecart";
-import { useKeyboardShortcuts } from "../../billing/components/hooks/Usekeyboardshortcuts";
+
 import PageHeader from "../components/PageHeader";
 import PrintableInvoice from "../components/PrintableInvoice";
 import POSTab from "../components/tabs/Postab";
@@ -41,14 +40,29 @@ import {
   errorNotification,
   successNotification,
 } from "../../../components/common/Notification";
+
+import CustomPageHeader from "../../../components/common/CustomPageHeader";
 import {
   POSProduct,
-  billingApi,
+  getPOSProductsApi,
+  getInvoicesApi,
+  getInvoiceApi,
+  getPaymentsApi,
+  getOutstandingApi,
+  getDailySummaryApi,
+  createPaymentApi,
+  cancelInvoiceApi,
+  checkoutApi,
+  getCartApi,
+  addCartItemApi,
+  updateCartItemApi,
+  removeCartItemApi,
+  updateCartSettingsApi,
+  clearCartApi,
   PaymentFilters,
   InvoiceFilters,
   OutstandingFilters,
 } from "../api/billing.api";
-import CustomPageHeader from "../../../components/common/CustomPageHeader";
 
 type ExportType = "invoices" | "payments" | "outstanding" | "summary";
 
@@ -97,9 +111,25 @@ const RISK_MAP: Record<string, "HIGH" | "MEDIUM" | "RECENT" | undefined> = {
   low: "RECENT",
 };
 
+const STATUS_FILTER_MAP: Record<string, string | undefined> = {
+  all: undefined,
+  paid: "PAID",
+  pending: "CONFIRMED",
+  partial: "PARTIAL",
+  overdue: "OVERDUE",
+  cancelled: "CANCELLED",
+};
+
+const TYPE_MAP: Record<string, string> = {
+  RESIDENTIAL: "Residential",
+  COMMERCIAL: "Commercial",
+  INDUSTRIAL: "Industrial",
+};
+
 const BillingPage = () => {
   const queryClient = useQueryClient();
   const today = getTodayString();
+
   const [, setCustomers] = useState<Customer[]>([]);
   const [activeTab, setActiveTab] = useState<TabKey>("pos");
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(
@@ -155,18 +185,106 @@ const BillingPage = () => {
   const [collectionSearch, setCollectionSearch] = useState("");
   const [collectionModeFilter, setCollectionModeFilter] = useState("all");
 
+  // ─── Cart state (replaces useCart hook) ────────────────────────────────────
+  const [cart, setCart] = useState<any[]>([]);
+  const [serverCart, setServerCart] = useState<any>(null);
+
   const productSearchRef = useRef<HTMLInputElement>(null);
 
-  const {
-    cart,
-    serverCart,
-    addToCart,
-    updateQuantity,
-    setQuantity,
-    removeFromCart,
-    clearCart,
-    getEffectivePrice,
-  } = useCart();
+  // ─── Fetch Cart ─────────────────────────────────────────────────────────────
+  const { data: cartData } = useQuery({
+    queryKey: ["billing-cart"],
+    queryFn: () => getCartApi().then((res) => res.data),
+    staleTime: 1000 * 10,
+  });
+
+  useEffect(() => {
+    if (cartData) {
+      setServerCart(cartData);
+      setCart(cartData.items ?? []);
+    }
+  }, [cartData]);
+
+  const getEffectivePrice = (
+    product: POSProduct
+  ): { price: number; isCustom: boolean } => {
+    return { price: product.basePrice, isCustom: false };
+  };
+
+  const addToCart = (product: POSProduct, quantity: number = 1) => {
+    const { price } = getEffectivePrice(product);
+
+    addCartItemApi({
+      productId: product.id,
+      quantity,
+      unitPrice: price,
+    })
+      .then(() => {
+        queryClient.invalidateQueries({ queryKey: ["billing-cart"] });
+      })
+      .catch((err: any) => {
+        errorNotification("Add Failed", err?.message ?? "Could not add item");
+      });
+  };
+
+  const updateQuantity = (itemId: string, quantity: number) => {
+    updateCartItemApi(itemId, { quantity })
+      .then(() => {
+        queryClient.invalidateQueries({ queryKey: ["billing-cart"] });
+      })
+      .catch((err: any) => {
+        errorNotification(
+          "Update Failed",
+          err?.message ?? "Could not update item"
+        );
+      });
+  };
+
+  const setQuantity = (itemId: string, quantity: number) => {
+    updateQuantity(itemId, quantity);
+  };
+
+  const removeFromCart = (itemId: string) => {
+    removeCartItemApi(itemId)
+      .then(() => {
+        queryClient.invalidateQueries({ queryKey: ["billing-cart"] });
+      })
+      .catch((err: any) => {
+        errorNotification(
+          "Remove Failed",
+          err?.message ?? "Could not remove item"
+        );
+      });
+  };
+
+  const clearCart = () => {
+    clearCartApi()
+      .then(() => {
+        queryClient.invalidateQueries({ queryKey: ["billing-cart"] });
+      })
+      .catch((err: any) => {
+        errorNotification(
+          "Clear Failed",
+          err?.message ?? "Could not clear cart"
+        );
+      });
+  };
+
+  //  Cart settings mutation
+  const updateCartSettingsMutation = useMutation({
+    mutationKey: ["updateCartSettings"],
+    mutationFn: (data: Parameters<typeof updateCartSettingsApi>[0]) =>
+      updateCartSettingsApi(data).then((res) => res.data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["billing-cart"] });
+    },
+    onError: (err: any) => {
+      errorNotification(
+        "Update Failed",
+        err?.message ?? "Could not update cart settings"
+      );
+    },
+  });
 
   const subtotal = serverCart?.subtotal ?? 0;
   const gstAmount = (serverCart?.cgst ?? 0) + (serverCart?.sgst ?? 0);
@@ -176,28 +294,7 @@ const BillingPage = () => {
   const discount = serverCart?.discount ?? 0;
   const changeAmount = Math.max(0, amountReceived - grandTotal);
 
-  const STATUS_FILTER_MAP: Record<string, string | undefined> = {
-    all: undefined,
-    paid: "PAID",
-    pending: "CONFIRMED",
-    partial: "PARTIAL",
-    overdue: "OVERDUE",
-    cancelled: "CANCELLED",
-  };
-
-  const updateCartSettingsMutation = useMutation({
-    mutationFn: billingApi.updateCartSettings,
-    onSuccess: () =>
-      queryClient.invalidateQueries({ queryKey: ["billing-cart"] }),
-  });
-
-  const { data: posProducts, isLoading: isLoadingProducts } = useQuery({
-    queryKey: ["billing-pos-products", { search: productSearch }],
-    queryFn: () => billingApi.getPOSProducts(productSearch || undefined),
-    staleTime: 1000 * 60 * 2,
-  });
-  const filteredProducts: POSProduct[] = posProducts ?? [];
-
+  //  Filters
   const invoiceApiFilters: InvoiceFilters = useMemo(() => {
     const f: InvoiceFilters = {
       limit: 50,
@@ -210,13 +307,6 @@ const BillingPage = () => {
       f.dateTo = invoiceDateRange[1].format("YYYY-MM-DD");
     return f;
   }, [invoiceStatusFilter, invoiceSearch, invoiceDateRange]);
-
-  const { data: invoicesData } = useQuery({
-    queryKey: ["billing-invoices", invoiceApiFilters],
-    queryFn: () => billingApi.listInvoices(invoiceApiFilters),
-    enabled: activeTab === "invoices",
-    staleTime: 1000 * 30,
-  });
 
   const paymentApiFilters: PaymentFilters = useMemo(() => {
     const onCollection = activeTab === "collection";
@@ -248,13 +338,6 @@ const BillingPage = () => {
     paymentsModeFilter,
   ]);
 
-  const { data: paymentsData } = useQuery({
-    queryKey: ["billing-payments", paymentApiFilters],
-    queryFn: () => billingApi.listPayments(paymentApiFilters),
-    enabled: activeTab === "payments" || activeTab === "collection",
-    staleTime: 1000 * 30,
-  });
-
   const outstandingApiFilters: OutstandingFilters = useMemo(
     () => ({
       risk: RISK_MAP[outstandingFilter],
@@ -266,13 +349,6 @@ const BillingPage = () => {
     [outstandingFilter, outstandingSearch, outstandingSortBy, outstandingPage]
   );
 
-  const { data: outstandingData } = useQuery({
-    queryKey: ["billing-outstanding", outstandingApiFilters],
-    queryFn: () => billingApi.getOutstanding(outstandingApiFilters),
-    enabled: activeTab === "outstanding",
-    staleTime: 1000 * 60,
-  });
-
   const dailySummaryFilters = useMemo(() => {
     const f: { dateFrom?: string; dateTo?: string } = {};
     if (collectionDateRange?.[0])
@@ -282,25 +358,52 @@ const BillingPage = () => {
     return f;
   }, [collectionDateRange]);
 
+  // Queries
+  const { data: posProducts, isLoading: isLoadingProducts } = useQuery({
+    queryKey: ["billing-pos-products", { search: productSearch }],
+    queryFn: () =>
+      getPOSProductsApi(productSearch || undefined).then((res) => res.data),
+    staleTime: 1000 * 60 * 2,
+  });
+
+  const { data: invoicesData } = useQuery({
+    queryKey: ["billing-invoices", invoiceApiFilters],
+    queryFn: () => getInvoicesApi(invoiceApiFilters).then((res) => res.data),
+    enabled: activeTab === "invoices",
+    staleTime: 1000 * 30,
+  });
+
+  const { data: paymentsData } = useQuery({
+    queryKey: ["billing-payments", paymentApiFilters],
+    queryFn: () => getPaymentsApi(paymentApiFilters).then((res) => res.data),
+    enabled: activeTab === "payments" || activeTab === "collection",
+    staleTime: 1000 * 30,
+  });
+
+  const { data: outstandingData } = useQuery({
+    queryKey: ["billing-outstanding", outstandingApiFilters],
+    queryFn: () =>
+      getOutstandingApi(outstandingApiFilters).then((res) => res.data),
+    enabled: activeTab === "outstanding",
+    staleTime: 1000 * 60,
+  });
+
   const { data: dailySummary } = useQuery({
     queryKey: ["billing-daily-summary", dailySummaryFilters],
-    queryFn: () => billingApi.getDailySummary(dailySummaryFilters),
+    queryFn: () =>
+      getDailySummaryApi(dailySummaryFilters).then((res) => res.data),
     enabled: activeTab === "collection",
     staleTime: 1000 * 60 * 5,
   });
 
   const { data: invoiceDetailData } = useQuery({
     queryKey: ["billing-invoice", selectedInvoice?.id],
-    queryFn: () => billingApi.getInvoice(selectedInvoice!.id),
+    queryFn: () => getInvoiceApi(selectedInvoice!.id).then((res) => res.data),
     enabled: showInvoiceDetail && !!selectedInvoice?.id,
     staleTime: 1000 * 10,
   });
 
-  const typeMap: Record<string, string> = {
-    RESIDENTIAL: "Residential",
-    COMMERCIAL: "Commercial",
-    INDUSTRIAL: "Industrial",
-  };
+  const filteredProducts: POSProduct[] = posProducts ?? [];
 
   const mapStatus = (inv: any): Invoice["status"] => {
     if (inv.status === "PAID") return "Paid";
@@ -321,13 +424,13 @@ const BillingPage = () => {
 
   const mapInvoice = (inv: any): Invoice => {
     const dueDateObj = inv.dueDate ? new Date(inv.dueDate) : null;
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const todayDate = new Date();
+    todayDate.setHours(0, 0, 0, 0);
     const balanceDue = inv.balanceDue ?? 0;
     const overdueDays =
-      dueDateObj && dueDateObj < today && balanceDue > 0
+      dueDateObj && dueDateObj < todayDate && balanceDue > 0
         ? Math.floor(
-            (today.getTime() - dueDateObj.getTime()) / (1000 * 60 * 60 * 24)
+            (todayDate.getTime() - dueDateObj.getTime()) / (1000 * 60 * 60 * 24)
           )
         : 0;
 
@@ -337,7 +440,7 @@ const BillingPage = () => {
       invoiceNo: inv.invoiceNumber,
       customerId: inv.customer?.customerCode ?? "WALK-IN",
       customerName: inv.customer?.name ?? inv.walkInName ?? "Walk-in",
-      customerType: typeMap[inv.customer?.type] ?? "Walk-in",
+      customerType: TYPE_MAP[inv.customer?.type] ?? "Walk-in",
       customerPhone: inv.customer?.phone ?? inv.walkInPhone ?? "",
       customerAddress: inv.customer?.address ?? "",
       items: (inv.items ?? []).map((item: any) => ({
@@ -369,7 +472,10 @@ const BillingPage = () => {
       ),
       time: new Date(inv.invoiceDate ?? inv.createdAt).toLocaleTimeString(
         "en-IN",
-        { hour: "2-digit", minute: "2-digit" }
+        {
+          hour: "2-digit",
+          minute: "2-digit",
+        }
       ),
       notes: inv.notes ?? "",
       dueDate: dueDateObj ? dueDateObj.toLocaleDateString("en-IN") : null,
@@ -403,7 +509,10 @@ const BillingPage = () => {
         ),
         time: new Date(p.paymentDate ?? p.createdAt).toLocaleTimeString(
           "en-IN",
-          { hour: "2-digit", minute: "2-digit" }
+          {
+            hour: "2-digit",
+            minute: "2-digit",
+          }
         ),
         reference: p.referenceId ?? "",
         notes: p.notes ?? "",
@@ -452,7 +561,7 @@ const BillingPage = () => {
         name: c.name,
         phone: c.phone ?? "",
         email: c.email ?? "",
-        type: (typeMap[c.type] ?? "Residential") as Customer["type"],
+        type: (TYPE_MAP[c.type] ?? "Residential") as Customer["type"],
         status: "Active" as const,
         outstanding: c.outstandingBalance ?? 0,
         overdueDays: c.overdueDays ?? 0,
@@ -498,8 +607,14 @@ const BillingPage = () => {
   }, [invoices, invoicesData]);
 
   const createPaymentMutation = useMutation({
-    mutationFn: billingApi.createPayment,
-    onSuccess: () => {
+    mutationKey: ["createPayment"],
+    mutationFn: (data: Parameters<typeof createPaymentApi>[0]) =>
+      createPaymentApi(data).then((res) => res.data),
+    onSuccess: (response) => {
+      successNotification(
+        "Success",
+        response.message ?? "Payment recorded successfully"
+      );
       queryClient.invalidateQueries({ queryKey: ["billing-payments"] });
       queryClient.invalidateQueries({ queryKey: ["billing-outstanding"] });
       queryClient.invalidateQueries({ queryKey: ["billing-invoices"] });
@@ -507,31 +622,32 @@ const BillingPage = () => {
       queryClient.invalidateQueries({ queryKey: ["billing-daily-summary"] });
     },
     onError: (err: any) => {
-      errorNotification(
-        "Payment Failed",
-        err?.message ?? "Could not record payment"
-      );
+      errorNotification("Error", err?.message ?? "Could not record payment");
     },
   });
 
   const cancelInvoiceMutation = useMutation({
-    mutationFn: billingApi.cancelInvoice,
-    onSuccess: () => {
-      successNotification("Invoice Cancelled", "Stock restored");
+    mutationKey: ["cancelInvoice"],
+    mutationFn: (id: string) => cancelInvoiceApi(id).then((res) => res.data),
+    onSuccess: (response) => {
+      successNotification(
+        "Success",
+        response.message ?? "Invoice cancelled, stock restored"
+      );
       queryClient.invalidateQueries({ queryKey: ["billing-invoices"] });
       queryClient.invalidateQueries({ queryKey: ["billing-outstanding"] });
       queryClient.invalidateQueries({ queryKey: ["billing-pos-products"] });
       setShowInvoiceDetail(false);
     },
-    onError: (err: any) =>
-      errorNotification(
-        "Cancel Failed",
-        err?.message ?? "Could not cancel invoice"
-      ),
+    onError: (err: any) => {
+      errorNotification("Error", err?.message ?? "Could not cancel invoice");
+    },
   });
 
   const checkoutMutation = useMutation({
-    mutationFn: billingApi.checkout,
+    mutationKey: ["checkout"],
+    mutationFn: (data: Parameters<typeof checkoutApi>[0]) =>
+      checkoutApi(data).then((res) => res.data),
     onSuccess: (response) => {
       setIsProcessing(false);
 
@@ -635,18 +751,29 @@ const BillingPage = () => {
     },
   });
 
-  useKeyboardShortcuts({
-    isActive: activeTab === "pos",
-    canPay: cart.length > 0,
-    onCustomerPicker: () => setShowCustomerPicker(true),
-    onProductSearch: () => productSearchRef.current?.focus(),
-    onPay: () => handleProcessPayment(),
-    onEscape: () => {
-      setShowCustomerPicker(false);
-      setShowQuickAdd(false);
-      setShowPaymentModal(false);
-    },
-  });
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (activeTab !== "pos") return;
+
+      if (e.key === "F2") {
+        e.preventDefault();
+        setShowCustomerPicker(true);
+      } else if (e.key === "F3") {
+        e.preventDefault();
+        productSearchRef.current?.focus();
+      } else if (e.key === "F4" && cart.length > 0) {
+        e.preventDefault();
+        handleProcessPayment();
+      } else if (e.key === "Escape") {
+        setShowCustomerPicker(false);
+        setShowQuickAdd(false);
+        setShowPaymentModal(false);
+      }
+    };
+
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [activeTab, cart.length]);
 
   const tabs: TabDef[] = [
     {
@@ -772,7 +899,6 @@ const BillingPage = () => {
   ) => {
     setIsProcessing(true);
 
-    // SPLIT PATH
     if (splits && splits.length > 0) {
       const paidNow = splits.reduce((s, p) => s + p.amount, 0);
       const isPartial = paidNow < grandTotal;
@@ -947,14 +1073,12 @@ const BillingPage = () => {
         subtitle="Quick billing, invoices, payments & collections"
         iconBg="bg-blue-500"
       />
-      {/* Print-only invoice receipt */}
       {generatedInvoice && (
         <div className="hidden print:block">
           <PrintableInvoice invoice={generatedInvoice} />
         </div>
       )}
 
-      {/* Everything below hides during print */}
       <div className="print:hidden">
         <PageHeader
           tabs={tabs}

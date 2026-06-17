@@ -3,7 +3,6 @@ import { Input } from "antd";
 import { Controller } from "react-hook-form";
 import { HiOutlineSave } from "react-icons/hi";
 import CustomInput from "../../../components/common/CustomInput";
-import { useUpdateProfile } from "../hooks/useUpdateProfile";
 import type { User } from "../../auth/types/Auth";
 import type { UpdateProfileRequest } from "../types/Profile";
 
@@ -41,7 +40,7 @@ const ProfileInfoForm = ({ user }: ProfileInfoFormProps) => {
       phone: data.phone.trim() || null,
     };
     updateProfile.mutate(payload, {
-      onSuccess: () => reset(data), // resets isDirty so button greys out
+      onSuccess: () => reset(data),
     });
   };
 
