@@ -1,4 +1,3 @@
-// src/modules/inventory/constants/Inventoryconstants.ts
 import { AlertPriority, MovementType, StockStatus } from "../types/Inventory";
 
 /* ------------------------------ Tabs ------------------------------ */
@@ -12,7 +11,6 @@ export const INVENTORY_TABS = [
 export type InventoryTabKey = (typeof INVENTORY_TABS)[number]["key"];
 
 /* --------------------------- Stock status -------------------------- */
-// CHANGED: keyed by backend StockStatus (UPPERCASE), so STOCK_STATUS_CONFIG[row.status] works.
 
 export const STOCK_STATUS_CONFIG: Record<
   StockStatus,
@@ -47,10 +45,7 @@ export const STATUS_FILTER_OPTIONS = [
 ];
 
 /* ------------------------- Movement config ------------------------- */
-// Two separate maps for two separate enums:
 
-// (1) Keyed by BACKEND record type (UPPERCASE) — used by Stockmovementtable
-//     via row.type. This is the one that was erroring.
 export const MOVEMENT_TYPE_CONFIG: Record<
   "STOCK_IN" | "STOCK_OUT" | "ADJUSTMENT",
   { label: string; color: string; bg: string; sign: 1 | -1 | 0 }

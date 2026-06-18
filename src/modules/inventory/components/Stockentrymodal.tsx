@@ -201,7 +201,6 @@ const Stockentrymodal = ({
       }
     >
       <div className="flex flex-col gap-5">
-        {/* Mode switch inside the modal — user never opened the "wrong" modal */}
         <CustomTabs
           items={[
             {

@@ -1,4 +1,3 @@
-// src/modules/inventory/components/SectionCard.tsx
 import { ReactNode } from "react";
 
 interface SectionCardProps {
@@ -7,17 +6,11 @@ interface SectionCardProps {
   iconColor?: string;
   title: string;
   subtitle?: string;
-  /** Right-aligned actions (buttons, badges, filters) */
   actions?: ReactNode;
   children: ReactNode;
   className?: string;
 }
 
-/**
- * Consistent section shell: header (icon + title + actions) and body.
- * Every inventory section lives inside one of these so the page rhythm
- * stays identical across tabs.
- */
 const SectionCard = ({
   icon,
   iconBg = "#eff6ff",

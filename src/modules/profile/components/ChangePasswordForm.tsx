@@ -1,7 +1,13 @@
 import { useForm } from "react-hook-form";
+import { useMutation } from "@tanstack/react-query";
 import { HiOutlineKey } from "react-icons/hi";
 import CustomInput from "../../../components/common/CustomInput";
-import { useChangePassword } from "../hooks/useChangePassword";
+
+import {
+  errorNotification,
+  successNotification,
+} from "../../../components/common/Notification";
+import { changePasswordApi } from "../../auth/api/user.api";
 
 interface FormValues {
   currentPassword: string;
@@ -10,7 +16,21 @@ interface FormValues {
 }
 
 const ChangePasswordForm = () => {
-  const changePassword = useChangePassword();
+  //  Change password mutation
+  const changePassword = useMutation({
+    mutationKey: ["changePassword"],
+    mutationFn: (data: { currentPassword: string; newPassword: string }) =>
+      changePasswordApi(data).then((res) => res.data),
+    onSuccess: (response) => {
+      successNotification(
+        "Success",
+        response.message ?? "Password updated successfully"
+      );
+    },
+    onError: (err: any) => {
+      errorNotification("Error", err?.message ?? "Could not update password");
+    },
+  });
 
   const {
     control,

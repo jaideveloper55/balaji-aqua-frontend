@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Button, message } from "antd";
+import { Button, message, Spin } from "antd";
 import {
   HiOutlineArrowDown,
   HiOutlineArrowUp,
@@ -18,6 +18,7 @@ import Productstocktable from "../components/Productstocktable";
 import Lowstockalerts from "../components/Lowstockalerts";
 import Stockmovementtable from "../components/Stockmovementtable";
 import Stockentrymodal from "../components/Stockentrymodal";
+
 import SectionCard from "../components/SectionCard";
 import CustomTabs from "../../../components/common/CustomTabs";
 import CustomPageHeader from "../../../components/common/CustomPageHeader";
@@ -33,11 +34,18 @@ import {
   StockItem,
 } from "../types/Inventory";
 import {
-  inventoryApi,
+  getInventorySummaryApi,
+  getStockListApi,
+  getLowStockApi,
+  getMovementsApi,
+  stockInApi,
+  stockOutApi,
+  adjustStockApi,
   StockListFilters,
   MovementFilters,
   LowStockRow,
 } from "../api/inventory.api";
+import InventoryExportDrawer from "../components/Inventoryexportdrawer";
 
 const DEFAULT_FILTERS: InventoryFilters = {
   search: "",
@@ -55,6 +63,8 @@ const Inventorypage = () => {
   const [modalOpen, setModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState<MovementType>("stock_in");
   const [modalProduct, setModalProduct] = useState<StockItem | null>(null);
+
+  const [exportOpen, setExportOpen] = useState(false);
 
   const stockParams: StockListFilters = useMemo(
     () => ({
@@ -80,31 +90,31 @@ const Inventorypage = () => {
   // KPI summary — always loaded (header cards show on every tab)
   const { data: summary } = useQuery({
     queryKey: ["inventory-summary"],
-    queryFn: inventoryApi.getSummary,
+    queryFn: () => getInventorySummaryApi().then((res) => res.data),
     staleTime: 1000 * 60,
   });
 
-  // Stock list — only when the Stock tab is active
+  // Stock list — when the Stock tab is active, or when exporting
   const { data: stockData, isLoading: stockLoading } = useQuery({
     queryKey: ["inventory-stock", stockParams],
-    queryFn: () => inventoryApi.getStockList(stockParams),
-    enabled: activeTab === "stock",
+    queryFn: () => getStockListApi(stockParams).then((res) => res.data),
+    enabled: activeTab === "stock" || exportOpen,
     staleTime: 1000 * 30,
   });
 
-  // Low-stock alerts — only when the Alerts tab is active
+  // Low-stock alerts — when the Alerts tab is active, or when exporting
   const { data: lowStockData, isLoading: lowLoading } = useQuery({
     queryKey: ["inventory-low-stock"],
-    queryFn: inventoryApi.getLowStock,
-    enabled: activeTab === "alerts",
+    queryFn: () => getLowStockApi().then((res) => res.data),
+    enabled: activeTab === "alerts" || exportOpen,
     staleTime: 1000 * 30,
   });
 
-  // Movement history — only when the Movements tab is active
+  // Movement history — when the Movements tab is active, or when exporting
   const { data: movementsData, isLoading: movementsLoading } = useQuery({
     queryKey: ["inventory-movements", movementParams],
-    queryFn: () => inventoryApi.getMovements(movementParams),
-    enabled: activeTab === "movements",
+    queryFn: () => getMovementsApi(movementParams).then((res) => res.data),
+    enabled: activeTab === "movements" || exportOpen,
     staleTime: 1000 * 30,
   });
 
@@ -122,12 +132,14 @@ const Inventorypage = () => {
   const onMutationError = (err: any) =>
     // Backend throws BadRequestException with a helpful message (e.g.
     // "Only 12 available") - surface it instead of a generic error.
-    message.error(
-      err?.response?.data?.message ?? "Could not save the stock entry"
-    );
+    // authAxios's response interceptor already unwraps to error.response.data
+    // on rejection, so the message is directly on the error.
+    message.error(err?.message ?? "Could not save the stock entry");
 
   const stockInMutation = useMutation({
-    mutationFn: inventoryApi.stockIn,
+    mutationKey: ["stockIn"],
+    mutationFn: (payload: Parameters<typeof stockInApi>[0]) =>
+      stockInApi(payload).then((res) => res.data),
     onSuccess: () => {
       invalidateAll();
       message.success("Stock in recorded");
@@ -137,7 +149,9 @@ const Inventorypage = () => {
   });
 
   const stockOutMutation = useMutation({
-    mutationFn: inventoryApi.stockOut,
+    mutationKey: ["stockOut"],
+    mutationFn: (payload: Parameters<typeof stockOutApi>[0]) =>
+      stockOutApi(payload).then((res) => res.data),
     onSuccess: () => {
       invalidateAll();
       message.success("Stock out recorded");
@@ -147,7 +161,9 @@ const Inventorypage = () => {
   });
 
   const adjustMutation = useMutation({
-    mutationFn: inventoryApi.adjust,
+    mutationKey: ["adjustStock"],
+    mutationFn: (payload: Parameters<typeof adjustStockApi>[0]) =>
+      adjustStockApi(payload).then((res) => res.data),
     onSuccess: () => {
       invalidateAll();
       message.success("Adjustment recorded");
@@ -226,7 +242,7 @@ const Inventorypage = () => {
           <>
             <Button
               icon={<HiOutlineDownload size={15} />}
-              onClick={() => message.info("Export coming soon")}
+              onClick={() => setExportOpen(true)}
               className="!rounded-xl !h-9"
             >
               Export
@@ -297,11 +313,13 @@ const Inventorypage = () => {
               resultCount={stockData?.meta.total ?? stockItems.length}
               categories={[]}
             />
-            <Productstocktable
-              items={stockItems}
-              loading={stockLoading}
-              onQuickAction={(item, mode) => openModal(mode, item)}
-            />
+            <Spin spinning={stockLoading}>
+              <Productstocktable
+                items={stockItems}
+                loading={false}
+                onQuickAction={(item, mode) => openModal(mode, item)}
+              />
+            </Spin>
           </div>
         </SectionCard>
       )}
@@ -324,16 +342,12 @@ const Inventorypage = () => {
             )
           }
         >
-          {lowLoading ? (
-            <div className="py-10 text-center text-slate-400 text-sm">
-              Loading alerts...
-            </div>
-          ) : (
+          <Spin spinning={lowLoading}>
             <Lowstockalerts
               items={lowStockItems}
               onRestock={(item) => openModal("stock_in", item as StockItem)}
             />
-          )}
+          </Spin>
         </SectionCard>
       )}
 
@@ -354,13 +368,28 @@ const Inventorypage = () => {
               resultCount={movementsData?.meta.total ?? movements.length}
               categories={[]}
             />
-            <Stockmovementtable
-              movements={movements}
-              loading={movementsLoading}
-            />
+            <Spin spinning={movementsLoading}>
+              <Stockmovementtable movements={movements} loading={false} />
+            </Spin>
           </div>
         </SectionCard>
       )}
+
+      {/* Export drawer — covers Stock List, Low Stock Alerts, and Movement History */}
+      <InventoryExportDrawer
+        open={exportOpen}
+        onClose={() => setExportOpen(false)}
+        defaultReportType={
+          activeTab === "alerts"
+            ? "alerts"
+            : activeTab === "movements"
+            ? "movements"
+            : "stock"
+        }
+        stockItems={stockItems}
+        lowStockItems={lowStockItems}
+        movements={movements}
+      />
 
       {/* One modal serves all three actions */}
       <Stockentrymodal

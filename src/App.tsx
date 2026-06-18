@@ -1,16 +1,9 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { ProtectedRoute } from "./components/ProtectedRoute";
-
-// Auth pages (public)
 import LoginPage from "./modules/auth/pages/Login";
 import RegisterPage from "./modules/auth/pages/Register";
 import ForgotPasswordPage from "./modules/auth/pages/ForgotPassword";
-
-// Admin layout
 import AdminLayout from "./components/layouts/AdminLayout";
-
-// Admin pages (protected)
-
 import CustomerPage from "./modules/customers/pages/Customerpage";
 import Companies from "./modules/companies/pages/Companies";
 import ProductsPage from "./modules/products/pages/ProductsPage";
@@ -39,8 +32,7 @@ function App() {
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
 
         {/* ─── PROTECTED ADMIN ROUTES ─────────────────────────────────── */}
-        {/* ProtectedRoute checks auth → AdminLayout wraps with sidebar/header
-            → Outlet renders the page below */}
+
         <Route
           path="/admin"
           element={

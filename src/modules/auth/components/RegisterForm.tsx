@@ -28,7 +28,6 @@ interface RegisterFormProps {
   onTenantChange: (id: TenantId) => void;
 }
 
-// Maps frontend tenant ID → backend CompanyType enum
 const TENANT_TO_COMPANY_TYPE: Record<TenantId, "WATER_PLANT" | "BEVERAGE"> = {
   "sri-balaji-aqua": "WATER_PLANT",
   "royal-beverage": "BEVERAGE",
@@ -53,18 +52,15 @@ const RegisterForm: React.FC<RegisterFormProps> = ({
   const [submitError, setSubmitError] = useState("");
   const navigate = useNavigate();
 
-  // ─── Register mutation ──────────────────────────────────────────────────
+  // Register mutation
   const register = useMutation({
     mutationKey: ["register"],
     mutationFn: (data: Parameters<typeof registerApi>[0]) =>
       registerApi(data).then((res) => res.data),
     onSuccess: (data) => {
-      // If backend logs the user in immediately on register, store auth
-      // and redirect. If it instead requires email verification / admin
-      // approval, swap this for a navigate("/login") + success message.
       if (data?.accessToken) {
         useAuthStore.getState().setAuth(data);
-        navigate("/dashboard");
+        navigate("/admin/dashboard");
       } else {
         navigate("/login");
       }

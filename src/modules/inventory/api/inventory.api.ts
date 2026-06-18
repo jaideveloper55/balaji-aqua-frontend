@@ -1,4 +1,4 @@
-import api from "../../../lib/axios";
+import authAxios from "../../../lib/axios";
 import type { StockItem, StockMovement } from "../types/Inventory";
 
 export interface InventoryFilters {
@@ -51,14 +51,14 @@ export interface InventorySummary {
 }
 
 export interface StockListFilters {
-    search?: string;
-    status?: "IN_STOCK" | "LOW_STOCK" | "OUT_OF_STOCK";
-    categoryId?: string;
-    page?: number;
-    limit?: number;
-  }
+  search?: string;
+  status?: "IN_STOCK" | "LOW_STOCK" | "OUT_OF_STOCK";
+  categoryId?: string;
+  page?: number;
+  limit?: number;
+}
 
-interface Paginated<T> {
+export interface Paginated<T> {
   data: T[];
   meta: { total: number; page: number; limit: number; totalPages: number };
 }
@@ -74,44 +74,41 @@ export interface LowStockResponse {
   meta: { total: number; critical: number };
 }
 
-// ─── The client ──────────────────────────────────────────────────────
-export const inventoryApi = {
-  getSummary: async (): Promise<InventorySummary> => {
-    const res = await api.get<InventorySummary>("/inventory/summary");
-    return res.data;
-  },
+// GET /inventory/summary
+export const getInventorySummaryApi = () => {
+  return authAxios.get<InventorySummary>("/inventory/summary");
+};
 
-  getStockList: async (
-    filters: StockListFilters = {}
-  ): Promise<Paginated<StockItem>> => {
-    const res = await api.get("/inventory/stock", { params: filters });
-    return res.data;
-  },
+// GET /inventory/stock
+export const getStockListApi = (filters: StockListFilters = {}) => {
+  return authAxios.get<Paginated<StockItem>>("/inventory/stock", {
+    params: filters,
+  });
+};
 
-  getLowStock: async (): Promise<LowStockResponse> => {
-    const res = await api.get("/inventory/low-stock");
-    return res.data;
-  },
+// GET /inventory/low-stock
+export const getLowStockApi = () => {
+  return authAxios.get<LowStockResponse>("/inventory/low-stock");
+};
 
-  getMovements: async (
-    filters: MovementFilters = {}
-  ): Promise<Paginated<StockMovement>> => {
-    const res = await api.get("/inventory/movements", { params: filters });
-    return res.data;
-  },
+// GET /inventory/movements
+export const getMovementsApi = (filters: MovementFilters = {}) => {
+  return authAxios.get<Paginated<StockMovement>>("/inventory/movements", {
+    params: filters,
+  });
+};
 
-  stockIn: async (payload: StockInPayload) => {
-    const res = await api.post("/inventory/stock-in", payload);
-    return res.data;
-  },
+// POST /inventory/stock-in
+export const stockInApi = (payload: StockInPayload) => {
+  return authAxios.post("/inventory/stock-in", payload);
+};
 
-  stockOut: async (payload: StockOutPayload) => {
-    const res = await api.post("/inventory/stock-out", payload);
-    return res.data;
-  },
+// POST /inventory/stock-out
+export const stockOutApi = (payload: StockOutPayload) => {
+  return authAxios.post("/inventory/stock-out", payload);
+};
 
-  adjust: async (payload: AdjustPayload) => {
-    const res = await api.post("/inventory/adjust", payload);
-    return res.data;
-  },
+// POST /inventory/adjust
+export const adjustStockApi = (payload: AdjustPayload) => {
+  return authAxios.post("/inventory/adjust", payload);
 };

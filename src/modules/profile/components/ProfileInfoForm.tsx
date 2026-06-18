@@ -1,10 +1,17 @@
 import { useForm } from "react-hook-form";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Input } from "antd";
 import { Controller } from "react-hook-form";
 import { HiOutlineSave } from "react-icons/hi";
 import CustomInput from "../../../components/common/CustomInput";
+
+import {
+  errorNotification,
+  successNotification,
+} from "../../../components/common/Notification";
 import type { User } from "../../auth/types/Auth";
 import type { UpdateProfileRequest } from "../types/Profile";
+import { updateMeApi } from "../../auth/api/user.api";
 
 interface ProfileInfoFormProps {
   user: User & { phone?: string | null };
@@ -17,7 +24,24 @@ interface FormValues {
 }
 
 const ProfileInfoForm = ({ user }: ProfileInfoFormProps) => {
-  const updateProfile = useUpdateProfile();
+  const queryClient = useQueryClient();
+
+  // Update profile
+  const updateProfile = useMutation({
+    mutationKey: ["updateMe"],
+    mutationFn: (data: UpdateProfileRequest) =>
+      updateMeApi(data).then((res) => res.data),
+    onSuccess: (response) => {
+      successNotification(
+        "Success",
+        response.message ?? "Profile updated successfully"
+      );
+      queryClient.invalidateQueries({ queryKey: ["getMe"] });
+    },
+    onError: (err: any) => {
+      errorNotification("Error", err?.message ?? "Could not update profile");
+    },
+  });
 
   const {
     control,

@@ -1,13 +1,10 @@
-// src/modules/inventory/components/Lowstockalerts.tsx
 import { Tooltip } from "antd";
 import { HiOutlineArrowDown, HiOutlineCheckCircle } from "react-icons/hi";
 import type { LowStockRow } from "../api/inventory.api";
 import { STOCK_STATUS_CONFIG } from "../constants/Inventoryconstants";
 
 interface LowstockalertsProps {
-  // Takes the backend's pre-computed alert rows (not the full list)
   items: LowStockRow[];
-  /** One-click restock → opens StockEntryModal in stock_in mode, prefilled */
   onRestock: (item: LowStockRow) => void;
 }
 

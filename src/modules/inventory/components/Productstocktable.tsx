@@ -1,4 +1,3 @@
-// src/modules/inventory/components/Productstocktable.tsx
 import { Table, Tooltip } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import {
@@ -22,7 +21,6 @@ import {
 interface ProductstocktableProps {
   items: StockItem[];
   loading?: boolean;
-  /** Row-level quick action → opens StockEntryModal pre-filled */
   onQuickAction: (item: StockItem, mode: MovementType) => void;
 }
 

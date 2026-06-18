@@ -1,5 +1,5 @@
 import { useCallback, useState } from "react";
-import { Button, Spin } from "antd";
+import { Button, Spin, message } from "antd";
 import {
   HiOutlineUsers,
   HiOutlineUserAdd,
@@ -74,6 +74,7 @@ const CustomerPage = () => {
               <>
                 <Button
                   icon={<HiOutlineDownload size={15} />}
+                  onClick={() => message.info("Export coming soon")}
                   className="!rounded-xl !h-9"
                 >
                   Export
