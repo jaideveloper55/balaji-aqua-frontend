@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import CustomerTable from "./Customertable";
 import CustomerModal from "./Customermodal";
@@ -11,6 +11,7 @@ import CustomStatCard from "../../../components/common/CustomStatCard";
 interface CustomerListProps {
   onNavigateToDetail?: (id: string) => void;
   onEditCustomer?: (id: string) => void;
+  onSelectionChange?: (selected: Customer[]) => void;
 }
 
 const EMPTY_STATS = {
@@ -23,11 +24,11 @@ const EMPTY_STATS = {
 const CustomerList: React.FC<CustomerListProps> = ({
   onNavigateToDetail,
   onEditCustomer,
+  onSelectionChange,
 }) => {
   const [modalOpen, setModalOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<Customer | null>(null);
 
-  //  Fetch Customer Stats
   const {
     data: statsData,
     isLoading: statsLoading,
@@ -120,12 +121,14 @@ const CustomerList: React.FC<CustomerListProps> = ({
         })}
       </div>
 
-      {/* Table */}
       <div className="bg-white rounded-2xl border border-slate-100 shadow-sm shadow-slate-100/50 p-5">
-        <CustomerTable onView={handleView} onEdit={handleEdit} />
+        <CustomerTable
+          onView={handleView}
+          onEdit={handleEdit}
+          onSelectionChange={onSelectionChange}
+        />
       </div>
 
-      {/* CREATE modal */}
       <CustomerModal
         open={modalOpen}
         onClose={closeModal}

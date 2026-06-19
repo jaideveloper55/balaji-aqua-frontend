@@ -33,12 +33,14 @@ interface CustomerTableProps {
   onView?: (customer: Customer) => void;
   onEdit?: (customer: Customer) => void;
   onDelete?: (customer: Customer) => void;
+  onSelectionChange?: (selected: Customer[]) => void;
 }
 
 const CustomerTable: React.FC<CustomerTableProps> = ({
   onView,
   onEdit,
   onDelete,
+  onSelectionChange,
 }) => {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
@@ -49,6 +51,7 @@ const CustomerTable: React.FC<CustomerTableProps> = ({
   const [toDate, setToDate] = useState<string | undefined>(undefined);
 
   const [deleteTarget, setDeleteTarget] = useState<Customer | null>(null);
+  const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([]);
 
   // Query params
   const query: CustomerQuery = {
@@ -117,6 +120,19 @@ const CustomerTable: React.FC<CustomerTableProps> = ({
   const handleTableChange = (pagination: TablePaginationConfig) => {
     setPage(pagination.current ?? 1);
     setPageSize(pagination.pageSize ?? 10);
+  };
+
+  // ─── Row selection ────────────────────────────────────────────────────────
+  const rowSelection = {
+    selectedRowKeys,
+    onChange: (keys: React.Key[], selectedRows: Customer[]) => {
+      setSelectedRowKeys(keys);
+      onSelectionChange?.(selectedRows);
+    },
+    columnWidth: 44,
+    getCheckboxProps: (record: Customer) => ({
+      name: record.name,
+    }),
   };
 
   const STATUS_BADGE_STYLES: Record<
@@ -361,7 +377,27 @@ const CustomerTable: React.FC<CustomerTableProps> = ({
         onDateRangeChange={handleDateRangeChange}
       />
 
+      {/* Selection summary bar */}
+      {selectedRowKeys.length > 0 && (
+        <div className="flex items-center justify-between px-4 py-2.5 bg-blue-50 border border-blue-100 rounded-xl">
+          <span className="text-[13px] font-semibold text-blue-700">
+            {selectedRowKeys.length} customer
+            {selectedRowKeys.length > 1 ? "s" : ""} selected
+          </span>
+          <button
+            onClick={() => {
+              setSelectedRowKeys([]);
+              onSelectionChange?.([]);
+            }}
+            className="text-[12px] text-blue-500 hover:text-blue-700 font-medium"
+          >
+            Clear selection
+          </button>
+        </div>
+      )}
+
       <Table
+        rowSelection={rowSelection}
         columns={columns}
         dataSource={customers}
         rowKey="id"

@@ -1,5 +1,5 @@
 import { useCallback, useState } from "react";
-import { Button, Spin, message } from "antd";
+import { Button, Spin } from "antd";
 import {
   HiOutlineUsers,
   HiOutlineUserAdd,
@@ -12,6 +12,7 @@ import CustomerDetail from "../components/Customerdetail";
 import CustomerModal from "../components/Customermodal";
 import { getCustomerApi } from "../api/customers.api";
 import type { Customer } from "../types/Customer";
+import CustomerExportDrawer from "../components/Customerexportdrawer";
 
 type CustomerView = { page: "list" } | { page: "detail"; customerId: string };
 
@@ -20,7 +21,9 @@ const INITIAL_VIEW: CustomerView = { page: "list" };
 const CustomerPage = () => {
   const [view, setView] = useState<CustomerView>(INITIAL_VIEW);
   const [createOpen, setCreateOpen] = useState(false);
+  const [exportOpen, setExportOpen] = useState(false);
   const [editCustomerId, setEditCustomerId] = useState<string | null>(null);
+  const [selectedCustomers, setSelectedCustomers] = useState<Customer[]>([]);
 
   const goToList = useCallback(() => setView({ page: "list" }), []);
 
@@ -29,7 +32,6 @@ const CustomerPage = () => {
     []
   );
 
-  //  Fetch Single Customer
   const { data: editCustomer, isLoading: isEditLoading } = useQuery({
     queryKey: ["getCustomer", { editCustomerId }],
     queryFn: () =>
@@ -38,14 +40,8 @@ const CustomerPage = () => {
     refetchOnWindowFocus: false,
   });
 
-  const handleEdit = useCallback((id: string) => {
-    setEditCustomerId(id);
-  }, []);
-
-  const closeEditModal = useCallback(() => {
-    setEditCustomerId(null);
-  }, []);
-
+  const handleEdit = useCallback((id: string) => setEditCustomerId(id), []);
+  const closeEditModal = useCallback(() => setEditCustomerId(null), []);
   const openCreate = useCallback(() => setCreateOpen(true), []);
   const closeCreate = useCallback(() => setCreateOpen(false), []);
 
@@ -57,9 +53,7 @@ const CustomerPage = () => {
     [goToDetail]
   );
 
-  const handleEditSuccess = useCallback(() => {
-    setEditCustomerId(null);
-  }, []);
+  const handleEditSuccess = useCallback(() => setEditCustomerId(null), []);
 
   return (
     <Spin spinning={isEditLoading}>
@@ -74,10 +68,15 @@ const CustomerPage = () => {
               <>
                 <Button
                   icon={<HiOutlineDownload size={15} />}
-                  onClick={() => message.info("Export coming soon")}
+                  onClick={() => setExportOpen(true)}
                   className="!rounded-xl !h-9"
                 >
                   Export
+                  {selectedCustomers.length > 0 && (
+                    <span className="ml-1.5 bg-blue-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">
+                      {selectedCustomers.length}
+                    </span>
+                  )}
                 </Button>
 
                 <Button
@@ -97,6 +96,7 @@ const CustomerPage = () => {
           <CustomerList
             onNavigateToDetail={goToDetail}
             onEditCustomer={handleEdit}
+            onSelectionChange={setSelectedCustomers}
           />
         )}
 
@@ -108,19 +108,26 @@ const CustomerPage = () => {
           />
         )}
 
-        {/* CREATE modal */}
         <CustomerModal
           open={createOpen}
           onClose={closeCreate}
           onSuccess={handleCreateSuccess}
         />
 
-        {/* EDIT modal */}
         <CustomerModal
           open={!!editCustomerId && !!editCustomer}
           onClose={closeEditModal}
           customer={editCustomer}
           onSuccess={handleEditSuccess}
+        />
+
+        <CustomerExportDrawer
+          open={exportOpen}
+          onClose={() => {
+            setExportOpen(false);
+            setSelectedCustomers([]);
+          }}
+          selectedCustomers={selectedCustomers}
         />
       </div>
     </Spin>

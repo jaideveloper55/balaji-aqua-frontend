@@ -191,7 +191,7 @@ const BillingPage = () => {
 
   const productSearchRef = useRef<HTMLInputElement>(null);
 
-  // ─── Fetch Cart ─────────────────────────────────────────────────────────────
+  // Fetch Cart
   const { data: cartData } = useQuery({
     queryKey: ["billing-cart"],
     queryFn: () => getCartApi().then((res) => res.data),
@@ -201,7 +201,12 @@ const BillingPage = () => {
   useEffect(() => {
     if (cartData) {
       setServerCart(cartData);
-      setCart(cartData.items ?? []);
+      setCart(
+        (cartData.items ?? []).map((item: any) => ({
+          ...item,
+          total: item.total ?? item.lineTotal ?? 0,
+        }))
+      );
     }
   }, [cartData]);
 
@@ -227,8 +232,19 @@ const BillingPage = () => {
       });
   };
 
-  const updateQuantity = (itemId: string, quantity: number) => {
-    updateCartItemApi(itemId, { quantity })
+  const updateQuantity = (itemId: string, delta: number) => {
+    const item = cart.find((c) => c.id === itemId);
+    if (!item) return;
+
+    const newQty = (item.quantity ?? 0) + delta;
+    if (newQty < 1) {
+      removeCartItemApi(itemId).then(() =>
+        queryClient.invalidateQueries({ queryKey: ["billing-cart"] })
+      );
+      return;
+    }
+
+    updateCartItemApi(itemId, { quantity: newQty })
       .then(() => {
         queryClient.invalidateQueries({ queryKey: ["billing-cart"] });
       })
@@ -240,8 +256,19 @@ const BillingPage = () => {
       });
   };
 
-  const setQuantity = (itemId: string, quantity: number) => {
-    updateQuantity(itemId, quantity);
+  const setQuantity = (itemId: string, qty: number) => {
+    if (qty < 1) return;
+
+    updateCartItemApi(itemId, { quantity: qty })
+      .then(() => {
+        queryClient.invalidateQueries({ queryKey: ["billing-cart"] });
+      })
+      .catch((err: any) => {
+        errorNotification(
+          "Update Failed",
+          err?.message ?? "Could not update item"
+        );
+      });
   };
 
   const removeFromCart = (itemId: string) => {
