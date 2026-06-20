@@ -53,10 +53,11 @@ const FORM_ID = "customer-pricing-form";
 const PricingTable: React.FC<PricingTableProps> = ({ customerId }) => {
   const queryClient = useQueryClient();
 
+  // ─── Local UI state ───────────────────────────────────────────────────
   const [modalOpen, setModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
 
-  //  Fetch Pricing
+  // ─── Fetch Pricing ────────────────────────────────────────────────────
   const {
     data: pricingData,
     isLoading: pricingLoading,
@@ -78,7 +79,7 @@ const PricingTable: React.FC<PricingTableProps> = ({ customerId }) => {
     }
   }, [pricingError, pricingErrorData]);
 
-  //  Fetch Products
+  // ─── Fetch Products ───────────────────────────────────────────────────
   const { data: productsData } = useQuery<Product[]>({
     queryKey: ["getProducts"],
     queryFn: () =>
@@ -89,7 +90,7 @@ const PricingTable: React.FC<PricingTableProps> = ({ customerId }) => {
     refetchOnWindowFocus: false,
   });
 
-  // Create Pricing
+  // ─── Create Pricing ───────────────────────────────────────────────────
   const createPricing = useMutation({
     mutationKey: ["createCustomerPricing", { customerId }],
     mutationFn: (data: CustomerPricingFormValues) =>
@@ -109,7 +110,7 @@ const PricingTable: React.FC<PricingTableProps> = ({ customerId }) => {
     },
   });
 
-  //  Update Pricing
+  // ─── Update Pricing ───────────────────────────────────────────────────
   const updatePricing = useMutation({
     mutationKey: ["updateCustomerPricing"],
     mutationFn: ({
@@ -134,7 +135,7 @@ const PricingTable: React.FC<PricingTableProps> = ({ customerId }) => {
     },
   });
 
-  // Delete Pricing
+  // ─── Delete Pricing ───────────────────────────────────────────────────
   const deletePricing = useMutation({
     mutationKey: ["deleteCustomerPricing"],
     mutationFn: (pricingId: string) =>
@@ -155,13 +156,22 @@ const PricingTable: React.FC<PricingTableProps> = ({ customerId }) => {
 
   const isSaving = createPricing.isPending || updatePricing.isPending;
 
-  const data: CustomerPricing[] = Array.isArray(pricingData)
+  const rawPricingData: CustomerPricing[] = Array.isArray(pricingData)
     ? pricingData
     : Array.isArray((pricingData as any)?.data)
     ? (pricingData as any).data
     : [];
 
   const products: Product[] = productsData ?? [];
+
+  // ─── Enrich pricing rows with product data ──────────────────────────────
+  // The API returns pricing without the nested product relation populated.
+  // Cross-reference with the products list using productId as the join key.
+  const data: CustomerPricing[] = rawPricingData.map((row) => ({
+    ...row,
+    product:
+      row.product ?? products.find((p) => p.id === row.productId) ?? undefined,
+  }));
 
   const {
     control,
@@ -176,6 +186,7 @@ const PricingTable: React.FC<PricingTableProps> = ({ customerId }) => {
   const productId = watch("productId");
   const customerPrice = watch("customerPrice");
 
+  // ─── Modal handlers ────────────────────────────────────────────────────
   const openAdd = () => {
     setEditingId(null);
     reset(DEFAULT_FORM_VALUES);
@@ -207,6 +218,7 @@ const PricingTable: React.FC<PricingTableProps> = ({ customerId }) => {
     return true;
   };
 
+  // ─── Submit ────────────────────────────────────────────────────────────
   const onSubmit = (values: PricingFormValues) => {
     const [from, to] = values.effectiveRange;
     if (!from) {
@@ -263,6 +275,7 @@ const PricingTable: React.FC<PricingTableProps> = ({ customerId }) => {
     ),
   }));
 
+  // ─── Columns ───────────────────────────────────────────────────────────
   const columns: ColumnsType<CustomerPricing> = [
     {
       title: "Product",

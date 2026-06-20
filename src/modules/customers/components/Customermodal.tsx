@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useEffect } from "react";
-import { Button, Steps, Input } from "antd";
-import { useForm, Controller } from "react-hook-form";
-import { useMutation } from "@tanstack/react-query";
+import { Button, Steps } from "antd";
+import { useForm } from "react-hook-form";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   HiOutlineUser,
   HiOutlineTruck,
@@ -75,6 +75,8 @@ const CustomerModal: React.FC<CustomerModalProps> = ({
   const [success, setSuccess] = useState(false);
   const [savedName, setSavedName] = useState("");
 
+  const queryClient = useQueryClient();
+
   const createCustomer = useMutation({
     mutationKey: ["createCustomer"],
     mutationFn: (data: CustomerFormValues) => createCustomerApi(data),
@@ -83,9 +85,12 @@ const CustomerModal: React.FC<CustomerModalProps> = ({
         "Success",
         response.data.message ?? "Customer created successfully"
       );
+      // Refresh the customer table and stats card
+      queryClient.invalidateQueries({ queryKey: ["getCustomers"] });
+      queryClient.invalidateQueries({ queryKey: ["getCustomerStats"] });
     },
     onError: (error: any) => {
-      errorNotification("Error", error.message);
+      errorNotification("Error", error.message ?? "Could not create customer");
     },
   });
 
@@ -98,9 +103,14 @@ const CustomerModal: React.FC<CustomerModalProps> = ({
         "Success",
         response.data.message ?? "Customer updated successfully"
       );
+      // Refresh the customer table, stats, detail page, and single customer cache
+      queryClient.invalidateQueries({ queryKey: ["getCustomers"] });
+      queryClient.invalidateQueries({ queryKey: ["getCustomerStats"] });
+      queryClient.invalidateQueries({ queryKey: ["getCustomer"] });
+      queryClient.invalidateQueries({ queryKey: ["getCustomerDetail"] });
     },
     onError: (error: any) => {
-      errorNotification("Error", error.message);
+      errorNotification("Error", error.message ?? "Could not update customer");
     },
   });
 
@@ -388,7 +398,6 @@ const CustomerModal: React.FC<CustomerModalProps> = ({
                   placeholder="Select type"
                   errors={errors}
                   isrequired
-                  size="large"
                   options={TYPE_OPTS}
                   rules={{ required: "Required" }}
                 />
@@ -407,7 +416,6 @@ const CustomerModal: React.FC<CustomerModalProps> = ({
                   placeholder="Select frequency"
                   errors={errors}
                   isrequired
-                  size="large"
                   options={FREQ_OPTS}
                   rules={{ required: "Required" }}
                 />
@@ -418,54 +426,33 @@ const CustomerModal: React.FC<CustomerModalProps> = ({
                   placeholder="Select payment mode"
                   errors={errors}
                   isrequired
-                  size="large"
                   options={PAY_OPTS}
                   rules={{ required: "Required" }}
                 />
               </div>
 
               {/* Opening Balance */}
-              <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-semibold text-slate-600">
-                  Opening Balance{" "}
-                  <span className="text-slate-400 font-normal">
-                    (outstanding at onboarding)
-                  </span>
-                </label>
-                <Controller
+              <div className="flex flex-col gap-0">
+                <CustomInput
                   name="outstandingBalance"
                   control={control}
-                  rules={{ min: { value: 0, message: "Cannot be negative" } }}
-                  render={({ field, fieldState }) => (
-                    <>
-                      <Input
-                        {...field}
-                        type="number"
-                        min={0}
-                        step="0.01"
-                        prefix="₹"
-                        placeholder="0.00"
-                        size="large"
-                        className="!rounded-lg"
-                        status={fieldState.error ? "error" : ""}
-                        onChange={(e) => {
-                          const v = e.target.value;
-                          field.onChange(v === "" ? 0 : Number(v));
-                        }}
-                      />
-                      {fieldState.error && (
-                        <span className="text-[11px] text-red-500">
-                          {fieldState.error.message}
-                        </span>
-                      )}
-                      <span className="text-[10px] text-slate-400">
-                        Leave 0 if customer has no pending dues
-                      </span>
-                    </>
-                  )}
+                  label="Opening Balance (₹)"
+                  placeholder="0"
+                  errors={errors}
+                  numbersOnly
+                  rules={{
+                    min: { value: 0, message: "Cannot be negative" },
+                    validate: (v: any) =>
+                      v === "" ||
+                      v === undefined ||
+                      (!isNaN(Number(v)) && Number(v) >= 0) ||
+                      "Must be a positive number",
+                  }}
                 />
+                <span className="text-[10px] text-slate-400 mt-0.5 ml-0.5">
+                  Leave 0 if customer has no pending dues
+                </span>
               </div>
-
               {/* Notes */}
               <CustomTextArea
                 name="notes"

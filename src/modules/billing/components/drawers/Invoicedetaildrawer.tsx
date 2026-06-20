@@ -64,6 +64,7 @@ const InvoiceDetailDrawer: React.FC<Props> = ({
     >
       {invoice && (
         <div className="space-y-5">
+          {/* Invoice number + status */}
           <div className="flex items-center justify-between">
             <div>
               <div className="font-mono text-base font-bold text-gray-900">
@@ -81,6 +82,7 @@ const InvoiceDetailDrawer: React.FC<Props> = ({
             </Tag>
           </div>
 
+          {/* Customer */}
           <div className="bg-gray-50 rounded-xl p-3 flex items-center gap-3">
             <div className="w-9 h-9 rounded-xl bg-emerald-100 flex items-center justify-center text-emerald-700 font-bold text-xs">
               {getInitials(invoice.customerName)}
@@ -104,6 +106,7 @@ const InvoiceDetailDrawer: React.FC<Props> = ({
             </div>
           </div>
 
+          {/* Items */}
           <div>
             <h4 className="text-[12px] font-semibold text-gray-500 uppercase tracking-wide mb-2">
               Items
@@ -140,6 +143,7 @@ const InvoiceDetailDrawer: React.FC<Props> = ({
             </div>
           </div>
 
+          {/* Totals */}
           <div className="bg-gray-50 rounded-xl p-4 space-y-2">
             <div className="flex justify-between text-[13px]">
               <span className="text-gray-500">Subtotal</span>
@@ -188,21 +192,41 @@ const InvoiceDetailDrawer: React.FC<Props> = ({
             )}
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            {[
-              { label: "Payment Mode", value: invoice.paymentMode },
-              { label: "Delivery Mode", value: invoice.deliveryMode },
-              { label: "Notes", value: invoice.notes || "—" },
-            ].map((item, idx) => (
-              <div key={idx} className="bg-gray-50 rounded-lg p-3">
-                <div className="text-[10px] text-gray-400 uppercase tracking-wide">
-                  {item.label}
+          {/* Meta info — Payment Mode, Delivery Mode, Notes each on own row */}
+          <div className="flex flex-col gap-2">
+            {/* Payment + Delivery side by side */}
+            <div className="grid grid-cols-2 gap-2">
+              <div className="bg-gray-50 rounded-lg p-3">
+                <div className="text-[10px] text-gray-400 uppercase tracking-wide mb-0.5">
+                  Payment Mode
                 </div>
-                <div className="text-[13px] font-medium text-gray-800 mt-0.5">
-                  {item.value}
+                <div className="text-[13px] font-medium text-gray-800">
+                  {invoice.paymentMode}
                 </div>
               </div>
-            ))}
+              <div className="bg-gray-50 rounded-lg p-3">
+                <div className="text-[10px] text-gray-400 uppercase tracking-wide mb-0.5">
+                  Delivery Mode
+                </div>
+                <div className="text-[13px] font-medium text-gray-800">
+                  {invoice.deliveryMode}
+                </div>
+              </div>
+            </div>
+
+            {/* Notes — full width, always visible */}
+            <div className="bg-gray-50 rounded-lg p-3">
+              <div className="text-[10px] text-gray-400 uppercase tracking-wide mb-0.5">
+                Notes
+              </div>
+              <div
+                className={`text-[13px] font-medium ${
+                  invoice.notes ? "text-gray-800" : "text-gray-400 italic"
+                }`}
+              >
+                {invoice.notes || "No notes added"}
+              </div>
+            </div>
           </div>
 
           {/* Action buttons */}

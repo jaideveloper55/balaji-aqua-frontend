@@ -108,21 +108,8 @@ const buildReportHTML = (customers: ExportableCustomer[]): string => {
     <p class="sub-meta">${customers.length} customer${
     customers.length === 1 ? "" : "s"
   }</p>
-    <table>
-      <thead>
-        <tr>
-          <th>Customer</th>
-          <th>Phone</th>
-          <th>Email</th>
-          <th class="center">Type</th>
-          <th class="center">Status</th>
-          <th class="right">Outstanding</th>
-          <th class="center">Joined</th>
-        </tr>
-      </thead>
-      <tbody>${rows}</tbody>
-    </table>
-    <div class="kpi-row">
+
+    <div class="kpi-row" style="margin-top:20px;">
       <div class="kpi-card">
         <div class="kpi-label">Total Customers</div>
         <div class="kpi-value blue">${customers.length}</div>
@@ -140,6 +127,21 @@ const buildReportHTML = (customers: ExportableCustomer[]): string => {
         <div class="kpi-value red">Rs.${fmt(totalOutstanding)}</div>
       </div>
     </div>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Customer</th>
+          <th>Phone</th>
+          <th>Email</th>
+          <th class="center">Type</th>
+          <th class="center">Status</th>
+          <th class="right">Outstanding</th>
+          <th class="center">Joined</th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>
   `;
 };
 
@@ -207,6 +209,7 @@ const CSS = `
     display: flex;
     gap: 12px;
     margin-top: 28px;
+    page-break-inside: avoid;
   }
   .kpi-card {
     flex: 1;
@@ -215,6 +218,7 @@ const CSS = `
     border-radius: 10px;
     background: #fff;
     text-align: center;
+    page-break-inside: avoid;
   }
   .kpi-label {
     font-size: 9px;
@@ -230,7 +234,9 @@ const CSS = `
   .kpi-value.blue { color: #2563eb; }
 `;
 
+// ─────────────────────────────────────────────────────────────────────────
 // PDF — download directly using html2pdf.js (loaded from CDN at runtime)
+// ─────────────────────────────────────────────────────────────────────────
 
 export const generateCustomerListPDF = async (
   customers: ExportableCustomer[]
@@ -258,7 +264,7 @@ export const generateCustomerListPDF = async (
   `;
 
   // Try html2pdf (loaded via CDN or installed as npm package)
-
+  // If not available, fall back to print dialog
   try {
     // Dynamically load html2pdf.js from CDN if not already loaded
     if (!(window as any).html2pdf) {
@@ -294,6 +300,7 @@ export const generateCustomerListPDF = async (
 
     document.body.removeChild(container);
   } catch (err) {
+    // Fallback: open in new tab with print dialog
     console.warn("html2pdf not available, falling back to print dialog", err);
     const win = window.open("", "_blank");
     if (!win) return;
@@ -324,7 +331,9 @@ export const generateCustomerListPDF = async (
   }
 };
 
+// ─────────────────────────────────────────────────────────────────────────
 // CSV
+// ─────────────────────────────────────────────────────────────────────────
 
 export const generateCustomerListCSV = (customers: ExportableCustomer[]) => {
   const header = [

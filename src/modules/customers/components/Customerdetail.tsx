@@ -70,6 +70,7 @@ const CustomerDetailPage: React.FC<CustomerDetailProps> = ({
   const address = [
     customer.addressLine1,
     customer.addressLine2,
+    customer.landmark ? `Near ${customer.landmark}` : null,
     customer.city,
     customer.state,
     customer.pincode,
@@ -194,6 +195,14 @@ const CustomerDetailPage: React.FC<CustomerDetailProps> = ({
                   label="Address"
                   value={address || "—"}
                 />
+
+                {customer.landmark && (
+                  <InfoRow
+                    icon={<HiOutlineLocationMarker size={15} />}
+                    label="Landmark"
+                    value={customer.landmark}
+                  />
+                )}
               </InfoSection>
               <InfoSection title="Account Details">
                 <InfoRow

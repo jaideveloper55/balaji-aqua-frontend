@@ -30,6 +30,7 @@ interface CustomInputProps<T extends FieldValues> {
   size?: InputSize;
   isrequired?: boolean;
   rules?: any;
+  numbersOnly?: boolean;
 }
 
 const ICON_MAP = {
@@ -51,11 +52,40 @@ const CustomInput = <T extends FieldValues>({
   size = "middle",
   isrequired = false,
   rules,
+  numbersOnly = false,
 }: CustomInputProps<T>) => {
   const errorMessage = errors?.[name]?.message as string | undefined;
   const hasError = !!errorMessage;
 
   const prefixIcon = iconType ? ICON_MAP[iconType] : undefined;
+
+  // Block non-numeric key presses at the keyboard level
+  const handleKeyDown = numbersOnly
+    ? (e: React.KeyboardEvent<HTMLInputElement>) => {
+        // Allow: digits, decimal point, backspace, delete, arrows, tab, enter
+        const allowed = [
+          "Backspace",
+          "Delete",
+          "ArrowLeft",
+          "ArrowRight",
+          "ArrowUp",
+          "ArrowDown",
+          "Tab",
+          "Enter",
+          "Home",
+          "End",
+        ];
+        if (allowed.includes(e.key)) return;
+        // Allow Ctrl/Cmd shortcuts (copy, paste, select all)
+        if (e.ctrlKey || e.metaKey) return;
+        // Allow digits 0-9
+        if (/^\d$/.test(e.key)) return;
+        // Allow one decimal point
+        if (e.key === "." && !e.currentTarget.value.includes(".")) return;
+        // Block everything else
+        e.preventDefault();
+      }
+    : undefined;
 
   return (
     <div className={`flex flex-col gap-1.5 ${className}`}>
@@ -102,6 +132,23 @@ const CustomInput = <T extends FieldValues>({
               status={hasError ? "error" : ""}
               prefix={prefixIcon}
               autoComplete={type === "email" ? "email" : "off"}
+              onKeyDown={handleKeyDown}
+              onChange={(e) => {
+                // If numbersOnly, strip any non-numeric characters that
+                // sneak through (e.g. via paste)
+                if (numbersOnly) {
+                  const cleaned = e.target.value.replace(/[^\d.]/g, "");
+                  // Prevent multiple decimal points
+                  const parts = cleaned.split(".");
+                  const sanitised =
+                    parts.length > 2
+                      ? `${parts[0]}.${parts.slice(1).join("")}`
+                      : cleaned;
+                  field.onChange(sanitised);
+                } else {
+                  field.onChange(e);
+                }
+              }}
             />
           )
         }

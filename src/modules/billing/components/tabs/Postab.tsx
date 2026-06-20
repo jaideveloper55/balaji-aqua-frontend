@@ -18,7 +18,6 @@ interface Props {
   onClearCustomer: () => void;
   onOpenPicker: () => void;
   onOpenQuickAdd: () => void;
-
   products: POSProduct[];
   isLoadingProducts: boolean;
   productSearch: string;
@@ -26,7 +25,6 @@ interface Props {
   onAddToCart: (p: POSProduct) => void;
   productSearchRef: RefObject<HTMLInputElement | null>;
   getEffectivePrice: (p: POSProduct) => { price: number; isCustom: boolean };
-
   cart: CartItem[];
   notes: string;
   discount: number;

@@ -32,7 +32,6 @@ interface Props {
   grandTotal: number;
   onPaymentModeChange: (mode: string) => void;
   onAmountReceivedChange: (val: number) => void;
-  // splits is optional so the parent stays backward-compatible until wired
   onConfirm: (
     reference?: string,
     dueDate?: string,
@@ -41,8 +40,20 @@ interface Props {
   onClose: () => void;
 }
 
-const BUSINESS_UPI_ID = "balajiaqua@hdfc";
-const BUSINESS_NAME = "Balaji Aqua Water Plant";
+// ─── Canara Bank payment details ──────────────────────────────────────────────
+const BUSINESS_UPI_ID = "8015929891@cnrb";
+const BUSINESS_NAME = "SRIBALAJI AQUA WATER";
+
+// Static QR image saved at public/images/bank-qr.jpeg
+const BUSINESS_QR_IMAGE = "/images/bank-qr.jpeg";
+
+const BANK_DETAILS = {
+  bankName: "Canara Bank",
+  accountHolder: "SRIBALAJI AQUA WATER",
+  accountNumber: "64943070000322",
+  ifscCode: "CNRB0016494",
+  mobile: "+91 80159 29891",
+};
 
 type FormShape = { dueDate: Dayjs | null };
 
@@ -53,7 +64,6 @@ const DUE_PRESETS = [
   { label: "End of Month", build: () => dayjs().endOf("month") },
 ];
 
-// The three real-money split rows (credit is never a row — it's the leftover)
 const SPLIT_ROWS: {
   mode: PaymentSplit["mode"];
   label: string;
@@ -95,23 +105,13 @@ const PaymentModal: React.FC<Props> = ({
 }) => {
   const [upiReference, setUpiReference] = useState("");
   const [upiVerified, setUpiVerified] = useState(false);
-
-  // ── Split mode state ──
   const [isSplit, setIsSplit] = useState(false);
   const [splitAmounts, setSplitAmounts] = useState<
     Record<PaymentSplit["mode"], number>
-  >({
-    CASH: 0,
-    UPI: 0,
-    BANK_TRANSFER: 0,
-  });
+  >({ CASH: 0, UPI: 0, BANK_TRANSFER: 0 });
   const [splitRefs, setSplitRefs] = useState<
     Record<PaymentSplit["mode"], string>
-  >({
-    CASH: "",
-    UPI: "",
-    BANK_TRANSFER: "",
-  });
+  >({ CASH: "", UPI: "", BANK_TRANSFER: "" });
 
   const {
     control,
@@ -123,10 +123,8 @@ const PaymentModal: React.FC<Props> = ({
     defaultValues: { dueDate: dayjs().add(30, "day") },
     mode: "onChange",
   });
-
   const dueDate = watch("dueDate");
 
-  // ── Split calculations ──
   const splitEntered = useMemo(
     () => splitAmounts.CASH + splitAmounts.UPI + splitAmounts.BANK_TRANSFER,
     [splitAmounts]
@@ -134,19 +132,15 @@ const PaymentModal: React.FC<Props> = ({
   const splitCredit = Math.max(0, grandTotal - splitEntered);
   const splitOverpaid = splitEntered > grandTotal;
 
-  // ── Single-mode partial / credit detection (unchanged) ──
   const isPartial =
     !isSplit &&
     paymentMode !== "credit" &&
     amountReceived > 0 &&
     amountReceived < grandTotal;
-
-  // Due date needed when: single credit, single partial, or split leaves a credit remainder
   const showDueDateSection =
     (!isSplit && (paymentMode === "credit" || isPartial)) ||
     (isSplit && splitCredit > 0);
 
-  // Reset everything when modal closes
   useEffect(() => {
     if (!open) {
       setUpiReference("");
@@ -162,18 +156,6 @@ const PaymentModal: React.FC<Props> = ({
     setUpiReference("");
     setUpiVerified(false);
   }, [paymentMode]);
-
-  // UPI link + QR (single-mode fast path)
-  const upiLink = `upi://pay?pa=${encodeURIComponent(
-    BUSINESS_UPI_ID
-  )}&pn=${encodeURIComponent(
-    BUSINESS_NAME
-  )}&am=${grandTotal}&cu=INR&tn=${encodeURIComponent(
-    `Invoice payment - ${selectedCustomer?.name || "Customer"}`
-  )}`;
-  const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=${encodeURIComponent(
-    upiLink
-  )}`;
 
   const paymentMethods = [
     { key: "cash", label: "Cash", icon: <HiOutlineCash className="w-5 h-5" /> },
@@ -216,7 +198,6 @@ const PaymentModal: React.FC<Props> = ({
       message.warning("Entered amount is more than the bill total");
       return;
     }
-    // require a reference for any non-cash split that has an amount
     for (const row of SPLIT_ROWS) {
       if (
         row.needsRef &&
@@ -228,7 +209,6 @@ const PaymentModal: React.FC<Props> = ({
       }
     }
     if (splitCredit > 0 && !validateDueDate()) return;
-
     const splits: PaymentSplit[] = SPLIT_ROWS.filter(
       (r) => splitAmounts[r.mode] > 0
     ).map((r) => ({
@@ -238,7 +218,6 @@ const PaymentModal: React.FC<Props> = ({
         ? splitRefs[r.mode].trim() || undefined
         : undefined,
     }));
-
     onConfirm(
       undefined,
       splitCredit > 0 ? dueDate?.toISOString() : undefined,
@@ -252,7 +231,6 @@ const PaymentModal: React.FC<Props> = ({
       return;
     }
     if (showDueDateSection && !validateDueDate()) return;
-
     onConfirm(
       paymentMode === "upi" ? upiReference : undefined,
       showDueDateSection ? dueDate?.toISOString() : undefined
@@ -286,17 +264,14 @@ const PaymentModal: React.FC<Props> = ({
     }
   };
 
-  const applyPreset = (build: () => Dayjs) => {
+  const applyPreset = (build: () => Dayjs) =>
     setValue("dueDate", build(), { shouldValidate: true });
-  };
   const isPresetActive = (build: () => Dayjs): boolean =>
     dueDate ? dueDate.isSame(build(), "day") : false;
-
   const dueDaysFromNow = dueDate
     ? dueDate.diff(dayjs().startOf("day"), "day")
     : 0;
 
-  // ── Confirm button label ──
   const confirmLabel = (() => {
     if (isSplit) {
       if (splitEntered > 0 && splitCredit > 0)
@@ -317,7 +292,6 @@ const PaymentModal: React.FC<Props> = ({
     (!isSplit && paymentMode === "upi" && !upiVerified) ||
     (isSplit && splitOverpaid);
 
-  // ── Footer ──
   const modalFooter = (
     <div className="flex gap-2">
       <button
@@ -366,7 +340,7 @@ const PaymentModal: React.FC<Props> = ({
       footer={modalFooter}
     >
       <div className="space-y-4">
-        {/* Customer & Total */}
+        {/* Bill summary */}
         <div className="bg-gradient-to-br from-emerald-50 to-green-50 rounded-xl p-4 border border-emerald-100">
           <div className="text-[11px] text-emerald-600 font-medium uppercase tracking-wide mb-1">
             Bill For
@@ -402,14 +376,13 @@ const PaymentModal: React.FC<Props> = ({
           </button>
         </div>
 
-        {/* ════════════ SPLIT MODE ════════════ */}
+        {/* ════ SPLIT MODE ════ */}
         {isSplit ? (
           <div className="space-y-3">
             <div className="text-[11px] text-gray-500">
               Enter how much was paid in each mode. Anything left over becomes
               credit.
             </div>
-
             {SPLIT_ROWS.map((row) => (
               <div
                 key={row.mode}
@@ -452,8 +425,6 @@ const PaymentModal: React.FC<Props> = ({
                 )}
               </div>
             ))}
-
-            {/* Totals */}
             <div className="bg-gray-50 rounded-xl p-3 space-y-1.5 text-[13px]">
               <div className="flex justify-between text-gray-600">
                 <span>Entered</span>
@@ -487,9 +458,9 @@ const PaymentModal: React.FC<Props> = ({
             </div>
           </div>
         ) : (
-          /* ════════════ SINGLE MODE (unchanged) ════════════ */
+          /* ════ SINGLE MODE ════ */
           <>
-            {/* Payment Mode Selector */}
+            {/* Payment Method Selector */}
             <div>
               <label className="text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-2 block">
                 Payment Method
@@ -543,7 +514,7 @@ const PaymentModal: React.FC<Props> = ({
               </div>
             )}
 
-            {/* UPI */}
+            {/* UPI — uses static Canara Bank QR image */}
             {paymentMode === "upi" && (
               <div className="space-y-3">
                 {!upiVerified ? (
@@ -557,15 +528,32 @@ const PaymentModal: React.FC<Props> = ({
                           Show this QR or open their UPI app
                         </div>
                       </div>
+
+                      {/* ── Static Canara Bank QR image ── */}
                       <div className="flex justify-center mb-3">
                         <div className="bg-white p-2 rounded-lg border border-gray-200">
                           <img
-                            src={qrCodeUrl}
-                            alt="UPI QR Code"
-                            className="w-48 h-48"
+                            src={BUSINESS_QR_IMAGE}
+                            alt="Scan to pay — Canara Bank UPI"
+                            className="w-48 h-48 object-contain"
+                            onError={(e) => {
+                              // Fallback: generate QR from UPI ID if image not found
+                              const upiLink = `upi://pay?pa=${encodeURIComponent(
+                                BUSINESS_UPI_ID
+                              )}&pn=${encodeURIComponent(
+                                BUSINESS_NAME
+                              )}&am=${grandTotal}&cu=INR`;
+                              (
+                                e.target as HTMLImageElement
+                              ).src = `https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=${encodeURIComponent(
+                                upiLink
+                              )}`;
+                            }}
                           />
                         </div>
                       </div>
+
+                      {/* UPI ID row */}
                       <div className="bg-gray-50 rounded-lg px-3 py-2 flex items-center justify-between">
                         <div>
                           <div className="text-[10px] text-gray-500 uppercase tracking-wide">
@@ -659,15 +647,49 @@ const PaymentModal: React.FC<Props> = ({
 
             {/* BANK */}
             {paymentMode === "bank" && (
-              <div className="bg-indigo-50/40 border border-indigo-100 rounded-xl p-4">
-                <div className="text-[11px] font-semibold text-indigo-600 uppercase tracking-wide mb-2">
-                  Bank Transfer Reference
+              <div className="bg-indigo-50/40 border border-indigo-100 rounded-xl p-4 space-y-3">
+                <div className="text-[11px] font-semibold text-indigo-600 uppercase tracking-wide">
+                  Bank Details
+                </div>
+                <div className="grid grid-cols-2 gap-2 text-[12px]">
+                  <div className="bg-white rounded-lg p-2.5 border border-indigo-100">
+                    <div className="text-[10px] text-gray-400 uppercase mb-0.5">
+                      Bank
+                    </div>
+                    <div className="font-semibold text-gray-800">
+                      {BANK_DETAILS.bankName}
+                    </div>
+                  </div>
+                  <div className="bg-white rounded-lg p-2.5 border border-indigo-100">
+                    <div className="text-[10px] text-gray-400 uppercase mb-0.5">
+                      Account Holder
+                    </div>
+                    <div className="font-semibold text-gray-800 text-[11px]">
+                      {BANK_DETAILS.accountHolder}
+                    </div>
+                  </div>
+                  <div className="bg-white rounded-lg p-2.5 border border-indigo-100">
+                    <div className="text-[10px] text-gray-400 uppercase mb-0.5">
+                      Account No.
+                    </div>
+                    <div className="font-mono font-semibold text-gray-800">
+                      {BANK_DETAILS.accountNumber}
+                    </div>
+                  </div>
+                  <div className="bg-white rounded-lg p-2.5 border border-indigo-100">
+                    <div className="text-[10px] text-gray-400 uppercase mb-0.5">
+                      IFSC
+                    </div>
+                    <div className="font-mono font-semibold text-gray-800">
+                      {BANK_DETAILS.ifscCode}
+                    </div>
+                  </div>
                 </div>
                 <input
                   type="text"
                   value={upiReference}
                   onChange={(e) => setUpiReference(e.target.value)}
-                  placeholder="NEFT/IMPS/RTGS reference number"
+                  placeholder="NEFT / IMPS / RTGS reference number"
                   className="w-full px-3 py-2 rounded-lg border border-gray-200 text-[13px] font-mono placeholder:text-gray-300 focus:outline-none focus:border-indigo-400 bg-white"
                 />
               </div>
@@ -694,7 +716,7 @@ const PaymentModal: React.FC<Props> = ({
           </>
         )}
 
-        {/* ─── DUE DATE (single credit/partial OR split credit) ─── */}
+        {/* Due date section */}
         {showDueDateSection && (
           <div className="bg-blue-50/40 border border-blue-100 rounded-xl p-3.5 space-y-2.5">
             <div className="flex items-center gap-2">

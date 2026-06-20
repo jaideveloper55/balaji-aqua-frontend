@@ -48,7 +48,6 @@ export interface OrgTheme {
   accentText: string;
   dropdownHoverBg: string;
   dropdownHoverText: string;
-  /** Full group-hover class for icon color, e.g. "group-hover/item:text-blue-500" */
   iconGroupHover: string;
 }
 

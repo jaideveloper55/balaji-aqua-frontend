@@ -12,13 +12,22 @@ import {
 } from "react-icons/hi";
 import { HiDocumentArrowDown, HiTableCells } from "react-icons/hi2";
 import { COMPANY_INFO } from "../../constants/Mockdata";
+import { exportInvoicesApi, ExportFilters } from "../../api/billing.api";
 import {
-  exportInvoicesApi,
-  exportPaymentsApi,
-  exportOutstandingApi,
-  exportDailySummaryApi,
-  ExportFilters,
-} from "../../api/billing.api";
+  ExportableOutstandingCustomer,
+  generateOutstandingPDF,
+  generateOutstandingCSV,
+} from "../../utils/Outstandinggenerators";
+import {
+  ExportablePayment,
+  generatePaymentsPDF,
+  generatePaymentsCSV,
+} from "../../utils/Paymentgenerators";
+import {
+  SummaryData,
+  generateSummaryPDF,
+  generateSummaryCSV,
+} from "../../utils/Summarygenerators";
 
 const { RangePicker } = DatePicker;
 
@@ -29,6 +38,10 @@ interface Props {
   open: boolean;
   onClose: () => void;
   defaultReportType?: ReportType;
+  outstandingCustomers?: ExportableOutstandingCustomer[];
+  summaryData?: SummaryData;
+  paymentsData?: ExportablePayment[];
+  paymentsPeriodLabel?: string;
 }
 
 const REPORTS: {
@@ -61,7 +74,7 @@ const REPORTS: {
     description: "Customers with pending dues, sorted by risk",
     icon: <HiOutlineExclamation className="w-5 h-5" />,
     color: "red",
-    supportsDateRange: false,
+    supportsDateRange: true,
   },
   {
     key: "summary",
@@ -151,6 +164,10 @@ const ExportDrawer: React.FC<Props> = ({
   open,
   onClose,
   defaultReportType = "invoices",
+  outstandingCustomers = [],
+  summaryData,
+  paymentsData = [],
+  paymentsPeriodLabel,
 }) => {
   const [reportType, setReportType] = useState<ReportType>(defaultReportType);
   const [format, setFormat] = useState<FormatType>("pdf");
@@ -188,8 +205,62 @@ const ExportDrawer: React.FC<Props> = ({
     URL.revokeObjectURL(url);
   };
 
-  const handleExport = () => {
+  const handleExport = async () => {
     setIsExporting(true);
+
+    // Outstanding — local HTML generator (avoids backend text-wrap issues)
+    if (reportType === "outstanding") {
+      try {
+        if (format === "pdf") {
+          await generateOutstandingPDF(outstandingCustomers);
+        } else {
+          generateOutstandingCSV(outstandingCustomers);
+        }
+        message.success("Outstanding Report downloaded");
+        onClose();
+      } catch (err: any) {
+        message.error(err?.message ?? "Export failed. Please try again.");
+      } finally {
+        setIsExporting(false);
+      }
+      return;
+    }
+
+    // Collection Summary — local HTML generator
+    if (reportType === "summary" && summaryData) {
+      try {
+        if (format === "pdf") {
+          await generateSummaryPDF(summaryData);
+        } else {
+          generateSummaryCSV(summaryData);
+        }
+        message.success("Collection Summary downloaded");
+        onClose();
+      } catch (err: any) {
+        message.error(err?.message ?? "Export failed. Please try again.");
+      } finally {
+        setIsExporting(false);
+      }
+      return;
+    }
+
+    // Payments — local HTML generator
+    if (reportType === "payments") {
+      try {
+        if (format === "pdf") {
+          await generatePaymentsPDF(paymentsData, paymentsPeriodLabel);
+        } else {
+          generatePaymentsCSV(paymentsData);
+        }
+        message.success("Payment Report downloaded");
+        onClose();
+      } catch (err: any) {
+        message.error(err?.message ?? "Export failed. Please try again.");
+      } finally {
+        setIsExporting(false);
+      }
+      return;
+    }
 
     const filters: ExportFilters = { format };
     if (currentReport.supportsDateRange) {
@@ -197,16 +268,8 @@ const ExportDrawer: React.FC<Props> = ({
       if (toDate) filters.dateTo = toDate.format("YYYY-MM-DD");
     }
 
-    const exportFn =
-      reportType === "invoices"
-        ? exportInvoicesApi(filters)
-        : reportType === "payments"
-        ? exportPaymentsApi(filters)
-        : reportType === "outstanding"
-        ? exportOutstandingApi({ format })
-        : exportDailySummaryApi(filters);
-
-    exportFn
+    // Only invoices reaches here — outstanding/summary/payments handled above
+    exportInvoicesApi(filters)
       .then((response) => {
         const blob = response.data;
         const timestamp = dayjs().format("YYYYMMDD_HHmmss");
@@ -328,7 +391,7 @@ const ExportDrawer: React.FC<Props> = ({
         {/* Step 3: Format */}
         <div>
           <label className="text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-2 block">
-            {currentReport.supportsDateRange ? "3" : "2"}. Format
+            3. Format
           </label>
           <div className="grid grid-cols-2 gap-2">
             <button
@@ -401,11 +464,11 @@ const ExportDrawer: React.FC<Props> = ({
                 </span>
               </div>
             )}
-            {!currentReport.supportsDateRange && (
+            {reportType === "payments" && (
               <div className="flex justify-between text-[12px]">
-                <span className="text-gray-500">Scope</span>
+                <span className="text-gray-500">Records</span>
                 <span className="font-semibold text-gray-800">
-                  All active customers
+                  {paymentsData.length} payments
                 </span>
               </div>
             )}
@@ -417,7 +480,15 @@ const ExportDrawer: React.FC<Props> = ({
             </div>
             <div className="flex justify-between text-[12px]">
               <span className="text-gray-500">Source</span>
-              <span className="font-semibold text-gray-800">Live (server)</span>
+              <span
+                className={`font-semibold text-[12px] ${
+                  reportType === "invoices"
+                    ? "text-blue-700"
+                    : "text-emerald-700"
+                }`}
+              >
+                {reportType === "invoices" ? "Live (server)" : "Local data"}
+              </span>
             </div>
           </div>
         </div>
@@ -457,8 +528,9 @@ const ExportDrawer: React.FC<Props> = ({
 
         <div className="text-center pt-1">
           <p className="text-[10px] text-gray-400">
-            Reports include {COMPANY_INFO.name} branding and are pulled live
-            from the server
+            {reportType === "invoices"
+              ? `Reports include ${COMPANY_INFO.name} branding and are pulled live from the server`
+              : `Reports include ${COMPANY_INFO.name} branding and are generated from current page data`}
           </p>
         </div>
       </div>
