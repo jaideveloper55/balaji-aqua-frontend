@@ -183,10 +183,10 @@ const LoginForm: React.FC<LoginFormProps> = ({ tenant, onTenantChange }) => {
         <button
           type="submit"
           disabled={isDisabled || login.isPending}
-          className={`w-full flex items-center justify-center gap-2.5 py-3.5 px-6 rounded-xl text-sm font-semibold mt-1 transition-all duration-200 ${
+          className={`w-full flex items-center justify-center gap-2.5 py-3 px-6 rounded-xl text-sm font-semibold mt-1 transition-all duration-200 ${
             isDisabled || login.isPending
               ? "bg-slate-200 text-slate-400 cursor-not-allowed"
-              : "bg-blue-600 hover:bg-blue-700 text-white shadow-lg hover:shadow-xl"
+              : "bg-blue-500 hover:bg-blue-600 text-white  hover:shadow-xl"
           }`}
         >
           {login.isPending ? (

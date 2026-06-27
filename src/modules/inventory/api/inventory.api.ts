@@ -56,6 +56,7 @@ export interface StockListFilters {
   categoryId?: string;
   page?: number;
   limit?: number;
+  isSellable?: boolean;
 }
 
 export interface Paginated<T> {

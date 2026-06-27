@@ -5,6 +5,7 @@ import {
   forwardRef,
   useImperativeHandle,
 } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Table, Tooltip, Popconfirm, Button, Spin } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import {
@@ -15,40 +16,104 @@ import {
   HiOutlineSearch,
   HiOutlineColorSwatch,
 } from "react-icons/hi";
-import CategoryModal, { CategoryFormValues } from "./CategoryModal";
 
 import {
-  useCategories,
-  useCreateCategory,
-  useUpdateCategory,
-  useDeleteCategory,
-} from "../hooks/Usecategories";
+  successNotification,
+  errorNotification,
+} from "../../../components/common/Notification";
+import CategoryModal, { CategoryFormValues } from "./CategoryModal";
 import type { Category } from "../types/Product";
+import {
+  getCategoriesApi,
+  createCategoryApi,
+  updateCategoryApi,
+  deleteCategoryApi,
+} from "../api/Categories.api";
 
 export interface CategoryManagerHandle {
   openCreate: () => void;
 }
 
 const CategoryManager = forwardRef<CategoryManagerHandle>((_props, ref) => {
+  const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
   const [editCategory, setEditCategory] = useState<Category | null>(null);
 
-  const { data: categories = [], isLoading } = useCategories();
-  const createMutation = useCreateCategory();
-  const updateMutation = useUpdateCategory();
-  const deleteMutation = useDeleteCategory();
+  const { data: categoriesData = [], isLoading } = useQuery({
+    queryKey: ["getCategories"],
+    queryFn: () =>
+      getCategoriesApi().then((res) => {
+        const d = res.data;
+        return Array.isArray(d) ? d : d?.data ?? d?.categories ?? [];
+      }),
+    staleTime: 1000 * 60 * 5,
+  });
 
+  const categories: Category[] = categoriesData;
+
+  // ─── Mutations ────────────────────────────────────────────────────────────
+  const createMutation = useMutation({
+    mutationKey: ["createCategory"],
+    mutationFn: (payload: Parameters<typeof createCategoryApi>[0]) =>
+      createCategoryApi(payload).then((res) => res.data),
+    onSuccess: () => {
+      successNotification("Category Created", "New category added");
+      queryClient.invalidateQueries({ queryKey: ["getCategories"] });
+    },
+    onError: (err: any) =>
+      errorNotification(
+        "Create Failed",
+        err?.message ?? "Could not create category"
+      ),
+  });
+
+  const updateMutation = useMutation({
+    mutationKey: ["updateCategory"],
+    mutationFn: ({
+      id,
+      payload,
+    }: {
+      id: string;
+      payload: Parameters<typeof updateCategoryApi>[1];
+    }) => updateCategoryApi(id, payload).then((res) => res.data),
+    onSuccess: () => {
+      successNotification("Category Updated", "Changes saved");
+      queryClient.invalidateQueries({ queryKey: ["getCategories"] });
+    },
+    onError: (err: any) =>
+      errorNotification(
+        "Update Failed",
+        err?.message ?? "Could not update category"
+      ),
+  });
+
+  const deleteMutation = useMutation({
+    mutationKey: ["deleteCategory"],
+    mutationFn: (id: string) => deleteCategoryApi(id).then((res) => res.data),
+    onSuccess: () => {
+      successNotification("Category Deleted", "Category removed");
+      queryClient.invalidateQueries({ queryKey: ["getCategories"] });
+      queryClient.invalidateQueries({ queryKey: ["getProducts"] });
+    },
+    onError: (err: any) =>
+      errorNotification(
+        "Delete Failed",
+        err?.message ?? "Could not delete category"
+      ),
+  });
+
+  // ─── Filtered list ────────────────────────────────────────────────────────
   const filtered = useMemo(() => {
     if (!search.trim()) return categories;
     const q = search.toLowerCase();
     return categories.filter(
       (c) =>
-        c.name.toLowerCase().includes(q) || c.slug.toLowerCase().includes(q)
+        c.name.toLowerCase().includes(q) || c.slug?.toLowerCase().includes(q)
     );
   }, [categories, search]);
 
-  // ─── Modal open/close ───
+  // ─── Modal handlers ───────────────────────────────────────────────────────
   const handleOpenCreate = useCallback(() => {
     setEditCategory(null);
     setModalOpen(true);
@@ -68,7 +133,6 @@ const CategoryManager = forwardRef<CategoryManagerHandle>((_props, ref) => {
     handleOpenCreate,
   ]);
 
-  // 🔑 Close the modal AFTER mutation success
   const handleSuccess = useCallback(
     async (data: CategoryFormValues & { color: string; bg: string }) => {
       try {
@@ -90,24 +154,20 @@ const CategoryManager = forwardRef<CategoryManagerHandle>((_props, ref) => {
             description: data.description,
           });
         }
-        // ✅ Only reach here if mutation SUCCEEDED — close the modal
         handleCloseModal();
       } catch {
-        // ❌ Mutation failed — keep modal open so user can retry
-        // toast is already shown by hook's onError
+        // error already shown by mutation onError — keep modal open for retry
       }
     },
     [editCategory, createMutation, updateMutation, handleCloseModal]
   );
 
   const handleDelete = useCallback(
-    (id: string) => {
-      deleteMutation.mutate(id);
-    },
+    (id: string) => deleteMutation.mutate(id),
     [deleteMutation]
   );
 
-  // ─── Columns ───
+  // ─── Columns ──────────────────────────────────────────────────────────────
   const columns: ColumnsType<Category> = useMemo(
     () => [
       {
@@ -156,7 +216,7 @@ const CategoryManager = forwardRef<CategoryManagerHandle>((_props, ref) => {
         key: "productCount",
         width: 110,
         align: "center",
-        sorter: (a, b) => a.productCount - b.productCount,
+        sorter: (a, b) => (a.productCount ?? 0) - (b.productCount ?? 0),
         render: (count: number) => (
           <span
             className={`inline-flex items-center justify-center min-w-8 h-7 px-2 rounded-lg text-[12px] font-bold tabular-nums ${
@@ -165,7 +225,7 @@ const CategoryManager = forwardRef<CategoryManagerHandle>((_props, ref) => {
                 : "bg-blue-50 text-blue-700 ring-1 ring-blue-100"
             }`}
           >
-            {count}
+            {count ?? 0}
           </span>
         ),
       },
@@ -257,6 +317,7 @@ const CategoryManager = forwardRef<CategoryManagerHandle>((_props, ref) => {
     [handleEdit, handleDelete, deleteMutation.isPending]
   );
 
+  // ─── Render ───────────────────────────────────────────────────────────────
   return (
     <>
       <div className="bg-white rounded-2xl border border-slate-200/60 shadow-sm shadow-slate-200/40 overflow-hidden">
@@ -276,13 +337,12 @@ const CategoryManager = forwardRef<CategoryManagerHandle>((_props, ref) => {
                 </span>{" "}
                 categories ·{" "}
                 <span className="font-semibold text-slate-700">
-                  {categories.reduce((s, c) => s + c.productCount, 0)}
+                  {categories.reduce((s, c) => s + (c.productCount ?? 0), 0)}
                 </span>{" "}
                 products
               </p>
             </div>
           </div>
-
           <Button
             type="primary"
             size="small"
@@ -327,7 +387,6 @@ const CategoryManager = forwardRef<CategoryManagerHandle>((_props, ref) => {
         </Spin>
       </div>
 
-      {/* Modal */}
       <CategoryModal
         open={modalOpen}
         onClose={handleCloseModal}

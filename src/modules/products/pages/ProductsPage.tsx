@@ -5,6 +5,7 @@ import React, {
   useRef,
   useEffect,
 } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import {
   HiOutlineBell,
@@ -14,7 +15,13 @@ import {
   HiOutlineSparkles,
   HiOutlineTag,
 } from "react-icons/hi";
-import type { ProductFilterFormValues, Product } from "../types/Product";
+import { Button } from "antd";
+import type { ExportableProduct } from "../utils/Productgenerators";
+import type {
+  ProductFilterFormValues,
+  Product,
+  ProductStatus,
+} from "../types/Product";
 import { PRODUCT_STAT_CONFIG } from "../constants/productConstants";
 import ProductModal, { ProductModalMode } from "../components/ProductModal";
 import AlertBanner from "../components/alerts/AlertBanner";
@@ -22,19 +29,23 @@ import CustomTabs from "../../../components/common/CustomTabs";
 import CategoryManager, {
   CategoryManagerHandle,
 } from "../components/Categorymanager";
-import Productstablesection from "../components/Productstablesection";
-
-import {
-  useProducts,
-  useProductStats,
-  useProductAlerts,
-  useDeleteProduct,
-  useDeleteProducts,
-} from "../hooks/Useproducts";
 import DeleteConfirmModal from "../components/Deleteconfirmmodal";
 import CustomStatCard from "../../../components/common/CustomStatCard";
 import CustomPageHeader from "../../../components/common/CustomPageHeader";
-import { Button } from "antd";
+import {
+  errorNotification,
+  successNotification,
+} from "../../../components/common/Notification";
+import {
+  getProductsApi,
+  getProductStatsApi,
+  getProductAlertsApi,
+  deleteProductApi,
+  deleteProductsApi,
+  updateProductApi,
+} from "../api/Products.api";
+import ProductExportDrawer from "../components/Productexportdrawer";
+import ProductTable from "../components/ProductTable";
 
 const FILTER_DEFAULTS: ProductFilterFormValues = {
   categoryFilter: "all",
@@ -52,7 +63,9 @@ const TABS = [
 const PAGE_SIZE = 10;
 
 const ProductsPage = () => {
-  const [search, setSearch] = useState("");
+  const queryClient = useQueryClient();
+
+  const [search] = useState("");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(PAGE_SIZE);
   const [modalOpen, setModalOpen] = useState(false);
@@ -65,11 +78,9 @@ const ProductsPage = () => {
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
   const categoryManagerRef = useRef<CategoryManagerHandle>(null);
 
-  const {
-    control,
-    watch,
-    formState: { errors },
-  } = useForm<ProductFilterFormValues>({ defaultValues: FILTER_DEFAULTS });
+  const { watch } = useForm<ProductFilterFormValues>({
+    defaultValues: FILTER_DEFAULTS,
+  });
 
   const categoryFilter = watch("categoryFilter");
   const statusFilter = watch("statusFilter");
@@ -82,7 +93,7 @@ const ProductsPage = () => {
         categoryFilter && categoryFilter !== "all" ? categoryFilter : undefined,
       status:
         statusFilter && statusFilter !== "all"
-          ? (statusFilter as any)
+          ? (statusFilter as ProductStatus)
           : undefined,
       dateFrom: dateRange?.[0]?.format("YYYY-MM-DD"),
       dateTo: dateRange?.[1]?.format("YYYY-MM-DD"),
@@ -94,21 +105,85 @@ const ProductsPage = () => {
     [search, categoryFilter, statusFilter, dateRange, page, pageSize]
   );
 
-  const productsQuery = useProducts(queryParams);
-  const statsQuery = useProductStats();
-  const alertsQuery = useProductAlerts();
-  const deleteMutation = useDeleteProduct();
-  const bulkDeleteMutation = useDeleteProducts();
+  const { data: productsData, isLoading: isLoadingProducts } = useQuery({
+    queryKey: ["getProducts", queryParams],
+    queryFn: () => getProductsApi(queryParams).then((res) => res.data),
+    staleTime: 1000 * 30,
+  });
 
-  const products = productsQuery.data?.data || [];
-  const totalProducts = productsQuery.data?.meta.total || 0;
-  const stats = statsQuery.data || {
+  const { data: statsData } = useQuery({
+    queryKey: ["getProductStats"],
+    queryFn: () => getProductStatsApi().then((res) => res.data),
+    staleTime: 1000 * 60,
+  });
+
+  const { data: alertsData } = useQuery({
+    queryKey: ["getProductAlerts"],
+    queryFn: () => getProductAlertsApi().then((res) => res.data),
+    staleTime: 1000 * 60,
+  });
+
+  const deleteMutation = useMutation({
+    mutationKey: ["deleteProduct"],
+    mutationFn: (id: string) => deleteProductApi(id).then((res) => res.data),
+    onSuccess: () => {
+      successNotification("Deleted", "Product removed");
+      queryClient.invalidateQueries({ queryKey: ["getProducts"] });
+      queryClient.invalidateQueries({ queryKey: ["getProductStats"] });
+      queryClient.invalidateQueries({ queryKey: ["getProductAlerts"] });
+      setDeleteTarget(null);
+    },
+    onError: (err: any) =>
+      errorNotification(
+        "Delete Failed",
+        err?.message ?? "Could not delete product"
+      ),
+  });
+
+  const toggleSellableMutation = useMutation({
+    mutationFn: ({ id, isSellable }: { id: string; isSellable: boolean }) =>
+      updateProductApi(id, { isSellable }).then((r) => r.data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["getProducts"] });
+      queryClient.invalidateQueries({ queryKey: ["billing-pos-products"] });
+      queryClient.invalidateQueries({ queryKey: ["inventory-stock"] });
+      successNotification("Updated", "Sellable status changed");
+    },
+    onError: () => errorNotification("Error", "Could not update product"),
+  });
+
+  const bulkDeleteMutation = useMutation({
+    mutationKey: ["deleteProducts"],
+    mutationFn: (ids: string[]) =>
+      deleteProductsApi(ids).then((res) => res.data),
+    onSuccess: () => {
+      successNotification(
+        "Deleted",
+        `${selectedRowKeys.length} products removed`
+      );
+      queryClient.invalidateQueries({ queryKey: ["getProducts"] });
+      queryClient.invalidateQueries({ queryKey: ["getProductStats"] });
+      setSelectedRowKeys([]);
+      setBulkDeleteOpen(false);
+    },
+    onError: (err: any) =>
+      errorNotification(
+        "Bulk Delete Failed",
+        err?.message ?? "Could not delete products"
+      ),
+  });
+
+  const products: Product[] = productsData?.data ?? [];
+  const totalProducts: number = productsData?.meta?.total ?? 0;
+  const stats = statsData ?? {
     total: 0,
     active: 0,
     outOfStock: 0,
     lowStock: 0,
   };
-  const alerts = alertsQuery.data || [];
+  const alerts: any[] = Array.isArray(alertsData)
+    ? alertsData
+    : alertsData?.data ?? [];
   const visibleAlerts = alerts.filter(
     (a) => !dismissedAlerts.includes(a.productId)
   );
@@ -137,9 +212,7 @@ const ProductsPage = () => {
     setModalMode("create");
   }, []);
 
-  const handleSwitchToEdit = useCallback(() => {
-    setModalMode("edit");
-  }, []);
+  const handleSwitchToEdit = useCallback(() => setModalMode("edit"), []);
 
   const handleDelete = useCallback((product: Product) => {
     setDeleteTarget(product);
@@ -150,18 +223,10 @@ const ProductsPage = () => {
     await deleteMutation.mutateAsync(deleteTarget.id);
   }, [deleteTarget, deleteMutation]);
 
-  const handleCloseDelete = useCallback(() => {
-    setDeleteTarget(null);
-  }, []);
-
-  const handleBulkDelete = useCallback(() => {
-    if (selectedRowKeys.length === 0) return;
-    setBulkDeleteOpen(true);
-  }, [selectedRowKeys]);
+  const handleCloseDelete = useCallback(() => setDeleteTarget(null), []);
 
   const handleConfirmBulkDelete = useCallback(async () => {
     await bulkDeleteMutation.mutateAsync(selectedRowKeys as string[]);
-    setSelectedRowKeys([]);
   }, [selectedRowKeys, bulkDeleteMutation]);
 
   const handleOpenCreateCategory = useCallback(() => {
@@ -204,6 +269,31 @@ const ProductsPage = () => {
     setPage(1);
   }, [search, categoryFilter, statusFilter, dateRange]);
 
+  const [exportOpen, setExportOpen] = useState(false);
+
+  const toExportable = useCallback(
+    (): ExportableProduct[] =>
+      products.map((p) => ({
+        id: p.id,
+        name: p.name,
+        sku: p.sku,
+        categoryName:
+          (p as any).category?.name ?? (p as any).categoryName ?? "",
+        categoryColor:
+          (p as any).category?.color ?? (p as any).categoryColor ?? "",
+        unit: p.unit,
+        basePrice: p.basePrice,
+        costPrice: p.costPrice,
+        gstRate: p.gstRate,
+        stock: p.stock,
+        minStock: p.minStock,
+        status: p.status,
+        hsn: (p as any).hsn ?? "",
+        createdAt: (p as any).createdAt,
+      })),
+    [products]
+  );
+
   return (
     <div className="flex flex-col gap-6">
       <CustomPageHeader
@@ -221,6 +311,7 @@ const ProductsPage = () => {
             </Button>
             <Button
               icon={<HiOutlineDownload size={15} />}
+              onClick={() => setExportOpen(true)}
               className="!rounded-xl !h-9"
             >
               Export
@@ -259,7 +350,7 @@ const ProductsPage = () => {
                 key={s.key}
                 icon={s.icon}
                 label={s.label}
-                value={statsQuery.isLoading ? "—" : value}
+                value={isLoadingProducts ? "—" : value}
                 color={s.color}
                 bg={s.bg}
                 tooltip={s.tooltip}
@@ -280,31 +371,26 @@ const ProductsPage = () => {
       </div>
 
       {activeTab === "products" ? (
-        <Productstablesection
+        <ProductTable
           products={products}
           totalProducts={totalProducts}
-          isLoading={productsQuery.isLoading}
+          isLoading={isLoadingProducts}
           page={page}
           pageSize={pageSize}
-          onPageChange={handlePageChange}
-          search={search}
-          onSearchChange={setSearch}
-          control={control}
-          errors={errors}
           selectedRowKeys={selectedRowKeys}
           onSelectionChange={setSelectedRowKeys}
-          onClearSelection={() => setSelectedRowKeys([])}
-          onBulkDelete={handleBulkDelete}
           onView={handleView}
           onEdit={handleEdit}
           onDelete={handleDelete}
-          onManageCategories={() => setActiveTab("categories")}
+          onToggleSellable={(product, val) =>
+            toggleSellableMutation.mutate({ id: product.id, isSellable: val })
+          }
+          onPageChange={handlePageChange}
         />
       ) : (
         <CategoryManager ref={categoryManagerRef} />
       )}
 
-      {/* Product View/Edit/Create Modal */}
       <ProductModal
         open={modalOpen}
         onClose={handleCloseModal}
@@ -331,7 +417,6 @@ const ProductsPage = () => {
         }
       />
 
-      {/*Single delete confirmation */}
       <DeleteConfirmModal
         open={!!deleteTarget}
         onClose={handleCloseDelete}
@@ -360,7 +445,6 @@ const ProductsPage = () => {
         warningMessage="This product will be permanently removed from your inventory. Any sales records, orders, or analytics referencing it may be affected."
       />
 
-      {/*Bulk delete confirmation */}
       <DeleteConfirmModal
         open={bulkDeleteOpen}
         onClose={() => setBulkDeleteOpen(false)}
@@ -370,6 +454,12 @@ const ProductsPage = () => {
         itemName={`${selectedRowKeys.length} selected products`}
         confirmLabel={`Delete ${selectedRowKeys.length} Products`}
         warningMessage={`All ${selectedRowKeys.length} selected products will be permanently removed from your inventory. This affects related sales records and analytics.`}
+      />
+      <ProductExportDrawer
+        open={exportOpen}
+        onClose={() => setExportOpen(false)}
+        products={toExportable()}
+        productCount={totalProducts}
       />
     </div>
   );

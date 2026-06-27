@@ -19,11 +19,6 @@ const InfoPanel: React.FC<InfoPanelProps> = ({ tenant }) => {
         background: `linear-gradient(160deg, ${config.gradientFrom} 0%, ${config.accent} 50%, ${config.gradientTo} 100%)`,
       }}
     >
-      {/* Dot pattern */}
-      <div className="absolute inset-0 opacity-[0.04] bg-[radial-gradient(circle_at_1px_1px,white_1px,transparent_0)] bg-[length:28px_28px]" />
-      <div className="absolute -top-20 -right-20 w-64 h-64 rounded-full bg-white opacity-[0.06]" />
-      <div className="absolute -bottom-32 -left-16 w-72 h-72 rounded-full bg-white opacity-[0.04]" />
-
       {/* Header */}
       <div className="relative flex items-center gap-3">
         <div className="w-11 h-11 rounded-xl flex items-center justify-center bg-white/[0.12] border border-white/10">

@@ -1,72 +1,35 @@
-import api from "../../../lib/axios";
+import authAxios from "../../../lib/axios";
 import type {
-  Product,
-  ProductAlert,
   ProductQueryParams,
-  ProductStats,
-  PaginatedResponse,
   CreateProductPayload,
   UpdateProductPayload,
 } from "../types/Product";
 
-export const productsApi = {
-  // GET /products?search=...&page=1...
-  list: async (
-    params: ProductQueryParams = {}
-  ): Promise<PaginatedResponse<Product>> => {
-    const { data } = await api.get<PaginatedResponse<Product>>("/products", {
-      params,
-    });
-    return data;
-  },
+// ─── GET /products ────────────────────────────────────────────────────────────
+export const getProductsApi = (params: ProductQueryParams = {}) =>
+  authAxios.get("/products", { params });
 
-  // GET /products/stats
-  stats: async (): Promise<ProductStats> => {
-    const { data } = await api.get<ProductStats>("/products/stats");
-    return data;
-  },
+// ─── GET /products/stats ──────────────────────────────────────────────────────
+export const getProductStatsApi = () => authAxios.get("/products/stats");
 
-  // GET /products/alerts
-  alerts: async (): Promise<ProductAlert[]> => {
-    const { data } = await api.get<ProductAlert[]>("/products/alerts");
-    return data;
-  },
+// ─── GET /products/alerts ─────────────────────────────────────────────────────
+export const getProductAlertsApi = () => authAxios.get("/products/alerts");
 
-  // GET /products/:id
-  getOne: async (id: string): Promise<Product> => {
-    const { data } = await api.get<Product>(`/products/${id}`);
-    return data;
-  },
+// ─── GET /products/:id ────────────────────────────────────────────────────────
+export const getProductApi = (id: string) => authAxios.get(`/products/${id}`);
 
-  // POST /products
-  create: async (payload: CreateProductPayload): Promise<Product> => {
-    const { data } = await api.post<Product>("/products", payload);
-    return data;
-  },
+// ─── POST /products ───────────────────────────────────────────────────────────
+export const createProductApi = (payload: CreateProductPayload) =>
+  authAxios.post("/products", payload);
 
-  // PATCH /products/:id
-  update: async (
-    id: string,
-    payload: UpdateProductPayload
-  ): Promise<Product> => {
-    const { data } = await api.patch<Product>(`/products/${id}`, payload);
-    return data;
-  },
+// ─── PATCH /products/:id ──────────────────────────────────────────────────────
+export const updateProductApi = (id: string, payload: UpdateProductPayload) =>
+  authAxios.patch(`/products/${id}`, payload);
 
-  // DELETE /products/:id
-  remove: async (id: string): Promise<{ message: string }> => {
-    const { data } = await api.delete<{ message: string }>(`/products/${id}`);
-    return data;
-  },
+// ─── DELETE /products/:id ─────────────────────────────────────────────────────
+export const deleteProductApi = (id: string) =>
+  authAxios.delete(`/products/${id}`);
 
-  // DELETE /products/bulk
-  removeMany: async (
-    ids: string[]
-  ): Promise<{ message: string; count: number }> => {
-    const { data } = await api.delete<{ message: string; count: number }>(
-      "/products/bulk",
-      { data: { ids } }
-    );
-    return data;
-  },
-};
+// ─── DELETE /products/bulk ────────────────────────────────────────────────────
+export const deleteProductsApi = (ids: string[]) =>
+  authAxios.delete("/products/bulk", { data: { ids } });

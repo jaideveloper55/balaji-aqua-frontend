@@ -91,12 +91,15 @@ export interface ExportFilters {
 
 // POS
 
-export const getPOSProductsApi = (search?: string) => {
-  return authAxios.get("/billing/pos/products", {
-    params: search ? { search } : {},
+export const getPOSProductsApi = (search?: string) =>
+  authAxios.get("/products", {
+    params: {
+      search,
+      isSellable: true,
+      pageSize: 100,
+      status: "ACTIVE",
+    },
   });
-};
-
 export const getCustomerPriceApi = (customerId: string, productId: string) => {
   return authAxios.get(
     `/billing/pos/customer-price/${customerId}/${productId}`

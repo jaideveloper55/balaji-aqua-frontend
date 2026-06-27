@@ -96,8 +96,6 @@ export const SOURCE_LABELS: Record<string, string> = {
   STOCK_COUNT_CORRECTION: "Stock Count Correction",
 };
 
-/* --------------------------- Categories ---------------------------- */
-
 export const CATEGORY_OPTIONS = [
   { value: "all", label: "All Categories" },
   { value: "Water Products", label: "Water Products" },

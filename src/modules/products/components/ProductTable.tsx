@@ -1,5 +1,5 @@
-import { useMemo, useCallback } from "react";
-import { Tooltip, Dropdown } from "antd";
+import React, { useMemo, useCallback } from "react";
+import { Switch, Table, Tooltip, Dropdown } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import type { MenuProps } from "antd";
 import {
@@ -9,35 +9,35 @@ import {
   HiOutlinePencil,
   HiOutlineTrash,
   HiOutlineDotsVertical,
+  HiOutlineInbox,
 } from "react-icons/hi";
-import type { Product, ProductStatus } from "../../products/types/Product";
+import type { Product, ProductStatus } from "../types/Product";
 import {
   STATUS_DISPLAY,
   UNIT_DISPLAY,
   getProductAlertSeverity,
-} from "../../products/types/Product";
-import { fmt, fmtDate } from "../../products/utils/productHelpers";
+} from "../types/Product";
+import { fmt, fmtDate } from "../utils/productHelpers";
 import AlertDot from "./AlertDot";
 
-interface UseProductColumnsArgs {
+interface ProductTableProps {
+  products: Product[];
+  totalProducts: number;
+  isLoading?: boolean;
+  page: number;
+  pageSize: number;
+  onPageChange: (page: number, pageSize: number) => void;
+  selectedRowKeys: React.Key[];
+  onSelectionChange: (keys: React.Key[]) => void;
   onView?: (product: Product) => void;
   onEdit: (product: Product) => void;
   onDelete?: (product: Product) => void;
+  onToggleSellable?: (product: Product, value: boolean) => void;
 }
 
-// Static menu — no per-row state needed since clicks are routed via
-// handleMenuClick(record, key) at the Dropdown level.
 const ROW_ACTIONS: MenuProps["items"] = [
-  {
-    key: "view",
-    icon: <HiOutlineEye size={14} />,
-    label: "View Details",
-  },
-  {
-    key: "edit",
-    icon: <HiOutlinePencil size={14} />,
-    label: "Edit Product",
-  },
+  { key: "view", icon: <HiOutlineEye size={14} />, label: "View Details" },
+  { key: "edit", icon: <HiOutlinePencil size={14} />, label: "Edit Product" },
   { type: "divider" },
   {
     key: "delete",
@@ -47,17 +47,24 @@ const ROW_ACTIONS: MenuProps["items"] = [
   },
 ];
 
-export const useProductColumns = ({
+const ProductTable: React.FC<ProductTableProps> = ({
+  products,
+  totalProducts,
+  isLoading,
+  page,
+  pageSize,
+  onPageChange,
+  selectedRowKeys,
+  onSelectionChange,
   onView,
   onEdit,
   onDelete,
-}: UseProductColumnsArgs) => {
-  // 🔑 Centralized handler — stops bubbling and routes to correct callback
+  onToggleSellable,
+}) => {
   const handleMenuClick = useCallback(
     (record: Product, key: string, domEvent: any) => {
       domEvent?.stopPropagation?.();
       domEvent?.preventDefault?.();
-
       if (key === "view") {
         onView ? onView(record) : onEdit(record);
       } else if (key === "edit") {
@@ -79,7 +86,6 @@ export const useProductColumns = ({
         render: (_, record) => {
           const alertSeverity = getProductAlertSeverity(record);
           const cat = record.category;
-
           return (
             <div className="flex items-center gap-3">
               <div className="relative">
@@ -119,13 +125,12 @@ export const useProductColumns = ({
         align: "center",
         render: (_, record) => {
           const c = record.category;
-          if (!c) {
+          if (!c)
             return (
               <span className="text-[11px] text-slate-400 italic">
                 Uncategorized
               </span>
             );
-          }
           return (
             <span
               className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-semibold whitespace-nowrap ring-1 ring-inset"
@@ -177,27 +182,22 @@ export const useProductColumns = ({
           const isOut = stock === 0;
           const ratio =
             r.minStock > 0 ? Math.min((stock / r.minStock) * 100, 100) : 100;
-
           const tooltipText = isOut
             ? "Out of stock — needs immediate restocking"
             : isLow
             ? `Below minimum (${r.minStock}) — reorder needed`
             : `${stock} in stock (min: ${r.minStock})`;
-
           const textColor = isOut
             ? "text-red-600"
             : isLow
             ? "text-amber-600"
             : "text-slate-700";
-
           const barColor = isOut
             ? "bg-red-500"
             : isLow
             ? "bg-amber-400"
             : "bg-emerald-400";
-
           const unitLabel = UNIT_DISPLAY[r.unit]?.slice(0, 3).toLowerCase();
-
           return (
             <Tooltip title={tooltipText}>
               <div className="flex flex-col items-center gap-1.5 cursor-default">
@@ -266,6 +266,46 @@ export const useProductColumns = ({
         },
       },
 
+      // ─── SELLABLE TOGGLE ───
+      {
+        title: (
+          <Tooltip title="Sellable products appear in POS, billing & customer pricing. Raw materials are hidden from sales.">
+            <span className="cursor-help border-b border-dashed border-slate-300">
+              Sellable
+            </span>
+          </Tooltip>
+        ),
+        key: "isSellable",
+        width: 90,
+        align: "center",
+        filters: [
+          { text: "Sellable", value: true },
+          { text: "Raw Material", value: false },
+        ],
+        onFilter: (value, r) => r.isSellable === value,
+        render: (_, record) => (
+          <Tooltip
+            title={
+              record.isSellable
+                ? "Visible in POS & sales — click to mark as raw material"
+                : "Hidden from POS & sales — click to mark as sellable"
+            }
+          >
+            <Switch
+              size="small"
+              checked={record.isSellable}
+              onChange={(val, e) => {
+                (e as any).stopPropagation?.();
+                onToggleSellable?.(record, val);
+              }}
+              style={{
+                backgroundColor: record.isSellable ? "#10b981" : "#cbd5e1",
+              }}
+            />
+          </Tooltip>
+        ),
+      },
+
       // ─── ADDED ───
       {
         title: "Added",
@@ -311,8 +351,51 @@ export const useProductColumns = ({
         ),
       },
     ],
-    [handleMenuClick]
+    [handleMenuClick, onToggleSellable]
   );
 
-  return columns;
+  return (
+    <Table<Product>
+      columns={columns}
+      dataSource={products}
+      rowKey="id"
+      size="middle"
+      tableLayout="fixed"
+      loading={isLoading}
+      scroll={{ x: 1100 }}
+      rowSelection={{
+        selectedRowKeys,
+        onChange: (keys) => onSelectionChange(keys),
+      }}
+      pagination={{
+        current: page,
+        pageSize,
+        total: totalProducts,
+        showSizeChanger: true,
+        pageSizeOptions: ["10", "20", "50"],
+        onChange: onPageChange,
+        showTotal: (total, range) => (
+          <span className="text-[11px] text-slate-500 font-medium">
+            Showing {range[0]}–{range[1]} of {total}
+          </span>
+        ),
+      }}
+      onRow={(record) => ({
+        onClick: () => (onView ? onView(record) : onEdit(record)),
+        className: "cursor-pointer group",
+      })}
+      locale={{
+        emptyText: (
+          <div className="py-10 flex flex-col items-center gap-2 text-slate-400">
+            <HiOutlineInbox size={32} />
+            <p className="text-sm font-medium">No products found</p>
+            <p className="text-xs">Try clearing search or filters</p>
+          </div>
+        ),
+      }}
+      className="product-table"
+    />
+  );
 };
+
+export default ProductTable;

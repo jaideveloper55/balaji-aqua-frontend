@@ -23,7 +23,6 @@ import {
 } from "../utils/Helpers";
 
 import PageHeader from "../components/PageHeader";
-import PrintableInvoice from "../components/PrintableInvoice";
 import POSTab from "../components/tabs/Postab";
 import InvoicesTab from "../components/tabs/Invoices";
 import PaymentsTab, { DateRange } from "../components/tabs/Payments";
@@ -63,6 +62,7 @@ import {
   InvoiceFilters,
   OutstandingFilters,
 } from "../api/billing.api";
+import ThermalReceipt from "../components/ThermalReceipt";
 
 type ExportType = "invoices" | "payments" | "outstanding" | "summary";
 
@@ -184,14 +184,12 @@ const BillingPage = () => {
   const [paymentNotes, setPaymentNotes] = useState("");
   const [collectionSearch, setCollectionSearch] = useState("");
   const [collectionModeFilter, setCollectionModeFilter] = useState("all");
-
-  // ─── Cart state (replaces useCart hook) ────────────────────────────────────
   const [cart, setCart] = useState<any[]>([]);
   const [serverCart, setServerCart] = useState<any>(null);
 
   const productSearchRef = useRef<HTMLInputElement>(null);
 
-  // ─── Fetch Cart ─────────────────────────────────────────────────────────────
+  // Fetch Cart
   const { data: cartData } = useQuery({
     queryKey: ["billing-cart"],
     queryFn: () => getCartApi().then((res) => res.data),
@@ -201,7 +199,6 @@ const BillingPage = () => {
   useEffect(() => {
     if (cartData) {
       setServerCart(cartData);
-      // Map lineTotal → total so CartPanel renders the correct line total
       setCart(
         (cartData.items ?? []).map((item: any) => ({
           ...item,
@@ -305,7 +302,7 @@ const BillingPage = () => {
       });
   };
 
-  // ─── Cart settings mutation ─────────────────────────────────────────────────
+  //Cart settings mutation
   const updateCartSettingsMutation = useMutation({
     mutationKey: ["updateCartSettings"],
     mutationFn: (data: Parameters<typeof updateCartSettingsApi>[0]) =>
@@ -332,7 +329,7 @@ const BillingPage = () => {
   // ─── Filters (computed before queries that depend on them) ─────────────────
   const invoiceApiFilters: InvoiceFilters = useMemo(() => {
     const f: InvoiceFilters = {
-      limit: 200, // increased from 50 so new invoices aren't cut off
+      limit: 200,
       status: STATUS_FILTER_MAP[invoiceStatusFilter],
       search: invoiceSearch || undefined,
     };
@@ -393,11 +390,12 @@ const BillingPage = () => {
     return f;
   }, [collectionDateRange]);
 
-  // ─── Queries ─────────────────────────────────────────────────────────────────
   const { data: posProducts, isLoading: isLoadingProducts } = useQuery({
     queryKey: ["billing-pos-products", { search: productSearch }],
     queryFn: () =>
-      getPOSProductsApi(productSearch || undefined).then((res) => res.data),
+      getPOSProductsApi(productSearch || undefined).then(
+        (res) => res.data.data
+      ),
     staleTime: 1000 * 60 * 2,
   });
 
@@ -436,8 +434,7 @@ const BillingPage = () => {
     enabled: showInvoiceDetail && !!selectedInvoice?.id,
     staleTime: 1000 * 10,
   });
-
-  const filteredProducts: POSProduct[] = posProducts ?? [];
+  const filteredProducts: POSProduct[] = posProducts?.data ?? posProducts ?? [];
 
   // ─── Mappers ─────────────────────────────────────────────────────────────────
   const mapStatus = (inv: any): Invoice["status"] => {
@@ -1111,7 +1108,7 @@ const BillingPage = () => {
       />
       {generatedInvoice && (
         <div className="hidden print:block">
-          <PrintableInvoice invoice={generatedInvoice} />
+          <ThermalReceipt invoice={generatedInvoice} />
         </div>
       )}
 
@@ -1163,7 +1160,7 @@ const BillingPage = () => {
               updateCartSettingsMutation.mutate({ discount: amount })
             }
             onPay={handleProcessPayment}
-            onPrint={() => handlePrint()}
+            onPrint={() => handlePrint(generatedInvoice ?? undefined)}
             onShare={handleShare}
             onNewSale={handleNewSale}
             onIncludeGSTChange={(enabled) =>

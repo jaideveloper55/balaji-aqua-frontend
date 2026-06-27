@@ -2,6 +2,7 @@ import React, { useEffect, useMemo } from "react";
 import { Button, Divider, Input, Modal } from "antd";
 import { Controller, useForm } from "react-hook-form";
 import { useNavigate } from "react-router-dom";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   HiOutlineCube,
   HiOutlinePencil,
@@ -11,20 +12,23 @@ import {
   HiOutlineAnnotation,
   HiOutlineArrowRight,
 } from "react-icons/hi";
-
 import CustomModal from "../../../components/common/CustomModal";
 import CustomInput from "../../../components/common/CustomInput";
 import CustomSelect from "../../../components/common/CustomSelect";
 import SectionLabel from "../../../components/common/SectionLabel";
 
-import { useCreateProduct, useUpdateProduct } from "../hooks/Useproducts";
-import { useCategories } from "../hooks/Usecategories";
+import {
+  errorNotification,
+  successNotification,
+} from "../../../components/common/Notification";
 import type {
   CreateProductPayload,
   UpdateProductPayload,
   ProductFormValues,
 } from "../types/Product";
 import { UNIT_OPTIONS, GST_OPTIONS } from "../types/Product";
+import { getCategoriesApi } from "../api/Categories.api";
+import { createProductApi, updateProductApi } from "../api/Products.api";
 
 export type ProductModalMode = "create" | "edit" | "view";
 
@@ -36,7 +40,6 @@ interface ProductModalProps {
   mode?: ProductModalMode;
   editId?: string;
   onSwitchToEdit?: () => void;
-
   currentStock?: number;
   unitLabel?: string;
   sku?: string;
@@ -89,7 +92,7 @@ const EMPTY_VALUES: ProductFormValues = {
 const numberRule = (label: string, required = false) => ({
   ...(required ? { required: `${label} is required` } : {}),
   validate: (v: unknown) => {
-    if (v === "" || v === undefined || v === null) return true; // required handled above
+    if (v === "" || v === undefined || v === null) return true;
     const n = Number(v);
     if (!Number.isFinite(n)) return "Enter a valid number";
     if (n < 0) return "Cannot be negative";
@@ -110,17 +113,60 @@ const ProductModal: React.FC<ProductModalProps> = ({
   sku,
 }) => {
   const navigate = useNavigate();
-  const createMutation = useCreateProduct();
-  const updateMutation = useUpdateProduct();
-  const { data: categoriesResponse, isLoading: loadingCategories } =
-    useCategories();
+  const queryClient = useQueryClient();
 
-  const loading = createMutation.isPending || updateMutation.isPending;
-  const config = MODE_CONFIG[mode];
   const isView = mode === "view";
   const isCreate = mode === "create";
+  const config = MODE_CONFIG[mode];
 
-  /* ------------------------------ form ------------------------------ */
+  // ─── Queries ──────────────────────────────────────────────────────────────
+  const { data: categoriesResponse, isLoading: loadingCategories } = useQuery({
+    queryKey: ["getCategories"],
+    queryFn: () => getCategoriesApi().then((res) => res.data),
+    staleTime: 1000 * 60 * 5,
+  });
+
+  // ─── Mutations ────────────────────────────────────────────────────────────
+  const createMutation = useMutation({
+    mutationKey: ["createProduct"],
+    mutationFn: (payload: CreateProductPayload) =>
+      createProductApi(payload).then((res) => res.data),
+    onSuccess: () => {
+      successNotification("Product Added", "New product created successfully");
+      queryClient.invalidateQueries({ queryKey: ["getProducts"] });
+      queryClient.invalidateQueries({ queryKey: ["getProductStats"] });
+    },
+    onError: (err: any) =>
+      errorNotification(
+        "Create Failed",
+        err?.message ?? "Could not create product"
+      ),
+  });
+
+  const updateMutation = useMutation({
+    mutationKey: ["updateProduct"],
+    mutationFn: ({
+      id,
+      payload,
+    }: {
+      id: string;
+      payload: UpdateProductPayload;
+    }) => updateProductApi(id, payload).then((res) => res.data),
+    onSuccess: () => {
+      successNotification("Product Updated", "Changes saved successfully");
+      queryClient.invalidateQueries({ queryKey: ["getProducts"] });
+      queryClient.invalidateQueries({ queryKey: ["getProductStats"] });
+    },
+    onError: (err: any) =>
+      errorNotification(
+        "Update Failed",
+        err?.message ?? "Could not update product"
+      ),
+  });
+
+  const loading = createMutation.isPending || updateMutation.isPending;
+
+  // ─── Form ─────────────────────────────────────────────────────────────────
   const {
     control,
     handleSubmit,
@@ -130,12 +176,11 @@ const ProductModal: React.FC<ProductModalProps> = ({
     defaultValues: { ...EMPTY_VALUES, ...defaultValues },
   });
 
-  // Re-sync whenever the modal opens for a different product / mode
   useEffect(() => {
     if (open) reset({ ...EMPTY_VALUES, ...defaultValues });
   }, [open, defaultValues, reset]);
 
-  /* --------------------------- categories --------------------------- */
+  // ─── Categories ───────────────────────────────────────────────────────────
   const rawCategories: any[] = Array.isArray(categoriesResponse)
     ? categoriesResponse
     : (categoriesResponse as any)?.data ??
@@ -159,7 +204,7 @@ const ProductModal: React.FC<ProductModalProps> = ({
     [rawCategories]
   );
 
-  /* ----------------------------- submit ----------------------------- */
+  // ─── Submit ───────────────────────────────────────────────────────────────
   const toPayload = (data: ProductFormValues): CreateProductPayload => ({
     name: data.name.trim(),
     sku: data.sku.trim().toUpperCase(),
@@ -170,7 +215,6 @@ const ProductModal: React.FC<ProductModalProps> = ({
     basePrice: Number(data.basePrice) || 0,
     costPrice: Number(data.costPrice) || 0,
     gstRate: Number(data.gstRate) || 0,
-
     ...(isCreate ? { stock: Number(data.stock) || 0 } : {}),
     minStock: Number(data.minStock) || 0,
   });
@@ -190,11 +234,11 @@ const ProductModal: React.FC<ProductModalProps> = ({
       onSuccess?.();
       onClose();
     } catch {
-      // toast already shown by hook's onError
+      // error already shown by mutation onError
     }
   };
 
-  /* Dirty-close guard — half-filled product form shouldn't vanish on ESC */
+  // ─── Dirty-close guard ────────────────────────────────────────────────────
   const beforeClose = () =>
     isView || !isDirty
       ? true
@@ -210,7 +254,7 @@ const ProductModal: React.FC<ProductModalProps> = ({
           });
         });
 
-  /* ----------------------------- footer ----------------------------- */
+  // ─── Footer ───────────────────────────────────────────────────────────────
   const renderFooter = () => {
     if (isView) {
       return (
@@ -236,7 +280,6 @@ const ProductModal: React.FC<ProductModalProps> = ({
         </div>
       );
     }
-
     return (
       <div className="flex items-center justify-between gap-3">
         <p className="text-[11px] text-slate-400">
@@ -261,7 +304,7 @@ const ProductModal: React.FC<ProductModalProps> = ({
     );
   };
 
-  /* ----------------------------- render ----------------------------- */
+  // ─── Render ───────────────────────────────────────────────────────────────
   return (
     <CustomModal
       open={open}
@@ -281,7 +324,7 @@ const ProductModal: React.FC<ProductModalProps> = ({
             : ""
         }`}
       >
-        {/* ───────────── Product Information ───────────── */}
+        {/* ── Product Information ── */}
         <section>
           <SectionLabel
             icon={HiOutlineCube}
@@ -306,7 +349,6 @@ const ProductModal: React.FC<ProductModalProps> = ({
               placeholder="e.g. WC-20L-STD"
               errors={errors}
               isrequired
-              
               disabled={isView || mode === "edit"}
               rules={{ required: "SKU is required" }}
             />
@@ -343,7 +385,7 @@ const ProductModal: React.FC<ProductModalProps> = ({
 
         <Divider className="!my-0 !border-slate-100" />
 
-        {/* ───────────── Pricing & Tax ───────────── */}
+        {/* ── Pricing & Tax ── */}
         <section>
           <SectionLabel
             icon={HiOutlineCurrencyRupee}
@@ -394,7 +436,7 @@ const ProductModal: React.FC<ProductModalProps> = ({
 
         <Divider className="!my-0 !border-slate-100" />
 
-        {/* ───────────── Inventory ───────────── */}
+        {/* ── Inventory ── */}
         <section>
           <SectionLabel
             icon={HiOutlineClipboardList}
@@ -416,8 +458,6 @@ const ProductModal: React.FC<ProductModalProps> = ({
                 rules={numberRule("Opening stock")}
               />
             ) : (
-              /* Edit/View: stock is OWNED BY INVENTORY — read-only here,
-                 with a direct path to the place that can change it. */
               <div className="flex flex-col gap-1.5">
                 <span className="flex justify-start py-1 text-sm text-text-primary">
                   Current Stock
@@ -443,7 +483,6 @@ const ProductModal: React.FC<ProductModalProps> = ({
                 </p>
               </div>
             )}
-
             <CustomInput
               name="minStock"
               control={control as any}
@@ -465,7 +504,7 @@ const ProductModal: React.FC<ProductModalProps> = ({
 
         <Divider className="!my-0 !border-slate-100" />
 
-        {/* ───────────── Description ───────────── */}
+        {/* ── Description ── */}
         <section>
           <SectionLabel icon={HiOutlineAnnotation} title="Description" />
           <Controller

@@ -76,7 +76,7 @@ const addPdfHeader = (doc: jsPDF, title: string, subtitle: string) => {
   doc.setFont("helvetica", "normal");
   doc.text(COMPANY_INFO.tagline, 14, 23);
   doc.text(COMPANY_INFO.address, 14, 27);
-  doc.text(`GSTIN: ${COMPANY_INFO.gstin}  ·  ${COMPANY_INFO.phone}`, 14, 31);
+  doc.text(`GSTIN: ${COMPANY_INFO}  ·  ${COMPANY_INFO.phone}`, 14, 31);
 
   doc.setFontSize(14);
   doc.setTextColor(17, 24, 39);

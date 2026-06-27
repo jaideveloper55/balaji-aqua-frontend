@@ -33,6 +33,7 @@ export interface StockItem {
   reorderLevel: number;
   stockHealth: number;
   status: StockStatus;
+  isSellable: boolean;
 }
 
 export interface StockMovement {

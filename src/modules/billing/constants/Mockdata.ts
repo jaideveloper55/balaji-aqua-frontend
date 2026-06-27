@@ -1,9 +1,8 @@
 export const COMPANY_INFO = {
-  name: "Balaji Aqua",
+  name: "Sri Balaji Aqua Water",
   tagline: "Pure Water · Pure Trust",
-  address: "12, Industrial Estate, Ambattur, Chennai - 600058",
-  phone: "+91 44 2625 8899",
+  address:
+    "No:131 vasanthavadi village, Madurathangam, Chengalpattu, Tamilnadu 603313",
+  phone: "9840531612, 8015929891",
   email: "contact@balajiaqua.com",
-  gstin: "33AABCB1234C1Z5",
-  fssai: "12345678901234",
 };

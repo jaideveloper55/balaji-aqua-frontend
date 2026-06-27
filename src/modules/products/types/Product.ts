@@ -43,6 +43,7 @@ export interface Product {
   hsn?: string | null;
   unit: ProductUnit;
   status: ProductStatus;
+  isSellable: boolean;
 
   // Pricing
   basePrice: number;
@@ -78,15 +79,14 @@ export interface CreateProductPayload {
   minStock?: number;
 }
 
-export type UpdateProductPayload = Partial<CreateProductPayload>;
-
-// ─── FORM VALUES ──────────────────────────────────────────────────────────
-// What the form uses internally (strings for inputs, etc.)
+export type UpdateProductPayload = Partial<CreateProductPayload> & {
+  isSellable?: boolean;
+};
 
 export interface ProductFormValues {
   name: string;
   sku: string;
-  categoryId: string; // ⚠️ renamed from `category` — now references Category.id
+  categoryId: string;
   unit: ProductUnit;
   basePrice: number | string;
   gstRate: number | string;
@@ -98,12 +98,10 @@ export interface ProductFormValues {
 }
 
 export interface ProductFilterFormValues {
-  categoryFilter: string; // "all" or Category.id
-  statusFilter: string; // "all" | ProductStatus
+  categoryFilter: string;
+  statusFilter: string;
   dateRange: [Dayjs | null, Dayjs | null] | null;
 }
-
-// ─── QUERY (for list endpoint) ────────────────────────────────────────────
 
 export interface ProductQueryParams {
   search?: string;

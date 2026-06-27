@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
 import { message } from "antd";
 import { HiOutlinePlus, HiOutlineDownload } from "react-icons/hi";
+import { MdEventNote } from "react-icons/md";
 import { useEvents } from "../hooks/useEvents";
 import { EventFilters, EventOrder } from "../types/Events";
 import { DEFAULT_PAGE_SIZE } from "../constants/Events.constants";
@@ -11,6 +12,7 @@ import CreateEventModal from "../modals/Createeventmodal";
 import CancelEventModal from "../modals/Canceleventmodal";
 import EventTable from "../components/Eventtable";
 import PrintEventModal from "../modals/Printeventmodal";
+import CustomPageHeader from "../../../components/common/CustomPageHeader";
 
 const EventOrdersPage = () => {
   const { stats, filterEvents, createEvent, updateStatus, cancelEvent } =
@@ -46,6 +48,7 @@ const EventOrdersPage = () => {
   const handlePrint = (e: EventOrder) => {
     setPrintTarget(e);
   };
+
   const handleMarkComplete = (e: EventOrder) => {
     updateStatus(e.id, "COMPLETED");
     message.success(`Marked ${e.eventNumber} as completed`);
@@ -66,30 +69,28 @@ const EventOrdersPage = () => {
   return (
     <div className="space-y-5">
       {/* Page Header */}
-      <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
-            Event / Function Orders
-          </h1>
-          <p className="text-sm text-slate-500 mt-1">
-            Manage bulk water and beverage orders for events and functions
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <button
-            onClick={() => message.info("Export coming soon")}
-            className="px-4 py-2.5 rounded-xl border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 font-medium text-sm transition flex items-center gap-2 shadow-sm"
-          >
-            <HiOutlineDownload /> Export
-          </button>
-          <button
-            onClick={() => setCreateOpen(true)}
-            className="px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-medium text-sm transition flex items-center gap-2 shadow-sm"
-          >
-            <HiOutlinePlus className="w-5 h-5" /> Create Event Order
-          </button>
-        </div>
-      </div>
+      <CustomPageHeader
+        icon={<MdEventNote className="w-6 h-6 text-white" />}
+        iconBg="bg-blue-600"
+        title="Event / Function Orders"
+        subtitle="Manage bulk water and beverage orders for events and functions"
+        actions={
+          <>
+            <button
+              onClick={() => message.info("Export coming soon")}
+              className="px-4 py-2.5 rounded-xl border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 font-medium text-sm transition flex items-center gap-2 shadow-sm"
+            >
+              <HiOutlineDownload /> Export
+            </button>
+            <button
+              onClick={() => setCreateOpen(true)}
+              className="px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-medium text-sm transition flex items-center gap-2 shadow-sm"
+            >
+              <HiOutlinePlus className="w-5 h-5" /> Create Event Order
+            </button>
+          </>
+        }
+      />
 
       {/* Stats */}
       <EventStatCards stats={stats} />
@@ -145,7 +146,7 @@ const EventOrdersPage = () => {
           address: "Your address",
           phone: "+91 ...",
           gstNumber: "33XXXXX...",
-          logoUrl: "/logo.png", // currently shows 💧 emoji — swap if you want
+          logoUrl: "/logo.png",
         }}
       />
     </div>

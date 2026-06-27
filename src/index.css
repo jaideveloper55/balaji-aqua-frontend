@@ -11,3 +11,42 @@ body {
   margin: 0;
   padding: 0;
 }
+
+@page {
+  size: 80mm auto; /* 80mm wide, height grows to fit content only */
+  margin: 0; /* no page margins — thermal rolls have none */
+}
+
+/* On screen: receipt hidden (never shows on the dashboard). */
+#thermal-receipt {
+  display: none;
+}
+
+@media print {
+  /* Hide everything, then reveal only the receipt. */
+  body * {
+    visibility: hidden;
+  }
+  #thermal-receipt,
+  #thermal-receipt * {
+    visibility: visible;
+  }
+  #thermal-receipt {
+    display: block !important;
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 80mm;
+    /* Trim any trailing whitespace so the strip ends at the content */
+    height: auto;
+  }
+
+  /* Stop the browser from forcing extra blank page height */
+  html,
+  body {
+    width: 80mm;
+    height: auto;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+}

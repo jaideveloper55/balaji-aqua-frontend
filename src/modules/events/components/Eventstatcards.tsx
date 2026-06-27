@@ -6,6 +6,7 @@ import {
 } from "react-icons/hi";
 import { formatINR } from "../constants/Events.constants";
 import type { EventStats } from "../types/Events";
+import CustomStatCard from "../../../components/common/CustomStatCard";
 
 interface Props {
   stats: EventStats;
@@ -14,38 +15,35 @@ interface Props {
 const cards = [
   {
     key: "totalEvents",
-    label: "TOTAL EVENTS",
+    label: "Total Events",
     icon: HiOutlineCalendar,
-    iconBg: "bg-blue-50",
-    iconColor: "text-blue-600",
-    accent: "border-slate-200",
+    color: "#2563eb",
+    bg: "#eff6ff",
   },
   {
     key: "upcomingEvents",
-    label: "UPCOMING",
+    label: "Upcoming",
     icon: HiOutlineClock,
-    iconBg: "bg-cyan-50",
-    iconColor: "text-cyan-600",
-    accent: "border-slate-200",
+    color: "#0891b2",
+    bg: "#ecfeff",
   },
   {
     key: "totalRevenue",
-    label: "TOTAL REVENUE",
+    label: "Total Revenue",
     icon: HiOutlineCurrencyRupee,
-    iconBg: "bg-emerald-50",
-    iconColor: "text-emerald-600",
-    accent: "border-emerald-200",
+    color: "#059669",
+    bg: "#ecfdf5",
     money: true,
   },
   {
     key: "pendingDues",
-    label: "PENDING DUES",
+    label: "Pending Dues",
     icon: HiOutlineExclamationCircle,
-    iconBg: "bg-amber-50",
-    iconColor: "text-amber-600",
-    accent: "border-amber-200",
+    color: "#dc2626",
+    bg: "#fff7ed",
     money: true,
-    danger: true,
+    alert: true,
+    tooltip: "Total outstanding dues across all events",
   },
 ] as const;
 
@@ -53,31 +51,21 @@ const EventStatCards = ({ stats }: Props) => {
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
       {cards.map((c) => {
-        const value = stats[c.key as keyof EventStats];
+        const raw = stats[c.key as keyof EventStats];
         const Icon = c.icon;
+        const value = "money" in c && c.money ? formatINR(raw as number) : raw;
+
         return (
-          <div
+          <CustomStatCard
             key={c.key}
-            className={`bg-white rounded-2xl border ${c.accent} px-5 py-4 flex items-center gap-4 transition hover:shadow-md hover:-translate-y-0.5 duration-200`}
-          >
-            <div
-              className={`w-12 h-12 rounded-xl ${c.iconBg} ${c.iconColor} flex items-center justify-center shrink-0`}
-            >
-              <Icon className="w-6 h-6" />
-            </div>
-            <div className="min-w-0">
-              <div
-                className={`text-2xl font-bold tracking-tight ${
-                  "danger" in c && c.danger ? "text-red-600" : "text-slate-900"
-                }`}
-              >
-                {"money" in c && c.money ? formatINR(value as number) : value}
-              </div>
-              <div className="text-[11px] font-semibold text-slate-500 tracking-wider mt-0.5">
-                {c.label}
-              </div>
-            </div>
-          </div>
+            icon={<Icon className="w-5 h-5" />}
+            label={c.label}
+            value={value as string | number}
+            color={c.color}
+            bg={c.bg}
+            alert={"alert" in c ? c.alert : false}
+            tooltip={"tooltip" in c ? c.tooltip : undefined}
+          />
         );
       })}
     </div>

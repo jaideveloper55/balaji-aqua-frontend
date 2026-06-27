@@ -1,41 +1,24 @@
-import api from "../../../lib/axios";
+import authAxios from "../../../lib/axios";
 import type {
-  Category,
   CreateCategoryPayload,
   UpdateCategoryPayload,
 } from "../types/Product";
 
-export const categoriesApi = {
-  // GET /categories
-  list: async (): Promise<Category[]> => {
-    const { data } = await api.get<Category[]>("/categories");
-    return data;
-  },
+// ─── GET /categories ──────────────────────────────────────────────────────────
+export const getCategoriesApi = () => authAxios.get("/categories");
 
-  // GET /categories/:id
-  getOne: async (id: string): Promise<Category> => {
-    const { data } = await api.get<Category>(`/categories/${id}`);
-    return data;
-  },
+// ─── GET /categories/:id ──────────────────────────────────────────────────────
+export const getCategoryApi = (id: string) =>
+  authAxios.get(`/categories/${id}`);
 
-  // POST /categories
-  create: async (payload: CreateCategoryPayload): Promise<Category> => {
-    const { data } = await api.post<Category>("/categories", payload);
-    return data;
-  },
+// ─── POST /categories ─────────────────────────────────────────────────────────
+export const createCategoryApi = (payload: CreateCategoryPayload) =>
+  authAxios.post("/categories", payload);
 
-  // PATCH /categories/:id
-  update: async (
-    id: string,
-    payload: UpdateCategoryPayload
-  ): Promise<Category> => {
-    const { data } = await api.patch<Category>(`/categories/${id}`, payload);
-    return data;
-  },
+// ─── PATCH /categories/:id ────────────────────────────────────────────────────
+export const updateCategoryApi = (id: string, payload: UpdateCategoryPayload) =>
+  authAxios.patch(`/categories/${id}`, payload);
 
-  // DELETE /categories/:id
-  remove: async (id: string): Promise<{ message: string }> => {
-    const { data } = await api.delete<{ message: string }>(`/categories/${id}`);
-    return data;
-  },
-};
+// ─── DELETE /categories/:id ───────────────────────────────────────────────────
+export const deleteCategoryApi = (id: string) =>
+  authAxios.delete(`/categories/${id}`);

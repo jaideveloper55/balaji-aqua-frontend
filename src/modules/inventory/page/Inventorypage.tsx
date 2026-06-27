@@ -177,7 +177,6 @@ const Inventorypage = () => {
     stockOutMutation.isPending ||
     adjustMutation.isPending;
 
-  /* -------------------------- derived ------------------------------ */
   const stockItems: StockItem[] = stockData?.data ?? [];
   const lowStockItems: LowStockRow[] = lowStockData?.data ?? [];
   const movements = movementsData?.data ?? [];
@@ -195,14 +194,12 @@ const Inventorypage = () => {
     [summary]
   );
 
-  /* ----------------------------- actions --------------------------- */
   const openModal = (mode: MovementType, product: StockItem | null = null) => {
     setModalMode(mode);
     setModalProduct(product);
     setModalOpen(true);
   };
 
-  // Map the ONE modal form to the THREE backend payloads by action.
   const handleSubmit = (
     values: StockEntryFormValues & { mode: MovementType }
   ) => {
@@ -216,7 +213,6 @@ const Inventorypage = () => {
     } else if (values.mode === "stock_out") {
       stockOutMutation.mutate({ ...common, quantity, source: values.source });
     } else {
-      // adjustment: backend wants countedQuantity (absolute physical count)
       adjustMutation.mutate({ ...common, countedQuantity: quantity });
     }
   };
@@ -230,7 +226,6 @@ const Inventorypage = () => {
       }));
   };
 
-  /* ------------------------------ render ---------------------------- */
   return (
     <div className="flex flex-col gap-6 mx-auto">
       <CustomPageHeader
@@ -298,7 +293,6 @@ const Inventorypage = () => {
         accentColor={activeTab === "alerts" ? "#dc2626" : "#2563eb"}
       />
 
-      {/* ------------------------- Tab: Stock ------------------------- */}
       {activeTab === "stock" && (
         <SectionCard
           icon={<HiOutlineCube size={19} />}
@@ -324,7 +318,6 @@ const Inventorypage = () => {
         </SectionCard>
       )}
 
-      {/* ------------------------- Tab: Alerts ------------------------ */}
       {activeTab === "alerts" && (
         <SectionCard
           icon={<HiOutlineBell size={19} />}
@@ -375,7 +368,6 @@ const Inventorypage = () => {
         </SectionCard>
       )}
 
-      {/* Export drawer — covers Stock List, Low Stock Alerts, and Movement History */}
       <InventoryExportDrawer
         open={exportOpen}
         onClose={() => setExportOpen(false)}
@@ -391,7 +383,6 @@ const Inventorypage = () => {
         movements={movements}
       />
 
-      {/* One modal serves all three actions */}
       <Stockentrymodal
         open={modalOpen}
         mode={modalMode}
