@@ -71,13 +71,6 @@ const AppHeader: React.FC<AppHeaderProps> = ({
         </div>
 
         <div className="flex items-center gap-2 shrink-0">
-          <div
-            className={`hidden sm:flex items-center gap-1.5 ${theme.pillBg} ${theme.pillText} px-3 py-1.5 rounded-full text-xs font-semibold`}
-          >
-            <LogoIcon size={11} />
-            <span>Phase 1</span>
-          </div>
-
           <div className="relative">
             <button
               onClick={onToggleProfile}

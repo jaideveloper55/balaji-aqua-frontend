@@ -36,7 +36,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ tenant, onTenantChange }) => {
       loginApi(data).then((res) => res.data),
     onSuccess: (data) => {
       useAuthStore.getState().setAuth(data);
-      navigate("/admin/dashboard");
+      navigate("/admin/customers");
     },
   });
 

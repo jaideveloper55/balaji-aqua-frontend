@@ -1,7 +1,7 @@
 import { HiOutlineCheckCircle, HiOutlineOfficeBuilding } from "react-icons/hi";
 import { useAuthStore } from "../../../store/auth.store";
 import { successNotification } from "../../../components/common/Notification";
-import { queryClient } from "../../../lib/queryClient";
+import { useQueryClient } from "@tanstack/react-query";
 
 const COMPANY_TYPE_LABELS: Record<string, { label: string; color: string }> = {
   WATER_PLANT: {
@@ -18,6 +18,7 @@ const MyCompaniesList = () => {
   const companies = useAuthStore((s) => s.companies);
   const activeCompanyId = useAuthStore((s) => s.activeCompanyId);
   const setActiveCompany = useAuthStore((s) => s.setActiveCompany);
+  const queryClient = useQueryClient();
 
   const handleSwitch = (id: string, name: string) => {
     if (id === activeCompanyId) return;
