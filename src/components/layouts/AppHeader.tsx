@@ -36,7 +36,7 @@ const AppHeader: React.FC<AppHeaderProps> = ({
   onOpenMobileSidebar,
 }) => {
   const { theme } = config;
-  const LogoIcon = config.logoIcon;
+  
 
   // Pull real user data from Zustand
   const user = useAuthStore((s) => s.user);
