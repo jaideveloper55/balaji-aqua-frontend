@@ -16,6 +16,9 @@ interface AuthState {
   accessToken: string | null;
   refreshToken: string | null;
 
+  hasHydrated: boolean;
+  setHasHydrated: (v: boolean) => void;
+
   // ── Actions ──
   setAuth: (data: LoginResponse) => void;
   setAccessToken: (token: string) => void;
@@ -36,6 +39,8 @@ export const useAuthStore = create<AuthState>()(
       activeCompanyId: null,
       accessToken: null,
       refreshToken: null,
+      hasHydrated: false,
+      setHasHydrated: (v) => set({ hasHydrated: v }),
 
       setAuth: (data) =>
         set({
@@ -52,7 +57,10 @@ export const useAuthStore = create<AuthState>()(
         const { companies } = get();
         const exists = companies.some((c) => c.id === companyId);
         if (!exists) return;
+
         set({ activeCompanyId: companyId });
+
+        window.location.href = "/admin/customers";
       },
 
       logout: () =>
@@ -73,12 +81,24 @@ export const useAuthStore = create<AuthState>()(
 
       getActiveTenant: () => {
         const company = get().getActiveCompany();
-        if (!company) return "sri-balaji-aqua"; // default
+        if (!company) return "sri-balaji-aqua";
         return COMPANY_TYPE_TO_TENANT[company.type];
       },
     }),
     {
-      name: "balaji-aqua-auth", // localStorage key
+      name: "balaji-aqua-auth",
+
+      onRehydrateStorage: () => (state) => {
+        state?.setHasHydrated(true);
+      },
+
+      partialize: (state) => ({
+        user: state.user,
+        companies: state.companies,
+        activeCompanyId: state.activeCompanyId,
+        accessToken: state.accessToken,
+        refreshToken: state.refreshToken,
+      }),
     }
   )
 );

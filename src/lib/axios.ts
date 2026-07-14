@@ -32,8 +32,11 @@ authAxios.interceptors.request.use(
       config.headers.Authorization = `Bearer ${accessToken}`;
     }
 
-    if (activeCompanyId) {
-      config.headers["X-Company-Id"] = activeCompanyId;
+    const companyId =
+      activeCompanyId ?? localStorage.getItem("activeCompanyId");
+
+    if (companyId) {
+      config.headers["X-Company-Id"] = companyId;
     }
 
     return config;

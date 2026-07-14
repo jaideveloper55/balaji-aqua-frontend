@@ -1,14 +1,19 @@
 import React, { useEffect, useState, useRef } from "react";
 import { useLocation, useNavigate, Outlet } from "react-router-dom";
 import { useMutation } from "@tanstack/react-query";
-import { getOrgConfig, ORG_CONFIGS } from "../../config/orgConfig";
+import { ORG_CONFIGS } from "../../config/orgConfig";
 import { useAuthStore } from "../../store/auth.store";
 import { logoutApi } from "../../modules/auth/api/auth.api";
-
 import DesktopSidebar from "./DesktopSidebar";
 import MobileSidebar from "./MobileSidebar";
 import AppHeader from "./AppHeader";
 
+interface MenuItem {
+  id: string;
+  label: string;
+  href: string;
+  icon?: React.ComponentType<{ className?: string }>;
+}
 interface AdminLayoutProps {
   children?: React.ReactNode;
   orgId?: string;
@@ -18,16 +23,24 @@ interface AdminLayoutProps {
 const SIDEBAR_EXPANDED = 260;
 const SIDEBAR_COLLAPSED = 72;
 
-const AdminLayout: React.FC<AdminLayoutProps> = ({
-  children,
-  orgId,
-  onOrgSwitch,
-}) => {
+const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
   const location = useLocation();
   const navigate = useNavigate();
 
-  const config = getOrgConfig(orgId);
-  const { menuItems: items } = config;
+  const companies = useAuthStore((s) => s.companies);
+  const setActiveCompany = useAuthStore((s) => s.setActiveCompany);
+  const getActiveCompany = useAuthStore((s) => s.getActiveCompany);
+
+  const activeCompany = getActiveCompany();
+
+  const allOrgs = Object.values(ORG_CONFIGS);
+
+  const config: any =
+    activeCompany?.type === "BEVERAGE" ? allOrgs[1] : allOrgs[0];
+
+  const otherOrgs = allOrgs.filter((o: any) => o.id !== config.id);
+
+  const { menuItems: items } = config as { menuItems: MenuItem[] };
 
   // Real user from auth store
   const user = useAuthStore((s) => s.user);
@@ -103,19 +116,12 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({
   // Real logout — clears tokens, hits API, redirects
   const handleLogout = () => logout.mutate();
 
-  const otherOrgs = Object.values(ORG_CONFIGS).filter(
-    (c) => c.id !== config.id
-  );
-
-  const handleOrgSwitch = (newOrgId: string) => {
-    setIsProfileOpen(false);
-    setIsMobileSidebarOpen(false);
-    if (onOrgSwitch) {
-      onOrgSwitch(newOrgId);
-    } else {
-      localStorage.setItem("orgId", newOrgId);
-      window.location.href = "/admin/dashboard";
-    }
+  const handleOrgSwitch = (orgConfigId: string) => {
+    const targetType =
+      orgConfigId === "royal-beverage" ? "BEVERAGE" : "WATER_PLANT";
+    const realCompany = companies.find((c) => c.type === targetType);
+    if (!realCompany) return;
+    setActiveCompany(realCompany.id);
   };
 
   const handleMobileMenuClick = (id: string) => {
