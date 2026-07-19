@@ -1,478 +1,315 @@
-import { useState } from "react";
+import React, { useState } from "react";
+import dayjs from "dayjs";
 import {
   HiOutlineRefresh,
-  HiOutlineCalendar,
-  HiOutlinePlus,
   HiOutlineCheckCircle,
-  HiOutlinePause,
-  HiOutlineLightningBolt,
+  HiOutlineCalendar,
   HiOutlineExclamation,
+  HiOutlinePlus,
+  HiOutlinePause,
+  HiOutlinePlay,
+  HiOutlineLightningBolt,
+  HiOutlineTruck,
+  HiOutlineCube,
+  HiOutlineArchive,
+  HiOutlineOfficeBuilding,
+  HiOutlineFolder,
+  HiOutlineClipboardCheck,
 } from "react-icons/hi";
-import { CATEGORY_META } from "../constants/Expenses.constants";
-import RecurringFormModal from "./Recurringformmodal";
+import Recurringformmodal, { RecurringFormValues } from "./Recurringformmodal";
+import { successNotification } from "../../../components/common/Notification";
 
-interface RecurringRow {
-  id: string;
-  title: string;
-  vendor: string;
-  category: string;
-  amount: number;
-  frequency: "monthly" | "quarterly" | "yearly" | "weekly";
-  nextDueDate: string;
-  daysUntilDue: number;
-  isActive: boolean;
-}
+import type { RecurringExpense } from "../types/Expenses";
+import { MOCK_RECURRING, RECURRING_STATS } from "../constants/Recurringmockdata";
+import { HiOutlineWrench } from "react-icons/hi2";
 
-const INITIAL_RECURRING: RecurringRow[] = [
-  {
-    id: "R-001",
-    title: "Plant Rent",
-    vendor: "Sundaram Property",
-    category: "rent",
-    amount: 12000,
-    frequency: "monthly",
-    nextDueDate: "2026-06-01",
-    daysUntilDue: 28,
-    isActive: true,
+const inr = (n: number) =>
+  `₹${new Intl.NumberFormat("en-IN", { maximumFractionDigits: 0 }).format(
+    n ?? 0
+  )}`;
+
+const CATEGORY_ICON: Record<
+  string,
+  { icon: React.ReactNode; color: string; bg: string }
+> = {
+  Utilities: {
+    icon: <HiOutlineLightningBolt size={22} />,
+    color: "#d97706",
+    bg: "#fffbeb",
   },
-  {
-    id: "R-002",
-    title: "Electricity Bill",
-    vendor: "TN Electricity Board",
-    category: "utilities",
-    amount: 18500,
-    frequency: "monthly",
-    nextDueDate: "2026-05-15",
-    daysUntilDue: 11,
-    isActive: true,
+  "Vehicle & Fuel": {
+    icon: <HiOutlineTruck size={22} />,
+    color: "#2563eb",
+    bg: "#eff6ff",
   },
-  {
-    id: "R-003",
-    title: "Internet & WiFi",
-    vendor: "Airtel Business",
-    category: "utilities",
-    amount: 1500,
-    frequency: "monthly",
-    nextDueDate: "2026-05-10",
-    daysUntilDue: 6,
-    isActive: true,
+  "Plant Operations": {
+    icon: <HiOutlineCube size={22} />,
+    color: "#0891b2",
+    bg: "#ecfeff",
   },
-  {
-    id: "R-004",
-    title: "Vehicle Insurance",
-    vendor: "ICICI Lombard",
-    category: "vehicle",
-    amount: 24000,
-    frequency: "yearly",
-    nextDueDate: "2026-08-15",
-    daysUntilDue: 103,
-    isActive: true,
+  Packaging: {
+    icon: <HiOutlineArchive size={22} />,
+    color: "#7c3aed",
+    bg: "#f5f3ff",
   },
-  {
-    id: "R-005",
-    title: "BIS License Renewal",
-    vendor: "Bureau of Indian Standards",
-    category: "compliance",
-    amount: 35000,
-    frequency: "yearly",
-    nextDueDate: "2026-05-08",
-    daysUntilDue: 4,
-    isActive: true,
+  "Rent & Lease": {
+    icon: <HiOutlineOfficeBuilding size={22} />,
+    color: "#4f46e5",
+    bg: "#eef2ff",
   },
-  {
-    id: "R-006",
-    title: "FSSAI License",
-    vendor: "FSSAI",
-    category: "compliance",
-    amount: 7500,
-    frequency: "yearly",
-    nextDueDate: "2026-09-22",
-    daysUntilDue: 141,
-    isActive: false,
+  Repairs: {
+    icon: <HiOutlineWrench size={22} />,
+    color: "#ea580c",
+    bg: "#fff7ed",
   },
-];
+  Office: {
+    icon: <HiOutlineFolder size={22} />,
+    color: "#0d9488",
+    bg: "#f0fdfa",
+  },
+  Compliance: {
+    icon: <HiOutlineClipboardCheck size={22} />,
+    color: "#dc2626",
+    bg: "#fef2f2",
+  },
+};
 
-const FREQ_META: Record<string, { label: string; bg: string; color: string }> =
-  {
-    monthly: {
-      label: "Monthly",
-      bg: "bg-blue-50 border-blue-200",
-      color: "text-blue-700",
-    },
-    quarterly: {
-      label: "Quarterly",
-      bg: "bg-purple-50 border-purple-200",
-      color: "text-purple-700",
-    },
-    yearly: {
-      label: "Yearly",
-      bg: "bg-indigo-50 border-indigo-200",
-      color: "text-indigo-700",
-    },
-    weekly: {
-      label: "Weekly",
-      bg: "bg-cyan-50 border-cyan-200",
-      color: "text-cyan-700",
-    },
-  };
+const FREQ_STYLE: Record<string, string> = {
+  MONTHLY: "bg-blue-50 text-blue-700",
+  YEARLY: "bg-indigo-50 text-indigo-700",
+  QUARTERLY: "bg-violet-50 text-violet-700",
+  WEEKLY: "bg-cyan-50 text-cyan-700",
+};
 
-const formatINR = (n: number) =>
-  new Intl.NumberFormat("en-IN", {
-    style: "currency",
-    currency: "INR",
-    maximumFractionDigits: 0,
-  }).format(n);
+const freqLabel = (f: string) => f.charAt(0) + f.slice(1).toLowerCase();
 
-const formatDate = (s: string) =>
-  new Date(s).toLocaleDateString("en-IN", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  });
+const Recurringpanel: React.FC = () => {
+  const [items, setItems] = useState<RecurringExpense[]>(MOCK_RECURRING);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editTarget, setEditTarget] = useState<RecurringExpense | null>(null);
 
-const RecurringPanel = () => {
-  const [recurring, setRecurring] = useState<RecurringRow[]>(INITIAL_RECURRING);
-  const [formOpen, setFormOpen] = useState(false);
-  const [editing, setEditing] = useState<RecurringRow | null>(null);
-  const [toast, setToast] = useState<string | null>(null);
-
-  const showToast = (msg: string) => {
-    setToast(msg);
-    setTimeout(() => setToast(null), 3000);
+  const openAdd = () => {
+    setEditTarget(null);
+    setModalOpen(true);
   };
 
   const togglePause = (id: string) => {
-    setRecurring((prev) =>
-      prev.map((r) => (r.id === id ? { ...r, isActive: !r.isActive } : r))
+    setItems((prev) =>
+      prev.map((i) => (i.id === id ? { ...i, isPaused: !i.isPaused } : i))
     );
-    const item = recurring.find((r) => r.id === id);
-    showToast(
-      item?.isActive ? `⏸ Paused "${item.title}"` : `▶ Resumed "${item?.title}"`
-    );
-  };
-
-  const payNow = (item: RecurringRow) => {
-    showToast(
-      `💸 Processing payment of ${formatINR(item.amount)} for ${item.title}`
-    );
-    // In real app: create expense entry + update next due date
-    setRecurring((prev) =>
-      prev.map((r) => {
-        if (r.id !== item.id) return r;
-        const nextDate = new Date(r.nextDueDate);
-        if (r.frequency === "monthly")
-          nextDate.setMonth(nextDate.getMonth() + 1);
-        else if (r.frequency === "weekly")
-          nextDate.setDate(nextDate.getDate() + 7);
-        else if (r.frequency === "quarterly")
-          nextDate.setMonth(nextDate.getMonth() + 3);
-        else if (r.frequency === "yearly")
-          nextDate.setFullYear(nextDate.getFullYear() + 1);
-
-        const newDays = Math.floor(
-          (nextDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24)
-        );
-
-        return {
-          ...r,
-          nextDueDate: nextDate.toISOString().split("T")[0],
-          daysUntilDue: newDays,
-        };
-      })
+    const target = items.find((i) => i.id === id);
+    successNotification(
+      target?.isPaused ? "Resumed" : "Paused",
+      `${target?.name} schedule ${target?.isPaused ? "resumed" : "paused"}`
     );
   };
 
-  const handleAdd = () => {
-    setEditing(null);
-    setFormOpen(true);
-  };
-
-  const handleEdit = (item: RecurringRow) => {
-    setEditing(item);
-    setFormOpen(true);
-  };
-
-  const handleSave = (data: any) => {
-    // Calculate days until due
-    const due = new Date(data.nextDueDate);
-    const days = Math.floor(
-      (due.getTime() - Date.now()) / (1000 * 60 * 60 * 24)
+  const handleSubmit = (values: RecurringFormValues) => {
+    successNotification(
+      editTarget ? "Schedule Updated" : "Recurring Added",
+      `${values.name} · ${inr(
+        Number(values.amount)
+      )} ${values.frequency.toLowerCase()}`
     );
-
-    if (editing) {
-      setRecurring((prev) =>
-        prev.map((r) =>
-          r.id === editing.id ? { ...r, ...data, daysUntilDue: days } : r
-        )
-      );
-      showToast(`✓ Updated "${data.title}"`);
-    } else {
-      setRecurring((prev) => [
-        ...prev,
-        { ...data, daysUntilDue: days, isActive: true },
-      ]);
-      showToast(`✓ Recurring schedule "${data.title}" created`);
-    }
+    setModalOpen(false);
   };
 
-  const active = recurring.filter((r) => r.isActive);
-  const totalMonthly = active
-    .filter((r) => r.frequency === "monthly")
-    .reduce((s, r) => s + r.amount, 0);
-  const upcomingThisWeek = active.filter((r) => r.daysUntilDue <= 7).length;
-  const overdueOrUrgent = active.filter((r) => r.daysUntilDue <= 5);
+  const daysUntil = (date: string) => dayjs(date).diff(dayjs(), "day");
 
-  // Sort by days until due
-  const sorted = [...recurring].sort((a, b) => a.daysUntilDue - b.daysUntilDue);
+  const stats = [
+    {
+      label: "Active Recurring",
+      value: String(RECURRING_STATS.activeCount),
+      sub: `${RECURRING_STATS.pausedCount} paused`,
+      icon: <HiOutlineRefresh size={20} />,
+      color: "#2563eb",
+      bg: "#eff6ff",
+    },
+    {
+      label: "Monthly Commitment",
+      value: inr(RECURRING_STATS.monthlyCommitment),
+      sub: "Fixed monthly bills",
+      icon: <HiOutlineCheckCircle size={20} />,
+      color: "#059669",
+      bg: "#ecfdf5",
+    },
+    {
+      label: "Due This Week",
+      value: String(RECURRING_STATS.dueThisWeek),
+      sub: "Need attention soon",
+      icon: <HiOutlineCalendar size={20} />,
+      color: "#d97706",
+      bg: "#fffbeb",
+      alert: true,
+    },
+    {
+      label: "Urgent (≤5 days)",
+      value: String(RECURRING_STATS.urgent),
+      sub: "Pay immediately",
+      icon: <HiOutlineExclamation size={20} />,
+      color: "#dc2626",
+      bg: "#fef2f2",
+    },
+  ];
 
   return (
-    <>
-      {toast && (
-        <div className="fixed bottom-6 right-6 z-50 px-4 py-3 rounded-xl bg-slate-900 text-white text-sm font-semibold shadow-2xl animate-in slide-in-from-bottom-4">
-          {toast}
-        </div>
-      )}
-
-      <div className="space-y-4">
-        {/* Stats */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          <div className="bg-white border border-slate-200 rounded-2xl p-4">
-            <div className="flex items-center gap-2">
-              <div className="p-2 rounded-lg bg-blue-100">
-                <HiOutlineRefresh className="w-4 h-4 text-blue-600" />
-              </div>
-              <div className="text-xs font-semibold text-slate-600 uppercase tracking-wider">
-                Active Recurring
-              </div>
-            </div>
-            <div className="text-2xl font-bold text-slate-900 mt-2">
-              {active.length}
-            </div>
-            <div className="text-xs text-slate-500 mt-1">
-              {recurring.length - active.length} paused
-            </div>
-          </div>
-
-          <div className="bg-white border border-slate-200 rounded-2xl p-4">
-            <div className="flex items-center gap-2">
-              <div className="p-2 rounded-lg bg-emerald-100">
-                <HiOutlineCheckCircle className="w-4 h-4 text-emerald-600" />
-              </div>
-              <div className="text-xs font-semibold text-slate-600 uppercase tracking-wider">
-                Monthly Commitment
-              </div>
-            </div>
-            <div className="text-2xl font-bold text-slate-900 mt-2">
-              {formatINR(totalMonthly)}
-            </div>
-            <div className="text-xs text-slate-500 mt-1">
-              Fixed monthly bills
-            </div>
-          </div>
-
-          <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4">
-            <div className="flex items-center gap-2">
-              <div className="p-2 rounded-lg bg-amber-200">
-                <HiOutlineCalendar className="w-4 h-4 text-amber-700" />
-              </div>
-              <div className="text-xs font-semibold text-amber-700 uppercase tracking-wider">
-                Due This Week
-              </div>
-            </div>
-            <div className="text-2xl font-bold text-amber-800 mt-2">
-              {upcomingThisWeek}
-            </div>
-            <div className="text-xs text-amber-700 mt-1">
-              Need attention soon
-            </div>
-          </div>
-
-          <div className="bg-rose-50 border border-rose-200 rounded-2xl p-4">
-            <div className="flex items-center gap-2">
-              <div className="p-2 rounded-lg bg-rose-200">
-                <HiOutlineExclamation className="w-4 h-4 text-rose-700" />
-              </div>
-              <div className="text-xs font-semibold text-rose-700 uppercase tracking-wider">
-                Urgent (≤5 days)
-              </div>
-            </div>
-            <div className="text-2xl font-bold text-rose-800 mt-2">
-              {overdueOrUrgent.length}
-            </div>
-            <div className="text-xs text-rose-700 mt-1">Pay immediately</div>
-          </div>
-        </div>
-
-        {/* Header */}
-        <div className="bg-white rounded-2xl border border-slate-200 p-3 flex items-center justify-between flex-wrap gap-2">
-          <div>
-            <h3 className="text-sm font-bold text-slate-900">
-              Recurring Expense Schedules
-            </h3>
-            <p className="text-xs text-slate-500 mt-0.5">
-              Auto-generates expense entries on due date
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={handleAdd}
-            className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-rose-600 text-white text-sm font-semibold shadow-md hover:bg-rose-700 active:scale-95 transition-all"
+    <div className="space-y-5">
+      {/* Stat cards */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {stats.map((s) => (
+          <div
+            key={s.label}
+            className={`bg-white rounded-2xl border p-5 ${
+              s.alert ? "border-amber-200" : "border-slate-200"
+            }`}
           >
-            <HiOutlinePlus className="w-4 h-4" />
-            Add Recurring
-          </button>
+            <div
+              className="w-10 h-10 rounded-xl flex items-center justify-center mb-3"
+              style={{ background: s.bg, color: s.color }}
+            >
+              {s.icon}
+            </div>
+            <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wide mb-1">
+              {s.label}
+            </p>
+            <p
+              className="text-[26px] font-extrabold leading-none"
+              style={{ color: s.alert ? "#d97706" : "#0f172a" }}
+            >
+              {s.value}
+            </p>
+            <p className="text-[12px] text-slate-500 mt-1.5">{s.sub}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* Header + Add */}
+      <div className="bg-white rounded-2xl border border-slate-200 p-5 flex items-center justify-between">
+        <div>
+          <h3 className="text-[16px] font-bold text-slate-900">
+            Recurring Expense Schedules
+          </h3>
+          <p className="text-[12px] text-slate-500 mt-0.5">
+            Auto-generates expense entries on due date
+          </p>
         </div>
+        <button
+          onClick={openAdd}
+          className="inline-flex items-center gap-2 px-4 h-10 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-[13px] font-semibold"
+        >
+          <HiOutlinePlus size={16} /> Add Recurring
+        </button>
+      </div>
 
-        {/* List */}
-        <div className="space-y-3">
-          {sorted.map((r) => {
-            const meta = CATEGORY_META[r.category];
-            const freq = FREQ_META[r.frequency];
-            const isUrgent = r.daysUntilDue <= 5 && r.isActive;
-            const isUpcoming =
-              r.daysUntilDue > 5 && r.daysUntilDue <= 14 && r.isActive;
-
-            return (
-              <div
-                key={r.id}
-                className={`bg-white rounded-2xl border overflow-hidden hover:shadow-md transition-all ${
-                  !r.isActive
-                    ? "border-slate-200 opacity-60"
-                    : isUrgent
-                    ? "border-rose-200"
-                    : isUpcoming
-                    ? "border-amber-200"
-                    : "border-slate-200"
-                }`}
-              >
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 p-4 items-center">
-                  {/* Title */}
-                  <div
-                    className="lg:col-span-4 flex items-center gap-3 cursor-pointer"
-                    onClick={() => handleEdit(r)}
-                  >
-                    <div
-                      className={`w-12 h-12 rounded-xl ${meta.iconBg} border flex items-center justify-center text-2xl shrink-0`}
+      {/* Schedule rows */}
+      <div className="space-y-3">
+        {items.map((it) => {
+          const cat = CATEGORY_ICON[it.category] ?? CATEGORY_ICON["Office"];
+          const days = daysUntil(it.nextDue);
+          const isUrgent = !it.isPaused && days >= 0 && days <= 7;
+          return (
+            <div
+              key={it.id}
+              className={`bg-white rounded-2xl border p-4 flex items-center gap-4 ${
+                it.isPaused
+                  ? "border-slate-200 opacity-70"
+                  : isUrgent
+                  ? "border-amber-300"
+                  : "border-slate-200"
+              }`}
+            >
+              {/* Icon + name */}
+              <div className="flex items-center gap-3 flex-1 min-w-0">
+                <div
+                  className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0"
+                  style={{ background: cat.bg, color: cat.color }}
+                >
+                  {cat.icon}
+                </div>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <h4 className="text-[15px] font-bold text-slate-900 truncate">
+                      {it.name}
+                    </h4>
+                    {it.isPaused && (
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-100 text-slate-500">
+                        PAUSED
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-[12px] text-slate-500">{it.vendor}</p>
+                  <div className="flex items-center gap-1.5 mt-1">
+                    <span
+                      className={`text-[11px] font-semibold px-2 py-0.5 rounded ${
+                        FREQ_STYLE[it.frequency]
+                      }`}
                     >
-                      {meta.icon}
-                    </div>
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2">
-                        <div className="font-bold text-slate-900 truncate">
-                          {r.title}
-                        </div>
-                        {!r.isActive && (
-                          <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-500 border border-slate-200">
-                            PAUSED
-                          </span>
-                        )}
-                      </div>
-                      <div className="text-xs text-slate-500 truncate">
-                        {r.vendor}
-                      </div>
-                      <div className="flex items-center gap-1.5 mt-1">
-                        <span
-                          className={`inline-flex px-1.5 py-0.5 rounded text-[10px] font-semibold border ${freq.bg} ${freq.color}`}
-                        >
-                          {freq.label}
-                        </span>
-                        <span
-                          className={`inline-flex px-1.5 py-0.5 rounded text-[10px] font-semibold border ${meta.bg} ${meta.color}`}
-                        >
-                          {meta.label}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Amount */}
-                  <div className="lg:col-span-2">
-                    <div className="text-xs text-slate-500 font-semibold uppercase tracking-wider">
-                      Amount
-                    </div>
-                    <div className="text-lg font-bold text-slate-900 mt-0.5">
-                      {formatINR(r.amount)}
-                    </div>
-                  </div>
-
-                  {/* Next due */}
-                  <div className="lg:col-span-3">
-                    <div className="text-xs text-slate-500 font-semibold uppercase tracking-wider">
-                      Next Due
-                    </div>
-                    <div className="text-sm font-bold text-slate-900 mt-0.5 flex items-center gap-1">
-                      <HiOutlineCalendar className="w-3.5 h-3.5 text-slate-400" />
-                      {formatDate(r.nextDueDate)}
-                    </div>
-                    {r.isActive && (
-                      <div
-                        className={`text-[10px] font-semibold mt-0.5 ${
-                          isUrgent
-                            ? "text-rose-600"
-                            : isUpcoming
-                            ? "text-amber-600"
-                            : "text-slate-500"
-                        }`}
-                      >
-                        {isUrgent && "⚠ "}
-                        {r.daysUntilDue === 0
-                          ? "Due today"
-                          : r.daysUntilDue === 1
-                          ? "Due tomorrow"
-                          : `In ${r.daysUntilDue} days`}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Actions */}
-                  <div className="lg:col-span-3 flex items-center justify-end gap-2">
-                    {r.isActive ? (
-                      <>
-                        {isUrgent && (
-                          <button
-                            type="button"
-                            onClick={() => payNow(r)}
-                            className="flex items-center gap-1 px-3 py-2 rounded-lg bg-rose-600 text-white text-xs font-semibold shadow-md hover:bg-rose-700 active:scale-95 transition-all"
-                          >
-                            <HiOutlineLightningBolt className="w-3.5 h-3.5" />
-                            Pay Now
-                          </button>
-                        )}
-                        <button
-                          type="button"
-                          onClick={() => togglePause(r.id)}
-                          className="p-2 rounded-lg bg-slate-50 border border-slate-200 hover:bg-slate-100 active:scale-95 transition-all"
-                          title="Pause"
-                        >
-                          <HiOutlinePause className="w-4 h-4 text-slate-500" />
-                        </button>
-                      </>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => togglePause(r.id)}
-                        className="flex items-center gap-1 px-3 py-2 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-semibold hover:bg-emerald-100 active:scale-95 transition-all"
-                      >
-                        <HiOutlineCheckCircle className="w-3.5 h-3.5" />
-                        Resume
-                      </button>
-                    )}
+                      {freqLabel(it.frequency)}
+                    </span>
+                    <span className="text-[11px] font-semibold px-2 py-0.5 rounded bg-amber-50 text-amber-700">
+                      {it.category}
+                    </span>
                   </div>
                 </div>
               </div>
-            );
-          })}
-        </div>
+
+              {/* Amount */}
+              <div className="text-center hidden md:block">
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">
+                  Amount
+                </p>
+                <p className="text-[15px] font-bold text-slate-900">
+                  {inr(it.amount)}
+                </p>
+              </div>
+
+              {/* Next due */}
+              <div className="text-right hidden sm:block min-w-[130px]">
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">
+                  Next Due
+                </p>
+                <p className="text-[13px] font-semibold text-slate-800 flex items-center justify-end gap-1">
+                  <HiOutlineCalendar size={13} className="text-slate-400" />
+                  {dayjs(it.nextDue).format("DD MMM YYYY")}
+                </p>
+                {!it.isPaused && (
+                  <p
+                    className={`text-[11px] ${
+                      isUrgent
+                        ? "text-amber-600 font-semibold"
+                        : "text-slate-400"
+                    }`}
+                  >
+                    {days < 0 ? "Overdue" : `In ${days} days`}
+                  </p>
+                )}
+              </div>
+
+              {/* Pause toggle */}
+              <button
+                onClick={() => togglePause(it.id)}
+                className="w-9 h-9 rounded-lg border border-slate-200 flex items-center justify-center text-slate-500 hover:bg-slate-50 shrink-0"
+                title={it.isPaused ? "Resume schedule" : "Pause schedule"}
+              >
+                {it.isPaused ? (
+                  <HiOutlinePlay size={16} />
+                ) : (
+                  <HiOutlinePause size={16} />
+                )}
+              </button>
+            </div>
+          );
+        })}
       </div>
 
-      <RecurringFormModal
-        open={formOpen}
-        onClose={() => setFormOpen(false)}
-        onSubmit={handleSave}
-        initialData={editing}
+      <Recurringformmodal
+        open={modalOpen}
+        editItem={editTarget}
+        onClose={() => setModalOpen(false)}
+        onSubmit={handleSubmit}
       />
-    </>
+    </div>
   );
 };
 
-export default RecurringPanel;
+export default Recurringpanel;

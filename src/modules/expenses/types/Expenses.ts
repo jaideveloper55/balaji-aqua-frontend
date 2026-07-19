@@ -1,16 +1,17 @@
-// src/modules/expenses/types/Expenses.ts
+import { ReactNode } from "react";
 
-export type ExpenseCategory =
-  | "utilities"
-  | "plant_ops"
-  | "packaging"
-  | "vehicle"
-  | "rent"
-  | "compliance"
-  | "marketing"
-  | "office"
-  | "repairs"
-  | "loan";
+export interface ExpenseCategory {
+  id: string;
+  name: string;
+  description: string;
+  icon: ReactNode;
+  color: string;
+  bg: string;
+  spent: number;
+  budget: number;
+  transactions: number;
+  trend: number;
+}
 
 export type PaymentMode = "cash" | "upi" | "bank" | "cheque" | "card";
 export type ExpenseStatus =
@@ -49,31 +50,26 @@ export interface Expense {
 export interface Vendor {
   id: string;
   name: string;
-  category: ExpenseCategory;
-  phone?: string;
+  category: string;
+  phone: string;
   email?: string;
   gstin?: string;
-  bankAccount?: string;
-  ifsc?: string;
-  upiId?: string;
   totalPaidYTD: number;
-  lastPaymentDate?: string;
   outstanding: number;
+  transactions: number;
+  lastTransaction: string;
   isActive: boolean;
 }
 
 export interface RecurringExpense {
   id: string;
-  title: string;
-  category: ExpenseCategory;
-  vendorName: string;
+  name: string;
+  vendor: string;
+  category: string;
+  frequency: "MONTHLY" | "QUARTERLY" | "YEARLY" | "WEEKLY";
   amount: number;
-  frequency: RecurringFrequency;
-  nextDueDate: string;
-  startDate: string;
-  endDate?: string;
-  reminderDays: number;
-  isActive: boolean;
+  nextDue: string;
+  isPaused: boolean;
 }
 
 export interface CategoryBudget {

@@ -1,126 +1,139 @@
 import React from "react";
-import { Tooltip } from "antd";
-import { HiOutlineTrendingUp, HiOutlineClock } from "react-icons/hi";
-import ReactECharts from "echarts-for-react";
-import type { EChartsOption } from "echarts";
-import { DashboardKPI } from "../types/Dashboard";
+import {
+  HiOutlineCurrencyRupee,
+  HiOutlineUsers,
+  HiOutlineExclamationCircle,
+  HiOutlineCube,
+  HiOutlineReceiptTax,
+  HiOutlineTrendingUp,
+} from "react-icons/hi";
 
-interface KPICardProps extends DashboardKPI {}
+export interface DashboardKPIs {
+  totalCustomers: number;
+  newThisMonth: number;
+  totalOutstanding: number;
+  customersWithDues: number;
+  todayCollection: number;
+  todayInvoices: number;
+  totalBilled: number;
+  totalProducts: number;
+  lowStockCount: number;
+  outOfStockCount: number;
+}
 
-const buildSparkOption = (data: number[], color: string): EChartsOption => ({
-  grid: { left: 0, right: 0, top: 4, bottom: 4 },
-  xAxis: { type: "category", show: false, data: data.map((_, i) => i) },
-  yAxis: { type: "value", show: false },
-  tooltip: { show: false },
-  series: [
+interface Props {
+  data: DashboardKPIs;
+}
+
+const inr = (n: number) =>
+  `₹${new Intl.NumberFormat("en-IN", { maximumFractionDigits: 0 }).format(
+    n ?? 0
+  )}`;
+
+interface CardDef {
+  label: string;
+  value: string;
+  sub: string;
+  icon: React.ReactNode;
+  color: string;
+  bg: string;
+  alert?: boolean;
+}
+
+const Dashboardkpicards: React.FC<Props> = ({ data }) => {
+  const cards: CardDef[] = [
     {
-      type: "line",
-      data,
-      smooth: true,
-      symbol: "none",
-      lineStyle: { color, width: 2 },
-      areaStyle: {
-        color: {
-          type: "linear",
-          x: 0,
-          y: 0,
-          x2: 0,
-          y2: 1,
-          colorStops: [
-            { offset: 0, color: color + "40" },
-            { offset: 1, color: color + "00" },
-          ],
-        },
-      },
+      label: "Today's Collection",
+      value: inr(data.todayCollection),
+      sub: `${data.todayInvoices} invoice${
+        data.todayInvoices === 1 ? "" : "s"
+      } today`,
+      icon: <HiOutlineCurrencyRupee size={20} />,
+      color: "#059669",
+      bg: "#ecfdf5",
     },
-  ],
-});
+    {
+      label: "Total Customers",
+      value: String(data.totalCustomers),
+      sub: `+${data.newThisMonth} new this month`,
+      icon: <HiOutlineUsers size={20} />,
+      color: "#2563eb",
+      bg: "#eff6ff",
+    },
+    {
+      label: "Total Outstanding",
+      value: inr(data.totalOutstanding),
+      sub: `${data.customersWithDues} customers with dues`,
+      icon: <HiOutlineExclamationCircle size={20} />,
+      color: "#d97706",
+      bg: "#fffbeb",
+      alert: data.totalOutstanding > 0,
+    },
+    {
+      label: "Products",
+      value: String(data.totalProducts),
+      sub:
+        data.lowStockCount > 0
+          ? `${data.lowStockCount} low stock`
+          : "All in stock",
+      icon: <HiOutlineCube size={20} />,
+      color: data.lowStockCount > 0 ? "#dc2626" : "#7c3aed",
+      bg: data.lowStockCount > 0 ? "#fef2f2" : "#f5f3ff",
+      alert: data.lowStockCount > 0,
+    },
+    {
+      label: "Billed Today",
+      value: inr(data.totalBilled),
+      sub: `${data.todayInvoices} invoices generated`,
+      icon: <HiOutlineReceiptTax size={20} />,
+      color: "#0891b2",
+      bg: "#ecfeff",
+    },
+    {
+      label: "Out of Stock",
+      value: String(data.outOfStockCount),
+      sub: data.outOfStockCount > 0 ? "Needs restocking" : "None — good to go",
+      icon: <HiOutlineTrendingUp size={20} />,
+      color: data.outOfStockCount > 0 ? "#dc2626" : "#059669",
+      bg: data.outOfStockCount > 0 ? "#fef2f2" : "#ecfdf5",
+      alert: data.outOfStockCount > 0,
+    },
+  ];
 
-const KPICard: React.FC<KPICardProps> = ({
-  icon,
-  label,
-  value,
-  change,
-  gradient,
-  iconColor,
-  tooltip,
-  sublabel,
-  spark,
-  sparkColor,
-}) => {
-  const card = (
-    <div className="group relative bg-white rounded-2xl border border-slate-100 p-4 overflow-hidden transition-all duration-300 hover:shadow-xl hover:-translate-y-1 cursor-default">
-      <div
-        className={`absolute top-0 left-0 right-0 h-1 ${gradient} opacity-80`}
-      />
-      <div
-        className={`absolute -top-8 -right-8 w-24 h-24 rounded-full ${gradient} opacity-5 group-hover:opacity-10 transition-opacity duration-500`}
-      />
-
-      <div className="relative flex items-start justify-between mb-3">
+  return (
+    <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+      {cards.map((c) => (
         <div
-          className={`w-10 h-10 rounded-xl ${gradient} ${iconColor} flex items-center justify-center shadow-sm transition-transform duration-300 group-hover:scale-110 group-hover:rotate-3`}
-        >
-          {icon}
-        </div>
-        <span
-          className={`flex items-center gap-0.5 text-[10px] font-bold px-2 py-1 rounded-lg ${
-            change.isUp
-              ? "text-emerald-700 bg-emerald-50"
-              : "text-red-600 bg-red-50"
+          key={c.label}
+          className={`group relative bg-white rounded-2xl border overflow-hidden transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 ${
+            c.alert
+              ? "border-rose-200/60 hover:shadow-rose-100/50"
+              : "border-slate-200 hover:shadow-slate-200/50"
           }`}
         >
-          <HiOutlineTrendingUp
-            size={11}
-            className={change.isUp ? "" : "rotate-180"}
+          <div
+            className="absolute top-0 left-0 right-0 h-[2.5px] opacity-0 group-hover:opacity-100 transition-opacity"
+            style={{ backgroundColor: c.color }}
           />
-          {change.value}%
-        </span>
-      </div>
-
-      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">
-        {label}
-      </p>
-      <p className="text-[22px] font-extrabold text-slate-800 leading-none tracking-tight tabular-nums">
-        {value}
-      </p>
-
-      {spark && spark.length > 0 && (
-        <div className="mt-2 -mx-1">
-          <ReactECharts
-            option={buildSparkOption(spark, sparkColor)}
-            style={{ height: 28, width: "100%" }}
-            opts={{ renderer: "svg" }}
-          />
+          <div className="px-4 py-4">
+            <div
+              className="w-10 h-10 rounded-xl flex items-center justify-center mb-3 transition-transform group-hover:scale-105"
+              style={{ background: c.bg, color: c.color }}
+            >
+              {c.icon}
+            </div>
+            <p className="text-[22px] font-extrabold text-slate-800 tabular-nums leading-none tracking-tight">
+              {c.value}
+            </p>
+            <p className="text-[11px] font-semibold text-slate-400 mt-1.5 uppercase tracking-wide">
+              {c.label}
+            </p>
+            <p className="text-[11px] text-slate-500 mt-1">{c.sub}</p>
+          </div>
         </div>
-      )}
-
-      <p className="text-[10px] text-slate-400 mt-1 flex items-center gap-1 truncate">
-        <HiOutlineClock size={10} />
-        {sublabel || "vs last period"}
-      </p>
+      ))}
     </div>
-  );
-
-  return tooltip ? (
-    <Tooltip title={tooltip} placement="bottom">
-      {card}
-    </Tooltip>
-  ) : (
-    card
   );
 };
 
-interface Props {
-  data: DashboardKPI[];
-}
-
-const DashboardKPICards: React.FC<Props> = ({ data }) => (
-  <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
-    {data.map(({ key, ...rest }) => (
-      <KPICard key={key} {...rest} />
-    ))}
-  </div>
-);
-
-export default DashboardKPICards;
+export default Dashboardkpicards;

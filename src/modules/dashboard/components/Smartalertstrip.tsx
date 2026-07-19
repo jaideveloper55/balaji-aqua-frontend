@@ -1,90 +1,66 @@
 import React from "react";
-import { useNavigate } from "react-router-dom";
-import { HiOutlineExclamation, HiOutlineX } from "react-icons/hi";
-import { AlertItem } from "../types/Dashboard";
+import { HiOutlineExclamation, HiX } from "react-icons/hi";
 
-interface Props {
-  alerts: AlertItem[];
+export interface SmartAlert {
+  label: string;
+  color: "red" | "amber" | "blue";
 }
 
-const TONE_STYLES: Record<
-  AlertItem["type"],
-  { bg: string; text: string; dot: string; border: string }
-> = {
-  danger: {
-    bg: "bg-red-50",
-    text: "text-red-700",
-    dot: "bg-red-500",
-    border: "border-red-100",
-  },
-  warning: {
-    bg: "bg-amber-50",
-    text: "text-amber-700",
-    dot: "bg-amber-500",
-    border: "border-amber-100",
-  },
-  info: {
-    bg: "bg-blue-50",
-    text: "text-blue-700",
-    dot: "bg-blue-500",
-    border: "border-blue-100",
-  },
-  success: {
-    bg: "bg-emerald-50",
-    text: "text-emerald-700",
-    dot: "bg-emerald-500",
-    border: "border-emerald-100",
-  },
+interface Props {
+  alerts: SmartAlert[];
+  onDismiss?: (index: number) => void;
+}
+
+const CHIP_STYLES: Record<string, string> = {
+  red: "bg-white border-rose-200 text-rose-600",
+  amber: "bg-white border-amber-200 text-amber-600",
+  blue: "bg-white border-blue-200 text-blue-600",
 };
 
-const SmartAlertStrip: React.FC<Props> = ({ alerts }) => {
-  const navigate = useNavigate();
-  const [dismissed, setDismissed] = React.useState<string[]>([]);
+const DOT_STYLES: Record<string, string> = {
+  red: "bg-rose-500",
+  amber: "bg-amber-500",
+  blue: "bg-blue-500",
+};
 
-  const visible = alerts.filter((a) => !dismissed.includes(a.id));
-  if (visible.length === 0) return null;
+const Smartalertstrip: React.FC<Props> = ({ alerts, onDismiss }) => {
+  if (alerts.length === 0) return null;
 
   return (
-    <div className="bg-gradient-to-r from-amber-50 via-orange-50 to-red-50 border border-amber-100 rounded-2xl p-3 flex items-center gap-3 flex-wrap shadow-sm">
-      <div className="flex items-center gap-2 shrink-0 pl-1">
-        <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-amber-500 to-red-500 text-white flex items-center justify-center shadow-sm">
-          <HiOutlineExclamation size={16} />
+    <div className="flex items-center gap-3 rounded-2xl bg-gradient-to-r from-amber-50 to-orange-50/40 border border-amber-100 px-4 py-3">
+      <div className="flex items-center gap-2 shrink-0">
+        <div className="w-8 h-8 rounded-lg bg-amber-500 flex items-center justify-center">
+          <HiOutlineExclamation className="text-white" size={17} />
         </div>
-        <span className="text-[12px] font-bold text-amber-900">
+        <span className="text-[13px] font-bold text-amber-800 hidden sm:inline">
           Action needed
         </span>
       </div>
-
-      <div className="flex items-center gap-2 flex-wrap flex-1">
-        {visible.map((alert) => {
-          const tone = TONE_STYLES[alert.type];
-          return (
-            <button
-              key={alert.id}
-              onClick={() => alert.action && navigate(alert.action)}
-              className={`group flex items-center gap-2 pl-2 pr-1 py-1 bg-white rounded-full border ${tone.border} hover:shadow-md hover:-translate-y-0.5 transition-all`}
-            >
-              <span
-                className={`w-1.5 h-1.5 rounded-full ${tone.dot} animate-pulse`}
-              />
-              <span className={`text-[11px] font-semibold ${tone.text}`}>
-                {alert.label}
-              </span>
-              <span
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setDismissed((prev) => [...prev, alert.id]);
-                }}
-                className="w-5 h-5 rounded-full hover:bg-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-600 transition-colors"
+      <div className="flex items-center gap-2 flex-wrap">
+        {alerts.map((a, i) => (
+          <span
+            key={i}
+            className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-[12px] font-medium border ${
+              CHIP_STYLES[a.color]
+            }`}
+          >
+            <span
+              className={`w-1.5 h-1.5 rounded-full ${DOT_STYLES[a.color]}`}
+            />
+            {a.label}
+            {onDismiss && (
+              <button
+                onClick={() => onDismiss(i)}
+                className="ml-0.5 text-slate-400 hover:text-slate-600"
               >
-                <HiOutlineX size={11} />
-              </span>
-            </button>
-          );
-        })}
+                <HiX size={12} />
+              </button>
+            )}
+          </span>
+        ))}
       </div>
     </div>
   );
 };
 
-export default SmartAlertStrip;
+export default Smartalertstrip;

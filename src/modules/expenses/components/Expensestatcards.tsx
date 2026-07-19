@@ -1,5 +1,3 @@
-// src/modules/expenses/components/ExpenseStatCards.tsx
-
 import {
   HiOutlineCash,
   HiOutlineTrendingUp,

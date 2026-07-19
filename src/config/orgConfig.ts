@@ -85,13 +85,13 @@ const waterPlantConfig: OrgConfig = {
   },
   groups: ["Main", "Operations", "Billing", "HR", "Finance", "Analytics"],
   menuItems: [
-    {
-      id: "dashboard",
-      icon: AiOutlineHome,
-      label: "Dashboard",
-      href: "/admin/dashboard",
-      group: "Main",
-    },
+    // {
+    //   id: "dashboard",
+    //   icon: AiOutlineHome,
+    //   label: "Dashboard",
+    //   href: "/admin/dashboard",
+    //   group: "Main",
+    // },
     {
       id: "customers",
       icon: BsPeopleFill,

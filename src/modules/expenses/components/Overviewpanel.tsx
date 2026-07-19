@@ -308,14 +308,10 @@ const OverviewPanel = () => {
           <p className="text-xs text-slate-600 mb-4">
             Snap a receipt photo and we'll auto-fill the expense details
           </p>
-          <div className="grid grid-cols-2 gap-2">
-            <button className="px-3 py-2 rounded-lg bg-white border border-rose-200 text-rose-700 text-xs font-semibold hover:bg-rose-50 transition-colors">
-              📸 Scan Receipt
-            </button>
-            <button className="px-3 py-2 rounded-lg bg-rose-600 text-white text-xs font-semibold hover:bg-rose-700 transition-colors">
-              + New Expense
-            </button>
-          </div>
+
+          <button className="px-3 py-2 rounded-lg bg-rose-600 text-white text-xs font-semibold hover:bg-rose-700 transition-colors">
+            + New Expense
+          </button>
         </div>
 
         {/* Cross-module insight */}

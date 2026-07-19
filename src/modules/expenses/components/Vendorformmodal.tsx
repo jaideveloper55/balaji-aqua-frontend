@@ -1,251 +1,211 @@
-import { useEffect } from "react";
+import React, { useEffect } from "react";
 import { useForm } from "react-hook-form";
-import {
-  HiOutlineUserAdd,
-  HiOutlinePencilAlt,
-  HiOutlineUserGroup,
-} from "react-icons/hi";
-
-import { EXPENSE_CATEGORIES } from "../constants/Expenses.constants";
+import { HiOutlineUserGroup } from "react-icons/hi";
 import CustomModal from "../../../components/common/CustomModal";
 import CustomInput from "../../../components/common/CustomInput";
 import CustomSelect from "../../../components/common/CustomSelect";
+import type { Vendor } from "../types/Expenses";
+import CustomTextArea from "../../../components/common/Customtextarea";
+
+export interface VendorFormValues {
+  name: string;
+  category: string;
+  phone: string;
+  email: string;
+  gstin: string;
+  openingOutstanding: string;
+  notes: string;
+}
 
 interface Props {
   open: boolean;
+  editVendor?: Vendor | null;
   onClose: () => void;
-  onSubmit: (data: any) => void;
-  initialData?: any;
+  onSubmit: (values: VendorFormValues) => void;
+  loading?: boolean;
 }
 
-const VendorFormModal = ({ open, onClose, onSubmit, initialData }: Props) => {
-  const isEdit = !!initialData;
+const CATEGORY_OPTIONS = [
+  { value: "Utilities", label: "Utilities" },
+  { value: "Vehicle & Fuel", label: "Vehicle & Fuel" },
+  { value: "Plant Operations", label: "Plant Operations" },
+  { value: "Packaging", label: "Packaging" },
+  { value: "Rent & Lease", label: "Rent & Lease" },
+  { value: "Repairs", label: "Repairs" },
+  { value: "Office", label: "Office" },
+  { value: "Compliance", label: "Compliance" },
+  { value: "Marketing", label: "Marketing" },
+];
+
+const Vendorformmodal: React.FC<Props> = ({
+  open,
+  editVendor,
+  onClose,
+  onSubmit,
+  loading = false,
+}) => {
+  const isEdit = !!editVendor;
 
   const {
     control,
     handleSubmit,
     reset,
     formState: { errors },
-  } = useForm<any>({
-    defaultValues: initialData || {
+  } = useForm<VendorFormValues>({
+    defaultValues: {
       name: "",
       category: "",
       phone: "",
       email: "",
       gstin: "",
-      bankAccount: "",
-      ifsc: "",
-      upiId: "",
+      openingOutstanding: "",
+      notes: "",
     },
   });
 
   useEffect(() => {
     if (open) {
-      reset(
-        initialData || {
-          name: "",
-          category: "",
-          phone: "",
-          email: "",
-          gstin: "",
-          bankAccount: "",
-          ifsc: "",
-          upiId: "",
-        }
-      );
+      reset({
+        name: editVendor?.name ?? "",
+        category: editVendor?.category ?? "",
+        phone: editVendor?.phone ?? "",
+        email: editVendor?.email ?? "",
+        gstin: editVendor?.gstin ?? "",
+        openingOutstanding: editVendor?.outstanding
+          ? String(editVendor.outstanding)
+          : "",
+        notes: "",
+      });
     }
-  }, [open, initialData, reset]);
+  }, [open, editVendor, reset]);
 
-  const handleFormSubmit = (data: any) => {
-    onSubmit({
-      ...data,
-      id: initialData?.id || `V-${String(Date.now()).slice(-3)}`,
-      totalPaidYTD: initialData?.totalPaidYTD || 0,
-      outstanding: initialData?.outstanding || 0,
-      transactionCount: initialData?.transactionCount || 0,
-      isActive: true,
-    });
-    onClose();
-  };
+  const footer = (
+    <div className="flex gap-2">
+      <button
+        type="button"
+        onClick={onClose}
+        disabled={loading}
+        className="flex-1 py-2.5 rounded-xl border border-gray-200 text-gray-600 text-[13px] font-medium hover:bg-gray-50 disabled:opacity-50"
+      >
+        Cancel
+      </button>
+      <button
+        type="button"
+        onClick={handleSubmit(onSubmit)}
+        disabled={loading}
+        className="flex-[2] py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-[13px] font-semibold flex items-center justify-center gap-2 disabled:opacity-50"
+      >
+        {loading ? (
+          <>
+            <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+            Saving...
+          </>
+        ) : isEdit ? (
+          "Update Vendor"
+        ) : (
+          "Add Vendor"
+        )}
+      </button>
+    </div>
+  );
 
   return (
     <CustomModal
       open={open}
       onClose={onClose}
-      title={isEdit ? "Edit Vendor" : "Add New Vendor"}
+      title={isEdit ? "Edit Vendor" : "Add Vendor"}
       subtitle={
-        isEdit
-          ? "Update vendor information"
-          : "Add a supplier to your vendor list"
+        isEdit ? "Update supplier details" : "Add a new supplier / vendor"
       }
-      icon={
-        isEdit ? (
-          <HiOutlinePencilAlt size={22} />
-        ) : (
-          <HiOutlineUserAdd size={22} />
-        )
-      }
-      iconTone={isEdit ? "amber" : "red"}
-      size="3xl"
-      footer={
-        <div className="flex items-center justify-end gap-2">
-          <button
-            type="button"
-            onClick={onClose}
-            className="px-4 py-2 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-100 transition-colors"
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            onClick={handleSubmit(handleFormSubmit)}
-            className="px-5 py-2 rounded-lg bg-rose-600 text-white text-sm font-semibold shadow-md hover:bg-rose-700 hover:shadow-lg transition-all"
-          >
-            {isEdit ? "Save Changes" : "Add Vendor"}
-          </button>
-        </div>
-      }
+      icon={<HiOutlineUserGroup className="w-5 h-5" />}
+      iconTone="red"
+      size="lg"
+      footer={footer}
     >
-      <div className="space-y-5">
-        {/* Section banner */}
-        <div className="rounded-xl bg-rose-50/60 border border-rose-100 p-4 flex items-center gap-3">
-          <div className="p-2 rounded-lg bg-white">
-            <HiOutlineUserGroup className="w-5 h-5 text-rose-600" />
-          </div>
-          <div>
-            <div className="text-sm font-semibold text-slate-900">
-              Vendor Details
-            </div>
-            <div className="text-xs text-slate-600">
-              Suppliers, service providers, and regular payees
-            </div>
-          </div>
+      <div className="space-y-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <CustomInput
+            name="name"
+            control={control}
+            label="Vendor Name"
+            placeholder="e.g. TN Electricity Board"
+            errors={errors}
+            isrequired
+            rules={{ required: "Vendor name is required" }}
+          />
+          <CustomSelect
+            name="category"
+            control={control}
+            errors={errors}
+            label="Category"
+            placeholder="Select category"
+            options={CATEGORY_OPTIONS}
+            isrequired
+            showSearch
+            rules={{ required: "Category is required" }}
+          />
         </div>
 
-        {/* Basic Info */}
-        <div>
-          <div className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-3">
-            Basic Information
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="md:col-span-2">
-              <CustomInput
-                name="name"
-                control={control}
-                label="Vendor Name"
-                placeholder="e.g. TN Electricity Board"
-                isrequired
-                errors={errors}
-                rules={{
-                  required: "Vendor name is required",
-                  minLength: { value: 2, message: "Too short" },
-                }}
-              />
-            </div>
-
-            <CustomSelect
-              name="category"
-              control={control}
-              label="Category"
-              placeholder="Select expense category"
-              isrequired
-              errors={errors}
-              rules={{ required: "Category is required" }}
-              options={EXPENSE_CATEGORIES.map((c) => ({
-                value: c.value,
-                label: `${c.icon}  ${c.label}`,
-              }))}
-            />
-
-            <CustomInput
-              name="phone"
-              control={control}
-              label="Phone Number"
-              placeholder="10-digit mobile number"
-              errors={errors}
-              rules={{
-                pattern: {
-                  value: /^[0-9]{4,12}$/,
-                  message: "Enter valid phone number",
-                },
-              }}
-            />
-
-            <div className="md:col-span-2">
-              <CustomInput
-                name="email"
-                control={control}
-                type="email"
-                iconType="mail"
-                label="Email (Optional)"
-                placeholder="vendor@example.com"
-                errors={errors}
-              />
-            </div>
-          </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <CustomInput
+            name="phone"
+            control={control}
+            label="Phone"
+            placeholder="e.g. 9876543210"
+            errors={errors}
+            isrequired
+            numbersOnly
+            rules={{
+              required: "Phone is required",
+              minLength: { value: 4, message: "Enter a valid phone number" },
+            }}
+          />
+          <CustomInput
+            name="email"
+            control={control}
+            label="Email (optional)"
+            placeholder="e.g. vendor@example.com"
+            errors={errors}
+            rules={{
+              pattern: {
+                value: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
+                message: "Enter a valid email",
+              },
+            }}
+          />
         </div>
 
-        {/* Tax Info */}
-        <div className="pt-4 border-t border-dashed border-slate-200">
-          <div className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-3">
-            Tax & Compliance
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="md:col-span-2">
-              <CustomInput
-                name="gstin"
-                control={control}
-                label="GSTIN (Optional)"
-                placeholder="e.g. 33AAACT2727Q1ZW"
-                errors={errors}
-                rules={{
-                  pattern: {
-                    value:
-                      /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[0-9]{1}[Z]{1}[A-Z0-9]{1}$/,
-                    message: "Invalid GSTIN format",
-                  },
-                }}
-              />
-            </div>
-          </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <CustomInput
+            name="gstin"
+            control={control}
+            label="GSTIN (optional)"
+            placeholder="e.g. 33AAACT2727Q1ZW"
+            errors={errors}
+          />
+          <CustomInput
+            name="openingOutstanding"
+            control={control}
+            label="Opening Outstanding (₹)"
+            placeholder="0 (optional)"
+            errors={errors}
+            numbersOnly
+          />
         </div>
 
-        {/* Bank Details */}
-        <div className="pt-4 border-t border-dashed border-slate-200">
-          <div className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-3">
-            Payment Details (Optional)
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <CustomInput
-              name="bankAccount"
-              control={control}
-              label="Bank Account Number"
-              placeholder="Account number"
-              errors={errors}
-            />
-
-            <CustomInput
-              name="ifsc"
-              control={control}
-              label="IFSC Code"
-              placeholder="e.g. HDFC0001234"
-              errors={errors}
-            />
-
-            <div className="md:col-span-2">
-              <CustomInput
-                name="upiId"
-                control={control}
-                label="UPI ID"
-                placeholder="e.g. vendor@upi"
-                errors={errors}
-              />
-            </div>
-          </div>
-        </div>
+        <CustomTextArea
+          name="notes"
+          control={control}
+          label="Notes (optional)"
+          placeholder="Any notes about this vendor..."
+          errors={errors}
+          rows={2}
+          maxLength={200}
+          showCount
+        />
       </div>
     </CustomModal>
   );
 };
 
-export default VendorFormModal;
+export default Vendorformmodal;

@@ -1,219 +1,218 @@
-import { useEffect } from "react";
-import { useForm } from "react-hook-form";
-import { HiOutlineRefresh, HiOutlinePencilAlt } from "react-icons/hi";
-import { EXPENSE_CATEGORIES } from "../constants/Expenses.constants";
+import React, { useEffect } from "react";
+import { useForm, Controller } from "react-hook-form";
+import { DatePicker } from "antd";
+import dayjs from "dayjs";
+import { HiOutlineRefresh} from "react-icons/hi";
 import CustomModal from "../../../components/common/CustomModal";
 import CustomInput from "../../../components/common/CustomInput";
 import CustomSelect from "../../../components/common/CustomSelect";
+import type { RecurringExpense } from "../types/Expenses";
+
+export interface RecurringFormValues {
+  name: string;
+  vendor: string;
+  category: string;
+  frequency: string;
+  amount: string;
+  nextDue: any;
+}
 
 interface Props {
   open: boolean;
+  editItem?: RecurringExpense | null;
   onClose: () => void;
-  onSubmit: (data: any) => void;
-  initialData?: any;
+  onSubmit: (values: RecurringFormValues) => void;
+  loading?: boolean;
 }
 
-const RecurringFormModal = ({
+const FREQUENCY_OPTIONS = [
+  { value: "WEEKLY", label: "Weekly" },
+  { value: "MONTHLY", label: "Monthly" },
+  { value: "QUARTERLY", label: "Quarterly" },
+  { value: "YEARLY", label: "Yearly" },
+];
+
+const CATEGORY_OPTIONS = [
+  { value: "Utilities", label: "Utilities" },
+  { value: "Vehicle & Fuel", label: "Vehicle & Fuel" },
+  { value: "Plant Operations", label: "Plant Operations" },
+  { value: "Packaging", label: "Packaging" },
+  { value: "Rent & Lease", label: "Rent & Lease" },
+  { value: "Repairs", label: "Repairs" },
+  { value: "Office", label: "Office" },
+  { value: "Compliance", label: "Compliance" },
+  { value: "Marketing", label: "Marketing" },
+];
+
+const Recurringformmodal: React.FC<Props> = ({
   open,
+  editItem,
   onClose,
   onSubmit,
-  initialData,
-}: Props) => {
-  const isEdit = !!initialData;
-
+  loading = false,
+}) => {
+  const isEdit = !!editItem;
   const {
     control,
     handleSubmit,
     reset,
     formState: { errors },
-  } = useForm<any>({
-    defaultValues: initialData || {
-      title: "",
+  } = useForm<RecurringFormValues>({
+    defaultValues: {
+      name: "",
       vendor: "",
       category: "",
+      frequency: "MONTHLY",
       amount: "",
-      frequency: "monthly",
-      nextDueDate: "",
-      reminderDays: "3",
+      nextDue: dayjs().add(1, "month"),
     },
   });
 
   useEffect(() => {
     if (open) {
-      reset(
-        initialData || {
-          title: "",
-          vendor: "",
-          category: "",
-          amount: "",
-          frequency: "monthly",
-          nextDueDate: "",
-          reminderDays: "3",
-        }
-      );
+      reset({
+        name: editItem?.name ?? "",
+        vendor: editItem?.vendor ?? "",
+        category: editItem?.category ?? "",
+        frequency: editItem?.frequency ?? "MONTHLY",
+        amount: editItem?.amount ? String(editItem.amount) : "",
+        nextDue: editItem?.nextDue
+          ? dayjs(editItem.nextDue)
+          : dayjs().add(1, "month"),
+      });
     }
-  }, [open, initialData, reset]);
+  }, [open, editItem, reset]);
 
-  const handleFormSubmit = (data: any) => {
-    onSubmit({
-      ...data,
-      id: initialData?.id || `R-${String(Date.now()).slice(-3)}`,
-      amount: Number(data.amount),
-      reminderDays: Number(data.reminderDays),
-      isActive: initialData?.isActive ?? true,
-    });
-    onClose();
-  };
+  const footer = (
+    <div className="flex gap-2">
+      <button
+        type="button"
+        onClick={onClose}
+        disabled={loading}
+        className="flex-1 py-2.5 rounded-xl border border-gray-200 text-gray-600 text-[13px] font-medium hover:bg-gray-50 disabled:opacity-50"
+      >
+        Cancel
+      </button>
+      <button
+        type="button"
+        onClick={handleSubmit(onSubmit)}
+        disabled={loading}
+        className="flex-[2] py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-[13px] font-semibold flex items-center justify-center gap-2 disabled:opacity-50"
+      >
+        {loading ? (
+          <>
+            <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+            Saving...
+          </>
+        ) : isEdit ? (
+          "Update Schedule"
+        ) : (
+          "Add Recurring"
+        )}
+      </button>
+    </div>
+  );
 
   return (
     <CustomModal
       open={open}
       onClose={onClose}
-      title={isEdit ? "Edit Recurring Expense" : "Add Recurring Expense"}
-      subtitle={
-        isEdit
-          ? "Update your recurring schedule"
-          : "Set up automatic expense reminders"
-      }
-      icon={
-        isEdit ? (
-          <HiOutlinePencilAlt size={22} />
-        ) : (
-          <HiOutlineRefresh size={22} />
-        )
-      }
-      iconTone={isEdit ? "amber" : "red"}
-      size="3xl"
-      footer={
-        <div className="flex items-center justify-end gap-2">
-          <button
-            type="button"
-            onClick={onClose}
-            className="px-4 py-2 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-100 transition-colors"
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            onClick={handleSubmit(handleFormSubmit)}
-            className="px-5 py-2 rounded-lg bg-rose-600 text-white text-sm font-semibold shadow-md hover:bg-rose-700 transition-all"
-          >
-            {isEdit ? "Save Changes" : "Create Schedule"}
-          </button>
-        </div>
-      }
+      title={isEdit ? "Edit Recurring" : "Add Recurring Expense"}
+      subtitle="Auto-generates an expense entry on each due date"
+      icon={<HiOutlineRefresh className="w-5 h-5" />}
+      iconTone="red"
+      size="lg"
+      footer={footer}
     >
       <div className="space-y-4">
-        {/* Banner */}
-        <div className="rounded-xl bg-rose-50/60 border border-rose-100 p-4 flex items-center gap-3">
-          <div className="p-2 rounded-lg bg-white">
-            <HiOutlineRefresh className="w-5 h-5 text-rose-600" />
-          </div>
-          <div>
-            <div className="text-sm font-semibold text-slate-900">
-              Recurring Expense Setup
-            </div>
-            <div className="text-xs text-slate-600">
-              Auto-generates expense entries on the due date
-            </div>
-          </div>
-        </div>
-
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="md:col-span-2">
-            <CustomInput
-              name="title"
-              control={control}
-              label="Schedule Title"
-              placeholder="e.g. Plant Rent, Electricity Bill"
-              isrequired
-              errors={errors}
-              rules={{ required: "Title is required" }}
-            />
-          </div>
-
+          <CustomInput
+            name="name"
+            control={control}
+            label="Expense Name"
+            placeholder="e.g. Internet & WiFi"
+            errors={errors}
+            isrequired
+            rules={{ required: "Name is required" }}
+          />
           <CustomInput
             name="vendor"
             control={control}
             label="Vendor / Payee"
-            placeholder="e.g. Sundaram Property"
-            isrequired
+            placeholder="e.g. Airtel Business"
             errors={errors}
+            isrequired
             rules={{ required: "Vendor is required" }}
           />
+        </div>
 
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <CustomSelect
             name="category"
             control={control}
+            errors={errors}
             label="Category"
             placeholder="Select category"
+            options={CATEGORY_OPTIONS}
             isrequired
-            errors={errors}
+            showSearch
             rules={{ required: "Category is required" }}
-            options={EXPENSE_CATEGORIES.map((c) => ({
-              value: c.value,
-              label: `${c.icon}  ${c.label}`,
-            }))}
           />
+          <CustomSelect
+            name="frequency"
+            control={control}
+            errors={errors}
+            label="Frequency"
+            placeholder="Select frequency"
+            options={FREQUENCY_OPTIONS}
+            isrequired
+            rules={{ required: "Frequency is required" }}
+          />
+        </div>
 
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <CustomInput
             name="amount"
             control={control}
             label="Amount (₹)"
-            placeholder="e.g. 12000"
-            isrequired
+            placeholder="0"
             errors={errors}
+            isrequired
+            numbersOnly
             rules={{
               required: "Amount is required",
-              min: { value: 1, message: "Must be greater than 0" },
-              pattern: { value: /^\d+$/, message: "Enter valid number" },
+              validate: (v: string) =>
+                Number(v) > 0 || "Must be greater than 0",
             }}
           />
-
-          <CustomSelect
-            name="frequency"
-            control={control}
-            label="Frequency"
-            placeholder="How often?"
-            isrequired
-            errors={errors}
-            rules={{ required: "Frequency required" }}
-            options={[
-              { value: "weekly", label: "Weekly" },
-              { value: "monthly", label: "Monthly" },
-              { value: "quarterly", label: "Quarterly (3 months)" },
-              { value: "yearly", label: "Yearly" },
-            ]}
-          />
-
-          <CustomInput
-            name="nextDueDate"
-            control={control}
-            label="Next Due Date"
-            placeholder="YYYY-MM-DD"
-            isrequired
-            errors={errors}
-            rules={{ required: "Due date is required" }}
-          />
-
-          <CustomSelect
-            name="reminderDays"
-            control={control}
-            label="Reminder (Days Before)"
-            placeholder="When to notify?"
-            errors={errors}
-            options={[
-              { value: "1", label: "1 day before" },
-              { value: "3", label: "3 days before" },
-              { value: "5", label: "5 days before" },
-              { value: "7", label: "1 week before" },
-              { value: "14", label: "2 weeks before" },
-            ]}
-          />
+          <div className="flex flex-col gap-1 w-full">
+            <label className="flex justify-start py-1 text-sm text-slate-700">
+              Next Due Date <span className="text-red-500 ml-1">*</span>
+            </label>
+            <Controller
+              name="nextDue"
+              control={control}
+              rules={{ required: "Due date is required" }}
+              render={({ field }) => (
+                <DatePicker
+                  {...field}
+                  format="YYYY-MM-DD"
+                  className="w-full"
+                  status={errors.nextDue ? "error" : undefined}
+                  placeholder="Select date"
+                />
+              )}
+            />
+            {errors.nextDue && (
+              <p className="text-red-500 text-sm">
+                {errors.nextDue.message as string}
+              </p>
+            )}
+          </div>
         </div>
       </div>
     </CustomModal>
   );
 };
 
-export default RecurringFormModal;
+export default Recurringformmodal;

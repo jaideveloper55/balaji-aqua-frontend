@@ -1,281 +1,267 @@
-import { useEffect } from "react";
+import React, { useEffect } from "react";
 import { useForm } from "react-hook-form";
-import {
-  HiOutlinePlus,
-  HiOutlineReceiptTax,
-  HiOutlineUpload,
-} from "react-icons/hi";
-
-import {
-  EXPENSE_CATEGORIES,
-  PAYMENT_MODES,
-} from "../constants/Expenses.constants";
+import dayjs, { Dayjs } from "dayjs";
+import { HiOutlineReceiptTax } from "react-icons/hi";
 import CustomModal from "../../../components/common/CustomModal";
 import CustomInput from "../../../components/common/CustomInput";
 import CustomSelect from "../../../components/common/CustomSelect";
+import { Controller } from "react-hook-form";
+import { DatePicker } from "antd";
+import type { Expense } from "./Allexpensespanel";
+import CustomTextArea from "../../../components/common/Customtextarea";
+
+export interface ExpenseFormValues {
+  vendor: string;
+  description: string;
+  category: string;
+  amount: string;
+  gstAmount: string;
+  paymentMode: string;
+  status: string;
+  date: Dayjs | null;
+  notes: string;
+}
 
 interface Props {
   open: boolean;
+  editExpense?: Expense | null;
   onClose: () => void;
-  onSubmit: (data: any) => void;
-  initialData?: any;
+  onSubmit: (values: ExpenseFormValues) => void;
+  loading?: boolean;
 }
 
-const ExpenseFormModal = ({ open, onClose, onSubmit, initialData }: Props) => {
-  const isEdit = !!initialData;
+const CATEGORY_OPTIONS = [
+  { value: "Utilities", label: "Utilities" },
+  { value: "Vehicle & Fuel", label: "Vehicle & Fuel" },
+  { value: "Plant Operations", label: "Plant Operations" },
+  { value: "Packaging", label: "Packaging" },
+  { value: "Repairs", label: "Repairs" },
+  { value: "Rent & Lease", label: "Rent & Lease" },
+  { value: "Office", label: "Office" },
+  { value: "Compliance", label: "Compliance" },
+  { value: "Marketing", label: "Marketing" },
+  { value: "Loan", label: "Loan" },
+];
+
+const PAYMENT_OPTIONS = [
+  { value: "CASH", label: "Cash" },
+  { value: "UPI", label: "UPI" },
+  { value: "BANK", label: "Bank Transfer" },
+  { value: "CARD", label: "Card" },
+];
+
+const STATUS_OPTIONS = [
+  { value: "PAID", label: "Paid" },
+  { value: "APPROVED", label: "Approved" },
+  { value: "PENDING", label: "Pending" },
+  { value: "REJECTED", label: "Rejected" },
+];
+
+const Expenseformmodal: React.FC<Props> = ({
+  open,
+  editExpense,
+  onClose,
+  onSubmit,
+  loading = false,
+}) => {
+  const isEdit = !!editExpense;
 
   const {
     control,
     handleSubmit,
     reset,
-    watch,
     formState: { errors },
-  } = useForm<any>({
-    defaultValues: initialData || {
-      date: new Date().toISOString().split("T")[0],
-      category: "",
+  } = useForm<ExpenseFormValues>({
+    defaultValues: {
       vendor: "",
       description: "",
+      category: "",
       amount: "",
-      gst: "0",
-      paymentMode: "cash",
-      paidBy: "",
-      reference: "",
+      gstAmount: "",
+      paymentMode: "CASH",
+      status: "PAID",
+      date: dayjs(),
+      notes: "",
     },
   });
 
   useEffect(() => {
     if (open) {
-      reset(
-        initialData || {
-          date: new Date().toISOString().split("T")[0],
-          category: "",
-          vendor: "",
-          description: "",
-          amount: "",
-          gst: "0",
-          paymentMode: "cash",
-          paidBy: "",
-          reference: "",
-        }
-      );
+      reset({
+        vendor: editExpense?.vendor ?? "",
+        description: editExpense?.description ?? "",
+        category: editExpense?.category ?? "",
+        amount: editExpense?.amount ? String(editExpense.amount) : "",
+        gstAmount: editExpense?.gstAmount ? String(editExpense.gstAmount) : "",
+        paymentMode: editExpense?.paymentMode ?? "CASH",
+        status: editExpense?.status ?? "PAID",
+        date: editExpense?.date ? dayjs(editExpense.date) : dayjs(),
+        notes: "",
+      });
     }
-  }, [open, initialData, reset]);
+  }, [open, editExpense, reset]);
 
-  const amount = watch("amount");
-  const gst = watch("gst");
-  const total = (Number(amount) || 0) + (Number(gst) || 0);
-
-  const handleFormSubmit = (data: any) => {
-    onSubmit({
-      ...data,
-      amount: Number(data.amount),
-      gst: Number(data.gst) || 0,
-      total: Number(data.amount) + (Number(data.gst) || 0),
-      status: "draft",
-      createdAt: new Date().toISOString(),
-    });
-    onClose();
-  };
+  const footer = (
+    <div className="flex gap-2">
+      <button
+        type="button"
+        onClick={onClose}
+        disabled={loading}
+        className="flex-1 py-2.5 rounded-xl border border-gray-200 text-gray-600 text-[13px] font-medium hover:bg-gray-50 disabled:opacity-50"
+      >
+        Cancel
+      </button>
+      <button
+        type="button"
+        onClick={handleSubmit(onSubmit)}
+        disabled={loading}
+        className="flex-[2] py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-[13px] font-semibold flex items-center justify-center gap-2 disabled:opacity-50"
+      >
+        {loading ? (
+          <>
+            <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+            Saving...
+          </>
+        ) : isEdit ? (
+          "Update Expense"
+        ) : (
+          "Add Expense"
+        )}
+      </button>
+    </div>
+  );
 
   return (
     <CustomModal
       open={open}
       onClose={onClose}
-      title={isEdit ? "Edit Expense" : "Add New Expense"}
+      title={isEdit ? "Edit Expense" : "Add Expense"}
       subtitle={
-        isEdit ? "Update the expense entry" : "Record a new business expense"
+        isEdit ? "Update expense details" : "Record a new business expense"
       }
-      icon={
-        isEdit ? <HiOutlineReceiptTax size={22} /> : <HiOutlinePlus size={22} />
-      }
+      icon={<HiOutlineReceiptTax className="w-5 h-5" />}
       iconTone="red"
-      size="3xl"
-      footer={
-        <div className="flex items-center justify-between gap-3">
-          <div className="text-xs text-slate-500">
-            Total amount:{" "}
-            <span className="font-bold text-rose-600">
-              ₹{total.toLocaleString("en-IN")}
-            </span>
-            {Number(gst) > 0 && (
-              <span className="text-slate-400">
-                {" "}
-                (incl. ₹{Number(gst).toLocaleString("en-IN")} GST)
-              </span>
-            )}
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={onClose}
-              className="px-4 py-2 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-100 transition-colors"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handleSubmit(handleFormSubmit)}
-              className="px-5 py-2 rounded-lg bg-rose-600 text-white text-sm font-semibold shadow-md hover:bg-rose-700 hover:shadow-lg transition-all"
-            >
-              {isEdit ? "Save Changes" : "Add Expense"}
-            </button>
-          </div>
-        </div>
-      }
+      size="lg"
+      footer={footer}
     >
-      <div className="space-y-5">
-        {/* Section header */}
-        <div className="rounded-xl bg-rose-50/60 border border-rose-100 p-4 flex items-center gap-3">
-          <div className="p-2 rounded-lg bg-white">
-            <HiOutlineReceiptTax className="w-5 h-5 text-rose-600" />
-          </div>
-          <div>
-            <div className="text-sm font-semibold text-slate-900">
-              Expense Details
-            </div>
-            <div className="text-xs text-slate-600">
-              All fields marked * are required
-            </div>
-          </div>
-        </div>
-
-        {/* Form grid */}
+      <div className="space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <CustomInput
-            name="date"
-            control={control}
-            label="Expense Date"
-            type="text"
-            placeholder="YYYY-MM-DD"
-            isrequired
-            errors={errors}
-            rules={{ required: "Date is required" }}
-          />
-
-          <CustomSelect
-            name="category"
-            control={control}
-            label="Category"
-            placeholder="Select category"
-            isrequired
-            errors={errors}
-            rules={{ required: "Category is required" }}
-            options={EXPENSE_CATEGORIES.map((c) => ({
-              value: c.value,
-              label: `${c.icon}  ${c.label}`,
-            }))}
-          />
-
           <CustomInput
             name="vendor"
             control={control}
             label="Vendor / Payee"
             placeholder="e.g. TN Electricity Board"
-            isrequired
             errors={errors}
+            isrequired
             rules={{ required: "Vendor is required" }}
           />
-
           <CustomSelect
-            name="paymentMode"
+            name="category"
             control={control}
-            label="Payment Mode"
-            placeholder="How was it paid?"
-            isrequired
             errors={errors}
-            rules={{ required: "Payment mode required" }}
-            options={PAYMENT_MODES.map((p) => ({
-              value: p.value,
-              label: `${p.icon}  ${p.label}`,
-            }))}
+            label="Category"
+            placeholder="Select category"
+            options={CATEGORY_OPTIONS}
+            isrequired
+            showSearch
+            rules={{ required: "Category is required" }}
           />
+        </div>
 
-          <div className="md:col-span-2">
-            <CustomInput
-              name="description"
-              control={control}
-              label="Description"
-              placeholder="Brief description of the expense..."
-              isrequired
-              errors={errors}
-              rules={{
-                required: "Description is required",
-                minLength: { value: 3, message: "Too short" },
-              }}
-            />
-          </div>
+        <CustomInput
+          name="description"
+          control={control}
+          label="Description"
+          placeholder="e.g. Monthly electricity bill — April"
+          errors={errors}
+          isrequired
+          rules={{ required: "Description is required" }}
+        />
 
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <CustomInput
             name="amount"
             control={control}
             label="Amount (₹)"
-            placeholder="e.g. 16500"
-            isrequired
+            placeholder="0"
             errors={errors}
+            isrequired
+            numbersOnly
             rules={{
               required: "Amount is required",
-              min: { value: 1, message: "Must be greater than 0" },
-              pattern: { value: /^\d+$/, message: "Enter valid number" },
+              validate: (v: string) =>
+                Number(v) > 0 || "Amount must be greater than 0",
             }}
           />
-
           <CustomInput
-            name="gst"
+            name="gstAmount"
             control={control}
             label="GST Amount (₹)"
-            placeholder="e.g. 2000 (optional)"
+            placeholder="0 (optional)"
             errors={errors}
-            rules={{
-              pattern: { value: /^\d+$/, message: "Enter valid number" },
-            }}
+            numbersOnly
+         
           />
+        </div>
 
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <CustomSelect
-            name="paidBy"
+            name="paymentMode"
             control={control}
-            label="Paid By"
-            placeholder="Who paid?"
             errors={errors}
-            options={[
-              { value: "Devaa Balaji", label: "Devaa Balaji" },
-              { value: "Suresh M.", label: "Suresh M." },
-              { value: "Karthik R.", label: "Karthik R." },
-              { value: "Divya B.", label: "Divya B." },
-              { value: "Rajesh K.", label: "Rajesh K." },
-            ]}
+            label="Payment Mode"
+            placeholder="Select mode"
+            options={PAYMENT_OPTIONS}
+            isrequired
+            rules={{ required: "Payment mode is required" }}
           />
-
-          <CustomInput
-            name="reference"
+          <CustomSelect
+            name="status"
             control={control}
-            label="Reference / Bill Number"
-            placeholder="e.g. INV-2026-042 (optional)"
             errors={errors}
+            label="Status"
+            placeholder="Select status"
+            options={STATUS_OPTIONS}
           />
-        </div>
-
-        {/* Receipt upload */}
-        <div className="pt-4 border-t border-dashed border-slate-200">
-          <div className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
-            Attach Receipt
+          <div className="flex flex-col gap-1 w-full">
+            <label className="flex justify-start py-1 text-sm text-slate-700">
+              Date <span className="text-red-500 ml-1">*</span>
+            </label>
+            <Controller
+              name="date"
+              control={control}
+              rules={{ required: "Date is required" }}
+              render={({ field }) => (
+                <DatePicker
+                  {...field}
+                  format="YYYY-MM-DD"
+                  className="w-full"
+                  status={errors.date ? "error" : undefined}
+                  placeholder="Select date"
+                />
+              )}
+            />
+            {errors.date && (
+              <p className="text-red-500 text-sm">
+                {errors.date.message as string}
+              </p>
+            )}
           </div>
-          <button
-            type="button"
-            className="w-full border-2 border-dashed border-slate-200 rounded-xl p-6 text-center hover:border-rose-300 hover:bg-rose-50/30 transition-all group"
-          >
-            <div className="inline-flex p-3 rounded-2xl bg-slate-100 group-hover:bg-rose-100 transition-colors">
-              <HiOutlineUpload className="w-6 h-6 text-slate-400 group-hover:text-rose-600 transition-colors" />
-            </div>
-            <div className="text-sm font-semibold text-slate-700 group-hover:text-rose-700 mt-2">
-              Click to upload receipt
-            </div>
-            <div className="text-xs text-slate-500 mt-1">
-              PDF, JPG, or PNG · Max 5MB
-            </div>
-          </button>
         </div>
+
+        <CustomTextArea
+          name="notes"
+          control={control}
+          label="Notes (optional)"
+          placeholder="Any additional notes..."
+          errors={errors}
+          rows={2}
+          maxLength={200}
+          showCount
+        />
       </div>
     </CustomModal>
   );
 };
 
-export default ExpenseFormModal;
+export default Expenseformmodal;

@@ -760,6 +760,10 @@ const BillingPage = () => {
         successNotification("Invoice Created", response.invoice.invoiceNumber);
       }
 
+      if (response.invoice.status !== "CANCELLED") {
+        handlePrint(newInvoice);
+      }
+
       setSelectedCustomer(null);
       setCustomerMode("existing");
       setWalkInName("");
