@@ -37,15 +37,26 @@ body {
     left: 0;
     top: 0;
     width: 100%;
+    margin: 0 !important;
+    padding-top: 20px !important;
+    padding-bottom: 0 !important;
+    padding-left: 0 !important;
+    padding-right: 0 !important;
   }
 
   #thermal-receipt,
   #gate-pass {
     width: 72mm;
-    margin: 0 auto;
-    padding: 1mm 3mm !important; /* less top/bottom padding inside each slip */
+    margin: 0 auto !important;
+    padding: 0 3mm !important;
     font-weight: 600 !important;
     color: #000 !important;
+  }
+
+  #thermal-receipt > *:first-child,
+  #gate-pass > *:first-child {
+    margin-top: 0 !important;
+    padding-top: 0 !important;
   }
 
   #thermal-receipt *,
@@ -54,10 +65,9 @@ body {
     color: #000 !important;
   }
 
-  /* TEAR LINE — smaller gap now (was 14mm → 6mm) */
   .tear-line {
     width: 72mm;
-    margin: 6mm auto; /* reduced space above and below the line */
+    margin: 6mm auto;
     border: none;
     border-top: 2px dashed #000;
     position: relative;
