@@ -63,6 +63,7 @@ import {
   OutstandingFilters,
 } from "../api/billing.api";
 import ThermalReceipt from "../components/ThermalReceipt";
+import GatePass from "../components/GatePass";
 
 type ExportType = "invoices" | "payments" | "outstanding" | "summary";
 
@@ -970,7 +971,7 @@ const BillingPage = () => {
 
   const handlePrint = (invoice?: Invoice) => {
     if (invoice) setGeneratedInvoice(invoice);
-    setTimeout(() => window.print(), 200);
+    setTimeout(() => window.print(), 300);
   };
 
   const handleShare = async () => {
@@ -1111,8 +1112,14 @@ const BillingPage = () => {
         iconBg="bg-blue-500"
       />
       {generatedInvoice && (
-        <div className="hidden print:block">
+        <div id="print-area">
+          {/* Page 1: the bill */}
           <ThermalReceipt invoice={generatedInvoice} />
+
+          <div className="page-break" />
+
+          {/* Page 2: the gate pass */}
+          <GatePass invoice={generatedInvoice} />
         </div>
       )}
 

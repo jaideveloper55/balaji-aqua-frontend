@@ -17,40 +17,53 @@ body {
   margin: 0;
 }
 
-/* On screen: receipt hidden (never shows on the dashboard). */
-#thermal-receipt {
+/* On screen: the whole print area is hidden (dashboard stays clean). */
+#print-area {
   display: none;
 }
 
 @media print {
-  /* Hide everything, then reveal only the receipt. */
+  /* Hide everything, then reveal only the print area (bill + gate pass). */
   body * {
     visibility: hidden;
   }
-  #thermal-receipt,
-  #thermal-receipt * {
+
+  #print-area,
+  #print-area * {
     visibility: visible;
   }
 
-  #thermal-receipt {
+  /* The print area holds BOTH documents stacked vertically. */
+  #print-area {
     display: block !important;
     position: absolute;
-    left: 50%;
+    left: 0;
     top: 0;
-    transform: translateX(-50%);
-    width: 72mm;
-    height: auto;
+    width: 100%;
+  }
 
-    /* Force darker thermal output: heavier text = more heat = darker print. */
+  /* Center each document on the paper (margin auto, NOT absolute —
+     absolute would stack them on top of each other). */
+  #thermal-receipt,
+  #gate-pass {
+    width: 72mm;
+    margin: 0 auto;
     font-weight: 600 !important;
     color: #000 !important;
   }
 
-  /* Make EVERY element inside the receipt heavier too, so the faint
-     normal-weight rows (items, totals, meta) print dark like the bold ones. */
-  #thermal-receipt * {
+  /* Make every element inside both heavier so faint rows print dark. */
+  #thermal-receipt *,
+  #gate-pass * {
     font-weight: 600 !important;
     color: #000 !important;
+  }
+
+  /* THE KEY LINE: page break after the bill = printer cuts here,
+     so the gate pass prints as a separate slip. */
+  .page-break {
+    break-after: page;
+    page-break-after: always; 
   }
 
   html,
