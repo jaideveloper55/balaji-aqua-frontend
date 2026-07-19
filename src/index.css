@@ -43,6 +43,7 @@ body {
   #gate-pass {
     width: 72mm;
     margin: 0 auto;
+    padding: 1mm 3mm !important; /* less top/bottom padding inside each slip */
     font-weight: 600 !important;
     color: #000 !important;
   }
@@ -53,28 +54,26 @@ body {
     color: #000 !important;
   }
 
-  /* TEAR LINE — a clear "cut here" divider with big space above and below,
-     so the cashier can tear the strip into two separate slips by hand. */
+  /* TEAR LINE — smaller gap now (was 14mm → 6mm) */
   .tear-line {
     width: 72mm;
-    margin: 14mm auto; /* generous gap on both sides of the line */
+    margin: 6mm auto; /* reduced space above and below the line */
     border: none;
-    border-top: 2px dashed #000; /* the dashed tear guide */
+    border-top: 2px dashed #000;
     position: relative;
     text-align: center;
   }
 
-  /* The little "✂ CUT HERE ✂" label sitting on the tear line */
   .tear-line::after {
-    content: "✂ - - - - - CUT HERE - - - - - ✂";
+    content: "✂ - - - CUT HERE - - - ✂";
     position: absolute;
-    top: -8px; /* lift the text onto the line */
+    top: -7px;
     left: 50%;
     transform: translateX(-50%);
-    background: #fff; /* white gap so line doesn't cross the text */
+    background: #fff;
     padding: 0 4px;
     font-family: "Courier New", monospace;
-    font-size: 10px;
+    font-size: 9px;
     font-weight: 700;
     color: #000;
     white-space: nowrap;
