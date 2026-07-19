@@ -3,6 +3,6 @@ export const COMPANY_INFO = {
   tagline: "Pure Water · Pure Trust",
   address:
     "No:131 vasanthavadi village, Madurathangam, Chengalpattu, Tamilnadu 603313",
-  phone: "9840531612, 8015929891",
+  phone: "9840531612, 9150116116, 8015929891, ",
   email: "contact@balajiaqua.com",
 };
