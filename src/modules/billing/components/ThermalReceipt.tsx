@@ -15,17 +15,14 @@ const ThermalReceipt: React.FC<Props> = ({ invoice }) => {
     <div
       id="thermal-receipt"
       style={{
-        // 80mm = standard thermal paper. 'auto' height = receipt grows with items,
-        // exactly how a thermal printer feeds paper (no fixed page like A4).
         width: "80mm",
         padding: "4mm 3mm",
         margin: "0 auto",
         background: "#fff",
         color: "#000",
-        // Monospace makes columns line up perfectly on a narrow receipt,
-        // the classic "till receipt" look from Image 1.
         fontFamily: "'Courier New', monospace",
         fontSize: "12px",
+        fontWeight: 600,
         lineHeight: 1.45,
       }}
     >

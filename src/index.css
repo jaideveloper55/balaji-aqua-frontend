@@ -13,8 +13,8 @@ body {
 }
 
 @page {
-  size: 80mm auto; /* 80mm wide, height grows to fit content only */
-  margin: 0; /* no page margins — thermal rolls have none */
+  size: 80mm auto;
+  margin: 0;
 }
 
 /* On screen: receipt hidden (never shows on the dashboard). */
@@ -31,17 +31,28 @@ body {
   #thermal-receipt * {
     visibility: visible;
   }
+
   #thermal-receipt {
     display: block !important;
     position: absolute;
-    left: 0;
+    left: 50%;
     top: 0;
-    width: 80mm;
-    /* Trim any trailing whitespace so the strip ends at the content */
+    transform: translateX(-50%);
+    width: 72mm;
     height: auto;
+
+    /* Force darker thermal output: heavier text = more heat = darker print. */
+    font-weight: 600 !important;
+    color: #000 !important;
   }
 
-  /* Stop the browser from forcing extra blank page height */
+  /* Make EVERY element inside the receipt heavier too, so the faint
+     normal-weight rows (items, totals, meta) print dark like the bold ones. */
+  #thermal-receipt * {
+    font-weight: 600 !important;
+    color: #000 !important;
+  }
+
   html,
   body {
     width: 80mm;
