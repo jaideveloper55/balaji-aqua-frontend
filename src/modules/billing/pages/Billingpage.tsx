@@ -1113,12 +1113,10 @@ const BillingPage = () => {
       />
       {generatedInvoice && (
         <div id="print-area">
-          {/* Page 1: the bill */}
           <ThermalReceipt invoice={generatedInvoice} />
 
-          <div className="page-break" />
+          <hr className="tear-line" />
 
-          {/* Page 2: the gate pass */}
           <GatePass invoice={generatedInvoice} />
         </div>
       )}

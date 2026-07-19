@@ -17,13 +17,11 @@ body {
   margin: 0;
 }
 
-/* On screen: the whole print area is hidden (dashboard stays clean). */
 #print-area {
   display: none;
 }
 
 @media print {
-  /* Hide everything, then reveal only the print area (bill + gate pass). */
   body * {
     visibility: hidden;
   }
@@ -33,7 +31,6 @@ body {
     visibility: visible;
   }
 
-  /* The print area holds BOTH documents stacked vertically. */
   #print-area {
     display: block !important;
     position: absolute;
@@ -42,8 +39,6 @@ body {
     width: 100%;
   }
 
-  /* Center each document on the paper (margin auto, NOT absolute —
-     absolute would stack them on top of each other). */
   #thermal-receipt,
   #gate-pass {
     width: 72mm;
@@ -52,18 +47,37 @@ body {
     color: #000 !important;
   }
 
-  /* Make every element inside both heavier so faint rows print dark. */
   #thermal-receipt *,
   #gate-pass * {
     font-weight: 600 !important;
     color: #000 !important;
   }
 
-  /* THE KEY LINE: page break after the bill = printer cuts here,
-     so the gate pass prints as a separate slip. */
-  .page-break {
-    break-after: page;
-    page-break-after: always; 
+  /* TEAR LINE — a clear "cut here" divider with big space above and below,
+     so the cashier can tear the strip into two separate slips by hand. */
+  .tear-line {
+    width: 72mm;
+    margin: 14mm auto; /* generous gap on both sides of the line */
+    border: none;
+    border-top: 2px dashed #000; /* the dashed tear guide */
+    position: relative;
+    text-align: center;
+  }
+
+  /* The little "✂ CUT HERE ✂" label sitting on the tear line */
+  .tear-line::after {
+    content: "✂ - - - - - CUT HERE - - - - - ✂";
+    position: absolute;
+    top: -8px; /* lift the text onto the line */
+    left: 50%;
+    transform: translateX(-50%);
+    background: #fff; /* white gap so line doesn't cross the text */
+    padding: 0 4px;
+    font-family: "Courier New", monospace;
+    font-size: 10px;
+    font-weight: 700;
+    color: #000;
+    white-space: nowrap;
   }
 
   html,
