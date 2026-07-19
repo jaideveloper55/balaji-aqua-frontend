@@ -869,6 +869,7 @@ const BillingPage = () => {
     setSelectedCustomer(null);
     setCustomerMode("existing");
     updateCartSettingsMutation.mutate({
+      customerId: null,
       invoiceType: "SALE",
       walkInName: undefined,
       walkInPhone: undefined,
@@ -898,7 +899,7 @@ const BillingPage = () => {
     setSelectedCustomer(walkIn);
     setCustomerMode("walkin");
     updateCartSettingsMutation.mutate({
-      customerId: undefined,
+      customerId: null,
       invoiceType: "WALK_IN",
       walkInName: walkInName.trim(),
       walkInPhone: walkInPhone.trim() || undefined,

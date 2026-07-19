@@ -206,7 +206,7 @@ export const removeCartItemApi = (itemId: string) => {
 };
 
 export const updateCartSettingsApi = (data: {
-  customerId?: string;
+  customerId?: string | null;
   walkInName?: string;
   walkInPhone?: string;
   invoiceType?: "SALE" | "WALK_IN";
