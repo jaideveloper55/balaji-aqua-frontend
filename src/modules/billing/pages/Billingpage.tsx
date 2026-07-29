@@ -187,6 +187,8 @@ const BillingPage = () => {
   const [collectionModeFilter, setCollectionModeFilter] = useState("all");
   const [cart, setCart] = useState<any[]>([]);
   const [serverCart, setServerCart] = useState<any>(null);
+  const [lastExtraPayment, setLastExtraPayment] = useState(0);
+  const [prevOutstanding, setPrevOutstanding] = useState(0);
 
   const productSearchRef = useRef<HTMLInputElement>(null);
 
@@ -325,9 +327,7 @@ const BillingPage = () => {
   const totalItems = serverCart?.itemCount ?? 0;
   const includeGST = serverCart?.gstEnabled ?? false;
   const discount = serverCart?.discount ?? 0;
-  const changeAmount = Math.max(0, amountReceived - grandTotal);
 
-  // ─── Filters (computed before queries that depend on them) ─────────────────
   const invoiceApiFilters: InvoiceFilters = useMemo(() => {
     const f: InvoiceFilters = {
       limit: 200,
@@ -397,7 +397,7 @@ const BillingPage = () => {
       getPOSProductsApi(productSearch || undefined).then(
         (res) => res.data.data
       ),
-    staleTime: 1000 * 60 * 2,
+    staleTime: 0,
   });
 
   const { data: invoicesData } = useQuery({
@@ -724,6 +724,14 @@ const BillingPage = () => {
         grandTotal: response.invoice.totalAmount,
         paidAmount: respPaid,
         balanceAmount: respBalance,
+        extraPaymentCollected:
+          response.extraPaymentCollected ?? lastExtraPayment,
+        outstandingAfter: Math.max(
+          0,
+          prevOutstanding -
+            (response.extraPaymentCollected ?? lastExtraPayment) +
+            respBalance
+        ),
         status: mapStatusLocal(),
         paymentMode:
           paymentMode === "cash"
@@ -934,9 +942,12 @@ const BillingPage = () => {
       mode: "CASH" | "UPI" | "BANK_TRANSFER";
       amount: number;
       referenceId?: string;
-    }[]
+    }[],
+    extraPayment?: number
   ) => {
     setIsProcessing(true);
+    setLastExtraPayment(extraPayment || 0);
+    setPrevOutstanding(selectedCustomer?.outstanding ?? 0);
 
     if (splits && splits.length > 0) {
       const paidNow = splits.reduce((s, p) => s + p.amount, 0);
@@ -950,6 +961,7 @@ const BillingPage = () => {
       checkoutMutation.mutate({
         payments: splits,
         dueDate: finalDueDate ?? undefined,
+        extraPayment: extraPayment || undefined,
       });
       return;
     }
@@ -967,6 +979,7 @@ const BillingPage = () => {
       referenceId: reference || undefined,
       amountPaid: isPartial ? amountReceived : undefined,
       dueDate: finalDueDate ?? undefined,
+      extraPayment: extraPayment || undefined,
     });
   };
 
@@ -1290,7 +1303,6 @@ const BillingPage = () => {
           selectedCustomer={selectedCustomer}
           paymentMode={paymentMode}
           amountReceived={amountReceived}
-          changeAmount={changeAmount}
           grandTotal={grandTotal}
           onPaymentModeChange={setPaymentMode}
           onAmountReceivedChange={setAmountReceived}

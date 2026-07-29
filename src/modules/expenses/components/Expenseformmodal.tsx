@@ -1,19 +1,19 @@
 import React, { useEffect } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, Controller } from "react-hook-form";
 import dayjs, { Dayjs } from "dayjs";
 import { HiOutlineReceiptTax } from "react-icons/hi";
+import { DatePicker } from "antd";
 import CustomModal from "../../../components/common/CustomModal";
 import CustomInput from "../../../components/common/CustomInput";
 import CustomSelect from "../../../components/common/CustomSelect";
-import { Controller } from "react-hook-form";
-import { DatePicker } from "antd";
-import type { Expense } from "./Allexpensespanel";
 import CustomTextArea from "../../../components/common/Customtextarea";
+import type { CreateExpensePayload } from "../api/Expenses.api";
+import { Expense } from "../types/Expenses";
 
-export interface ExpenseFormValues {
-  vendor: string;
+interface ExpenseFormValues {
+  vendorName: string;
   description: string;
-  category: string;
+  categoryName: string;
   amount: string;
   gstAmount: string;
   paymentMode: string;
@@ -24,30 +24,20 @@ export interface ExpenseFormValues {
 
 interface Props {
   open: boolean;
-  editExpense?: Expense | null;
   onClose: () => void;
-  onSubmit: (values: ExpenseFormValues) => void;
-  loading?: boolean;
+  onSubmit: (payload: CreateExpensePayload) => void;
+  initialData?: Expense | null;
+  categories?: { id: string; name: string }[];
+  vendors?: { id: string; name: string; category?: string }[];
+  isSubmitting?: boolean;
 }
-
-const CATEGORY_OPTIONS = [
-  { value: "Utilities", label: "Utilities" },
-  { value: "Vehicle & Fuel", label: "Vehicle & Fuel" },
-  { value: "Plant Operations", label: "Plant Operations" },
-  { value: "Packaging", label: "Packaging" },
-  { value: "Repairs", label: "Repairs" },
-  { value: "Rent & Lease", label: "Rent & Lease" },
-  { value: "Office", label: "Office" },
-  { value: "Compliance", label: "Compliance" },
-  { value: "Marketing", label: "Marketing" },
-  { value: "Loan", label: "Loan" },
-];
 
 const PAYMENT_OPTIONS = [
   { value: "CASH", label: "Cash" },
   { value: "UPI", label: "UPI" },
-  { value: "BANK", label: "Bank Transfer" },
+  { value: "BANK_TRANSFER", label: "Bank Transfer" },
   { value: "CARD", label: "Card" },
+  { value: "CHEQUE", label: "Cheque" },
 ];
 
 const STATUS_OPTIONS = [
@@ -59,12 +49,14 @@ const STATUS_OPTIONS = [
 
 const Expenseformmodal: React.FC<Props> = ({
   open,
-  editExpense,
   onClose,
   onSubmit,
-  loading = false,
+  initialData = null,
+  categories = [],
+  vendors = [],
+  isSubmitting = false,
 }) => {
-  const isEdit = !!editExpense;
+  const isEdit = !!initialData;
 
   const {
     control,
@@ -73,9 +65,9 @@ const Expenseformmodal: React.FC<Props> = ({
     formState: { errors },
   } = useForm<ExpenseFormValues>({
     defaultValues: {
-      vendor: "",
+      vendorName: "",
       description: "",
-      category: "",
+      categoryName: "",
       amount: "",
       gstAmount: "",
       paymentMode: "CASH",
@@ -86,38 +78,72 @@ const Expenseformmodal: React.FC<Props> = ({
   });
 
   useEffect(() => {
-    if (open) {
-      reset({
-        vendor: editExpense?.vendor ?? "",
-        description: editExpense?.description ?? "",
-        category: editExpense?.category ?? "",
-        amount: editExpense?.amount ? String(editExpense.amount) : "",
-        gstAmount: editExpense?.gstAmount ? String(editExpense.gstAmount) : "",
-        paymentMode: editExpense?.paymentMode ?? "CASH",
-        status: editExpense?.status ?? "PAID",
-        date: editExpense?.date ? dayjs(editExpense.date) : dayjs(),
-        notes: "",
-      });
-    }
-  }, [open, editExpense, reset]);
+    if (!open) return;
+
+    reset({
+      vendorName: initialData?.vendorName ?? "",
+      description: initialData?.description ?? "",
+      categoryName: initialData?.categoryName ?? "",
+      amount: initialData?.amount ? String(initialData.amount) : "",
+      gstAmount: initialData?.gstAmount ? String(initialData.gstAmount) : "",
+      paymentMode: initialData?.paymentMode ?? "CASH",
+      status: initialData?.status ?? "PAID",
+      date: initialData?.date ? dayjs(initialData.date) : dayjs(),
+      notes: "",
+    });
+  }, [open, initialData, reset]);
+
+  const handleFormSubmit = (values: ExpenseFormValues) => {
+    const matchedCategory = categories.find(
+      (c) => c.name === values.categoryName
+    );
+    const matchedVendor = vendors.find((v) => v.name === values.vendorName);
+    const payload: CreateExpensePayload = {
+      vendorName: values.vendorName,
+      vendorId: matchedVendor?.id ?? undefined,
+      description: values.description,
+      categoryName: values.categoryName,
+      categoryId: matchedCategory?.id ?? undefined,
+      amount: Number(values.amount),
+      gstAmount: values.gstAmount ? Number(values.gstAmount) : 0,
+      paymentMode: values.paymentMode as CreateExpensePayload["paymentMode"],
+      status: values.status as CreateExpensePayload["status"],
+      date: values.date
+        ? values.date.format("YYYY-MM-DD")
+        : dayjs().format("YYYY-MM-DD"),
+      notes: values.notes || undefined,
+    };
+
+    onSubmit(payload);
+  };
+
+  const categoryOptions = categories.map((c) => ({
+    value: c.name,
+    label: c.name,
+  }));
+
+  const vendorOptions = vendors.map((v) => ({
+    value: v.name,
+    label: v.name,
+  }));
 
   const footer = (
     <div className="flex gap-2">
       <button
         type="button"
         onClick={onClose}
-        disabled={loading}
+        disabled={isSubmitting}
         className="flex-1 py-2.5 rounded-xl border border-gray-200 text-gray-600 text-[13px] font-medium hover:bg-gray-50 disabled:opacity-50"
       >
         Cancel
       </button>
       <button
         type="button"
-        onClick={handleSubmit(onSubmit)}
-        disabled={loading}
+        onClick={handleSubmit(handleFormSubmit)}
+        disabled={isSubmitting}
         className="flex-[2] py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-[13px] font-semibold flex items-center justify-center gap-2 disabled:opacity-50"
       >
-        {loading ? (
+        {isSubmitting ? (
           <>
             <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
             Saving...
@@ -146,22 +172,24 @@ const Expenseformmodal: React.FC<Props> = ({
     >
       <div className="space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <CustomInput
-            name="vendor"
+          <CustomSelect
+            name="vendorName"
             control={control}
+            errors={errors}
             label="Vendor / Payee"
             placeholder="e.g. TN Electricity Board"
-            errors={errors}
+            options={vendorOptions.length > 0 ? vendorOptions : []}
+            showSearch
             isrequired
             rules={{ required: "Vendor is required" }}
           />
           <CustomSelect
-            name="category"
+            name="categoryName"
             control={control}
             errors={errors}
             label="Category"
             placeholder="Select category"
-            options={CATEGORY_OPTIONS}
+            options={categoryOptions}
             isrequired
             showSearch
             rules={{ required: "Category is required" }}
@@ -200,7 +228,6 @@ const Expenseformmodal: React.FC<Props> = ({
             placeholder="0 (optional)"
             errors={errors}
             numbersOnly
-         
           />
         </div>
 

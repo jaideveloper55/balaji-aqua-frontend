@@ -139,6 +139,7 @@ const LedgerTable: React.FC<LedgerTableProps> = ({ customerId }) => {
         dataIndex: "entryDate",
         key: "entryDate",
         width: 100,
+        defaultSortOrder: "descend" as const,
         sorter: (a, b) =>
           new Date(a.entryDate).getTime() - new Date(b.entryDate).getTime(),
         render: (d: string) => (

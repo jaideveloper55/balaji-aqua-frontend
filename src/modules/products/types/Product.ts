@@ -255,3 +255,37 @@ export const getProductAlertSeverity = (
     return "warning";
   return null;
 };
+
+export interface BomLinePayload {
+  componentId: string;
+  quantityPerUnit: number;
+}
+
+export interface SetBomPayload {
+  lines: BomLinePayload[];
+}
+
+export interface BomLine {
+  id: string;
+  componentId: string;
+  name: string;
+  sku: string;
+  unit: ProductUnit;
+  category: string | null;
+  quantityPerUnit: number;
+  currentStock: number;
+  available: number;
+  buildableUnits: number;
+}
+
+export interface BomResponse {
+  product: {
+    id: string;
+    name: string;
+    sku: string;
+    unit: ProductUnit;
+    consumesBom: boolean;
+  };
+  lines: BomLine[];
+  maxBuildable: number | null;
+}

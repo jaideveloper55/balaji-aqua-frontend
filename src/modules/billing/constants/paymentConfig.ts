@@ -1,7 +1,7 @@
 export const PAYMENT_CONFIG = {
   // ─── UPI ───────────────────────────────────────────────────────────────────
   upi: {
-    id: "8015929891@cnrb", // Canara Bank VPA
+    id: "8015929891@cnrb", 
     name: "SRIBALAJI AQUA WATER",
     hint: "Works with GPay, PhonePe, Paytm, BHIM & all UPI apps",
     qrImagePath: "/images/bank-qr.jpeg",

@@ -52,8 +52,9 @@ const CustomerPage = () => {
     },
     [goToDetail]
   );
-
-  const handleEditSuccess = useCallback(() => setEditCustomerId(null), []);
+  const handleEditSuccess = useCallback((_id: string) => {
+    setEditCustomerId(null);
+  }, []);
 
   return (
     <Spin spinning={isEditLoading}>

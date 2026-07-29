@@ -109,8 +109,49 @@ const ThermalReceipt: React.FC<Props> = ({ invoice }) => {
       <div style={{ borderTop: "1px solid #000", margin: "5px 0" }} />
 
       {/* ── PAYMENT (Tendered / Balance, exactly like Image 1) ── */}
-      <Row label="Tendered:" value={invoice.paidAmount.toFixed(2)} />
-      <Row label="Balance:" value={invoice.balanceAmount.toFixed(2)} />
+      {/* ── PAYMENT ──
+          When old dues were also collected, the cash handed over exceeds
+          this bill. Show the split so the slip reconciles with the drawer. */}
+      {(invoice.extraPaymentCollected ?? 0) > 0 && (
+        <>
+          <Row label="This Bill:" value={invoice.paidAmount.toFixed(2)} />
+          <Row
+            label="Old Dues Paid:"
+            value={invoice.extraPaymentCollected!.toFixed(2)}
+          />
+          <div style={{ borderTop: "1px dashed #000", margin: "4px 0" }} />
+        </>
+      )}
+
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          fontWeight: 700,
+          fontSize: "13px",
+        }}
+      >
+        <span>TOTAL RECEIVED:</span>
+        <span>
+          {(invoice.paidAmount + (invoice.extraPaymentCollected ?? 0)).toFixed(
+            2
+          )}
+        </span>
+      </div>
+
+      {/* Unpaid portion of THIS bill */}
+      {invoice.balanceAmount > 0 && (
+        <Row label="Bill Balance:" value={invoice.balanceAmount.toFixed(2)} />
+      )}
+
+      {/* Where the customer's account stands now */}
+      {typeof invoice.outstandingAfter === "number" &&
+        invoice.outstandingAfter > 0 && (
+          <Row
+            label="Total Due Now:"
+            value={invoice.outstandingAfter.toFixed(2)}
+          />
+        )}
 
       <div style={{ borderTop: "1px dashed #000", margin: "6px 0" }} />
       <div style={{ textAlign: "center", fontSize: "12px" }}>
@@ -120,8 +161,6 @@ const ThermalReceipt: React.FC<Props> = ({ invoice }) => {
   );
 };
 
-// Tiny helper so each "label ........ value" line stays consistent.
-// WHY a sub-component: avoids repeating the same flex/justify code 8 times.
 const Row: React.FC<{ label: string; value: string }> = ({ label, value }) => (
   <div
     style={{

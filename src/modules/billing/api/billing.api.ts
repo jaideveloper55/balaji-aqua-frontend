@@ -227,6 +227,7 @@ export const checkoutApi = (data: {
   paymentMode?: string;
   referenceId?: string;
   amountPaid?: number;
+  extraPayment?: number;
   payments?: {
     mode: "CASH" | "UPI" | "BANK_TRANSFER";
     amount: number;

@@ -4,10 +4,10 @@ import { HiOutlineUserGroup } from "react-icons/hi";
 import CustomModal from "../../../components/common/CustomModal";
 import CustomInput from "../../../components/common/CustomInput";
 import CustomSelect from "../../../components/common/CustomSelect";
-import type { Vendor } from "../types/Expenses";
 import CustomTextArea from "../../../components/common/Customtextarea";
+import type { CreateVendorPayload } from "../api/Expenses.api";
 
-export interface VendorFormValues {
+interface VendorFormValues {
   name: string;
   category: string;
   phone: string;
@@ -17,15 +17,27 @@ export interface VendorFormValues {
   notes: string;
 }
 
-interface Props {
-  open: boolean;
-  editVendor?: Vendor | null;
-  onClose: () => void;
-  onSubmit: (values: VendorFormValues) => void;
-  loading?: boolean;
+interface ApiVendor {
+  id: string;
+  name: string;
+  category: string;
+  phone: string;
+  email?: string;
+  gstin?: string;
+  openingOutstanding?: number;
+  notes?: string;
+  isActive?: boolean;
 }
 
-const CATEGORY_OPTIONS = [
+interface Props {
+  open: boolean;
+  onClose: () => void;
+  onSubmit: (payload: CreateVendorPayload) => void;
+  initialData?: ApiVendor | null;
+  isSubmitting?: boolean;
+}
+
+const VENDOR_CATEGORY_OPTIONS = [
   { value: "Utilities", label: "Utilities" },
   { value: "Vehicle & Fuel", label: "Vehicle & Fuel" },
   { value: "Plant Operations", label: "Plant Operations" },
@@ -35,16 +47,17 @@ const CATEGORY_OPTIONS = [
   { value: "Office", label: "Office" },
   { value: "Compliance", label: "Compliance" },
   { value: "Marketing", label: "Marketing" },
+  { value: "Other", label: "Other" },
 ];
 
 const Vendorformmodal: React.FC<Props> = ({
   open,
-  editVendor,
   onClose,
   onSubmit,
-  loading = false,
+  initialData = null,
+  isSubmitting = false,
 }) => {
-  const isEdit = !!editVendor;
+  const isEdit = !!initialData;
 
   const {
     control,
@@ -64,38 +77,52 @@ const Vendorformmodal: React.FC<Props> = ({
   });
 
   useEffect(() => {
-    if (open) {
-      reset({
-        name: editVendor?.name ?? "",
-        category: editVendor?.category ?? "",
-        phone: editVendor?.phone ?? "",
-        email: editVendor?.email ?? "",
-        gstin: editVendor?.gstin ?? "",
-        openingOutstanding: editVendor?.outstanding
-          ? String(editVendor.outstanding)
-          : "",
-        notes: "",
-      });
-    }
-  }, [open, editVendor, reset]);
+    if (!open) return;
+    reset({
+      name: initialData?.name ?? "",
+      category: initialData?.category ?? "",
+      phone: initialData?.phone ?? "",
+      email: initialData?.email ?? "",
+      gstin: initialData?.gstin ?? "",
+      openingOutstanding: initialData?.openingOutstanding
+        ? String(initialData.openingOutstanding)
+        : "",
+      notes: initialData?.notes ?? "",
+    });
+  }, [open, initialData, reset]);
+
+  const handleFormSubmit = (values: VendorFormValues) => {
+    const payload: CreateVendorPayload = {
+      name: values.name,
+      category: values.category,
+      phone: values.phone,
+      email: values.email || undefined,
+      gstin: values.gstin || undefined,
+      openingOutstanding: values.openingOutstanding
+        ? Number(values.openingOutstanding)
+        : undefined,
+      notes: values.notes || undefined,
+    };
+    onSubmit(payload);
+  };
 
   const footer = (
     <div className="flex gap-2">
       <button
         type="button"
         onClick={onClose}
-        disabled={loading}
+        disabled={isSubmitting}
         className="flex-1 py-2.5 rounded-xl border border-gray-200 text-gray-600 text-[13px] font-medium hover:bg-gray-50 disabled:opacity-50"
       >
         Cancel
       </button>
       <button
         type="button"
-        onClick={handleSubmit(onSubmit)}
-        disabled={loading}
+        onClick={handleSubmit(handleFormSubmit)}
+        disabled={isSubmitting}
         className="flex-[2] py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-[13px] font-semibold flex items-center justify-center gap-2 disabled:opacity-50"
       >
-        {loading ? (
+        {isSubmitting ? (
           <>
             <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
             Saving...
@@ -139,7 +166,7 @@ const Vendorformmodal: React.FC<Props> = ({
             errors={errors}
             label="Category"
             placeholder="Select category"
-            options={CATEGORY_OPTIONS}
+            options={VENDOR_CATEGORY_OPTIONS}
             isrequired
             showSearch
             rules={{ required: "Category is required" }}
@@ -154,7 +181,6 @@ const Vendorformmodal: React.FC<Props> = ({
             placeholder="e.g. 9876543210"
             errors={errors}
             isrequired
-            numbersOnly
             rules={{
               required: "Phone is required",
               minLength: { value: 4, message: "Enter a valid phone number" },
@@ -193,6 +219,7 @@ const Vendorformmodal: React.FC<Props> = ({
           />
         </div>
 
+        {/* Notes */}
         <CustomTextArea
           name="notes"
           control={control}

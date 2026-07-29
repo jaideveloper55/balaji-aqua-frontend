@@ -1,10 +1,13 @@
 import React from "react";
-import { Drawer, Tag, Divider, message } from "antd";
+import { Drawer, Tag, Divider } from "antd";
 import {
   HiOutlineDocumentText,
   HiOutlinePrinter,
   HiOutlineClipboardCopy,
   HiOutlineCash,
+  HiOutlineBan,
+  HiOutlineCalendar,
+  HiOutlineExclamationCircle,
 } from "react-icons/hi";
 import {
   formatCurrency,
@@ -13,6 +16,10 @@ import {
   getInitials,
 } from "../../utils/Helpers";
 import { Invoice } from "../../types/billing";
+import {
+  errorNotification,
+  successNotification,
+} from "../../../../components/common/Notification";
 
 interface Props {
   open: boolean;
@@ -20,6 +27,7 @@ interface Props {
   onClose: () => void;
   onPrint: (invoice: Invoice) => void;
   onRecordPayment: (invoice: Invoice) => void;
+  onCancel?: (invoice: Invoice) => void;
 }
 
 const InvoiceDetailDrawer: React.FC<Props> = ({
@@ -28,194 +36,282 @@ const InvoiceDetailDrawer: React.FC<Props> = ({
   onClose,
   onPrint,
   onRecordPayment,
-}) => (
-  <Drawer
-    open={open}
-    onClose={onClose}
-    title={
-      <div className="flex items-center gap-2">
-        <HiOutlineDocumentText className="w-5 h-5 text-emerald-600" />
-        <span>Invoice Details</span>
-      </div>
-    }
-    width={520}
-    extra={
-      <div className="flex gap-2">
-        <button
-          onClick={() => invoice && onPrint(invoice)}
-          className="flex items-center gap-1 px-3 py-1.5 rounded-lg border border-gray-200 text-[12px] font-medium text-gray-600 hover:bg-gray-50"
-        >
-          <HiOutlinePrinter className="w-3.5 h-3.5" /> Print
-        </button>
-        <button
-          onClick={() => {
-            if (invoice) {
-              navigator.clipboard.writeText(
-                `${invoice.invoiceNo} - ${formatCurrency(invoice.grandTotal)}`
-              );
-              message.success("Copied!");
-            }
-          }}
-          className="flex items-center gap-1 px-3 py-1.5 rounded-lg border border-gray-200 text-[12px] font-medium text-gray-600 hover:bg-gray-50"
-        >
-          <HiOutlineClipboardCopy className="w-3.5 h-3.5" /> Copy
-        </button>
-      </div>
-    }
-  >
-    {invoice && (
-      <div className="space-y-5">
-        <div className="flex items-center justify-between">
-          <div>
-            <div className="font-mono text-base font-bold text-gray-900">
-              {invoice.invoiceNo}
-            </div>
-            <div className="text-[12px] text-gray-400 mt-0.5">
-              {invoice.date} · {invoice.time}
-            </div>
-          </div>
-          <Tag
-            color={getStatusConfig(invoice.status).color}
-            className="text-[12px] px-3 py-0.5"
-          >
-            {invoice.status}
-          </Tag>
+  onCancel,
+}) => {
+  const canCancel =
+    invoice &&
+    invoice.status !== "Paid" &&
+    invoice.status !== "Cancelled" &&
+    !!onCancel;
+
+  const canRecordPayment =
+    invoice &&
+    (invoice.status === "Pending" ||
+      invoice.status === "Partial" ||
+      invoice.status === "Overdue") &&
+    invoice.balanceAmount > 0;
+
+  return (
+    <Drawer
+      open={open}
+      onClose={onClose}
+      title={
+        <div className="flex items-center gap-2">
+          <HiOutlineDocumentText className="w-5 h-5 text-emerald-600" />
+          <span>Invoice Details</span>
         </div>
-
-        <div className="bg-gray-50 rounded-xl p-3 flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-emerald-100 flex items-center justify-center text-emerald-700 font-bold text-xs">
-            {getInitials(invoice.customerName)}
-          </div>
-          <div className="flex-1">
-            <div className="font-semibold text-[13px] text-gray-800">
-              {invoice.customerName}
-            </div>
-            <div className="flex items-center gap-2 text-[11px] text-gray-400">
-              <span>{invoice.customerId}</span>
-              <Tag
-                color={getCustomerTypeColor(invoice.customerType)}
-                className="text-[10px]"
-              >
-                {invoice.customerType}
-              </Tag>
-              {invoice.customerPhone && <span>· {invoice.customerPhone}</span>}
-            </div>
-          </div>
-        </div>
-
-        <div>
-          <h4 className="text-[12px] font-semibold text-gray-500 uppercase tracking-wide mb-2">
-            Items
-          </h4>
-          <div className="bg-white border border-gray-100 rounded-xl overflow-hidden">
-            <table className="w-full">
-              <thead>
-                <tr className="bg-gray-50 text-[11px] text-gray-500">
-                  <th className="text-left px-3 py-2 font-medium">Product</th>
-                  <th className="text-center px-3 py-2 font-medium">Qty</th>
-                  <th className="text-right px-3 py-2 font-medium">Price</th>
-                  <th className="text-right px-3 py-2 font-medium">Total</th>
-                </tr>
-              </thead>
-              <tbody>
-                {invoice.items.map((item, idx) => (
-                  <tr key={idx} className="border-t border-gray-50">
-                    <td className="px-3 py-2.5 text-[13px] font-medium text-gray-800">
-                      {item.product}
-                    </td>
-                    <td className="px-3 py-2.5 text-[13px] text-gray-600 text-center">
-                      {item.qty}
-                    </td>
-                    <td className="px-3 py-2.5 text-[13px] text-gray-600 text-right">
-                      {formatCurrency(item.price)}
-                    </td>
-                    <td className="px-3 py-2.5 text-[13px] font-semibold text-gray-900 text-right">
-                      {formatCurrency(item.total)}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        <div className="bg-gray-50 rounded-xl p-4 space-y-2">
-          <div className="flex justify-between text-[13px]">
-            <span className="text-gray-500">Subtotal</span>
-            <span className="text-gray-700 font-medium">
-              {formatCurrency(invoice.subtotal)}
-            </span>
-          </div>
-          {invoice.gst > 0 && (
-            <div className="flex justify-between text-[13px]">
-              <span className="text-gray-500">GST (18%)</span>
-              <span className="text-gray-700 font-medium">
-                +{formatCurrency(invoice.gst)}
-              </span>
-            </div>
-          )}
-          {invoice.discount > 0 && (
-            <div className="flex justify-between text-[13px]">
-              <span className="text-gray-500">Discount</span>
-              <span className="text-emerald-600 font-medium">
-                -{formatCurrency(invoice.discount)}
-              </span>
-            </div>
-          )}
-          <Divider className="!my-2" />
-          <div className="flex justify-between">
-            <span className="text-[14px] font-bold text-gray-900">
-              Grand Total
-            </span>
-            <span className="text-[16px] font-bold text-gray-900">
-              {formatCurrency(invoice.grandTotal)}
-            </span>
-          </div>
-          <div className="flex justify-between text-[13px]">
-            <span className="text-emerald-600 font-medium">Paid</span>
-            <span className="text-emerald-600 font-bold">
-              {formatCurrency(invoice.paidAmount)}
-            </span>
-          </div>
-          {invoice.balanceAmount > 0 && (
-            <div className="flex justify-between text-[13px]">
-              <span className="text-red-500 font-medium">Balance Due</span>
-              <span className="text-red-600 font-bold">
-                {formatCurrency(invoice.balanceAmount)}
-              </span>
-            </div>
-          )}
-        </div>
-
-        <div className="grid grid-cols-2 gap-3">
-          {[
-            { label: "Payment Mode", value: invoice.paymentMode },
-            { label: "Delivery Mode", value: invoice.deliveryMode },
-
-            { label: "Notes", value: invoice.notes || "—" },
-          ].map((item, idx) => (
-            <div key={idx} className="bg-gray-50 rounded-lg p-3">
-              <div className="text-[10px] text-gray-400 uppercase tracking-wide">
-                {item.label}
-              </div>
-              <div className="text-[13px] font-medium text-gray-800 mt-0.5">
-                {item.value}
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {invoice.balanceAmount > 0 && (
+      }
+      width={520}
+      extra={
+        <div className="flex gap-2">
           <button
-            onClick={() => onRecordPayment(invoice)}
-            className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-[13px] flex items-center justify-center gap-2"
+            onClick={() => invoice && onPrint(invoice)}
+            className="flex items-center gap-1 px-3 py-1.5 rounded-lg border border-gray-200 text-[12px] font-medium text-gray-600 hover:bg-gray-50 transition-colors"
           >
-            <HiOutlineCash className="w-4 h-4" /> Record Payment for Balance
+            <HiOutlinePrinter className="w-3.5 h-3.5" /> Print
           </button>
-        )}
-      </div>
-    )}
-  </Drawer>
-);
+          <button
+            onClick={() => {
+              if (invoice) {
+                navigator.clipboard
+                  .writeText(
+                    `${invoice.invoiceNo} - ${formatCurrency(
+                      invoice.grandTotal
+                    )}`
+                  )
+                  .then(() => successNotification("Copied", invoice.invoiceNo))
+                  .catch(() =>
+                    errorNotification(
+                      "Copy Failed",
+                      "Could not copy to clipboard"
+                    )
+                  );
+              }
+            }}
+            className="flex items-center gap-1 px-3 py-1.5 rounded-lg border border-gray-200 text-[12px] font-medium text-gray-600 hover:bg-gray-50 transition-colors"
+          >
+            <HiOutlineClipboardCopy className="w-3.5 h-3.5" /> Copy
+          </button>
+        </div>
+      }
+    >
+      {invoice && (
+        <div className="space-y-5">
+          {/* ── Header ─────────────────────────────────────────────────────── */}
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="font-mono text-base font-bold text-gray-900">
+                {invoice.invoiceNo}
+              </div>
+              <div className="text-[12px] text-gray-400 mt-0.5">
+                {invoice.date} · {invoice.time}
+              </div>
+            </div>
+            <Tag
+              color={getStatusConfig(invoice.status).color}
+              className="text-[12px] px-3 py-0.5"
+            >
+              {invoice.status}
+            </Tag>
+          </div>
+
+          {/* ── Overdue warning ────────────────────────────────────────────── */}
+          {invoice.status === "Overdue" && invoice.overdueDays > 0 && (
+            <div className="flex items-center gap-2 bg-red-50 border border-red-100 rounded-xl px-3 py-2.5">
+              <HiOutlineExclamationCircle className="w-4 h-4 text-red-500 shrink-0" />
+              <div className="text-[12px] text-red-700 font-medium">
+                Overdue by {invoice.overdueDays} day
+                {invoice.overdueDays === 1 ? "" : "s"}
+              </div>
+            </div>
+          )}
+
+          {/* ── Due date (if present) ───────────────────────────────────────── */}
+          {invoice.dueDate &&
+            invoice.status !== "Paid" &&
+            invoice.status !== "Cancelled" && (
+              <div className="flex items-center gap-2 bg-amber-50 border border-amber-100 rounded-xl px-3 py-2.5">
+                <HiOutlineCalendar className="w-4 h-4 text-amber-500 shrink-0" />
+                <div className="text-[12px] text-amber-700">
+                  Due by{" "}
+                  <span className="font-semibold">{invoice.dueDate}</span>
+                </div>
+              </div>
+            )}
+
+          {/* ── Customer ───────────────────────────────────────────────────── */}
+          <div className="bg-gray-50 rounded-xl p-3 flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-emerald-100 flex items-center justify-center text-emerald-700 font-bold text-xs shrink-0">
+              {getInitials(invoice.customerName)}
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="font-semibold text-[13px] text-gray-800 truncate">
+                {invoice.customerName}
+              </div>
+              <div className="flex items-center gap-2 text-[11px] text-gray-400 flex-wrap mt-0.5">
+                <span className="font-mono">{invoice.customerId}</span>
+                <Tag
+                  color={getCustomerTypeColor(invoice.customerType)}
+                  className="text-[10px] m-0"
+                >
+                  {invoice.customerType}
+                </Tag>
+                {invoice.customerPhone && invoice.customerPhone !== "—" && (
+                  <span>· {invoice.customerPhone}</span>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* ── Items ──────────────────────────────────────────────────────── */}
+          <div>
+            <h4 className="text-[12px] font-semibold text-gray-500 uppercase tracking-wide mb-2">
+              Items
+            </h4>
+            <div className="bg-white border border-gray-100 rounded-xl overflow-hidden">
+              <table className="w-full">
+                <thead>
+                  <tr className="bg-gray-50 text-[11px] text-gray-500">
+                    <th className="text-left px-3 py-2 font-medium">Product</th>
+                    <th className="text-center px-3 py-2 font-medium">Qty</th>
+                    <th className="text-right px-3 py-2 font-medium">Price</th>
+                    <th className="text-right px-3 py-2 font-medium">Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {invoice.items.map((item, idx) => (
+                    <tr key={idx} className="border-t border-gray-50">
+                      <td className="px-3 py-2.5">
+                        <div className="text-[13px] font-medium text-gray-800">
+                          {item.product}
+                        </div>
+                        {item.sku && (
+                          <div className="text-[10px] text-gray-400 font-mono">
+                            {item.sku}
+                          </div>
+                        )}
+                      </td>
+                      <td className="px-3 py-2.5 text-[13px] text-gray-600 text-center">
+                        {item.qty}
+                      </td>
+                      <td className="px-3 py-2.5 text-[13px] text-gray-600 text-right">
+                        {formatCurrency(item.price)}
+                      </td>
+                      <td className="px-3 py-2.5 text-[13px] font-semibold text-gray-900 text-right">
+                        {formatCurrency(item.total)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* ── Totals ─────────────────────────────────────────────────────── */}
+          <div className="bg-gray-50 rounded-xl p-4 space-y-2">
+            <div className="flex justify-between text-[13px]">
+              <span className="text-gray-500">Subtotal</span>
+              <span className="text-gray-700 font-medium">
+                {formatCurrency(invoice.subtotal)}
+              </span>
+            </div>
+            {invoice.gst > 0 && (
+              <div className="flex justify-between text-[13px]">
+                <span className="text-gray-500">GST (18%)</span>
+                <span className="text-gray-700 font-medium">
+                  +{formatCurrency(invoice.gst)}
+                </span>
+              </div>
+            )}
+            {invoice.discount > 0 && (
+              <div className="flex justify-between text-[13px]">
+                <span className="text-gray-500">Discount</span>
+                <span className="text-emerald-600 font-medium">
+                  -{formatCurrency(invoice.discount)}
+                </span>
+              </div>
+            )}
+            <Divider className="!my-2" />
+            <div className="flex justify-between">
+              <span className="text-[14px] font-bold text-gray-900">
+                Grand Total
+              </span>
+              <span className="text-[16px] font-bold text-gray-900">
+                {formatCurrency(invoice.grandTotal)}
+              </span>
+            </div>
+            <div className="flex justify-between text-[13px]">
+              <span className="text-emerald-600 font-medium">Paid</span>
+              <span className="text-emerald-600 font-bold">
+                {formatCurrency(invoice.paidAmount)}
+              </span>
+            </div>
+            {invoice.balanceAmount > 0 && (
+              <div className="flex justify-between text-[13px]">
+                <span className="text-red-500 font-medium">Balance Due</span>
+                <span className="text-red-600 font-bold">
+                  {formatCurrency(invoice.balanceAmount)}
+                </span>
+              </div>
+            )}
+          </div>
+
+          {/* ── Meta info ──────────────────────────────────────────────────── */}
+          <div className="grid grid-cols-2 gap-3">
+            {[
+              { label: "Payment Mode", value: invoice.paymentMode },
+              { label: "Delivery Mode", value: invoice.deliveryMode },
+              ...(invoice.notes
+                ? [{ label: "Notes", value: invoice.notes }]
+                : []),
+            ].map((item, idx) => (
+              <div key={idx} className="bg-gray-50 rounded-lg p-3">
+                <div className="text-[10px] text-gray-400 uppercase tracking-wide">
+                  {item.label}
+                </div>
+                <div className="text-[13px] font-medium text-gray-800 mt-0.5">
+                  {item.value}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* ── Action Buttons ─────────────────────────────────────────────── */}
+          <div className="space-y-2">
+            {canRecordPayment && (
+              <button
+                onClick={() => onRecordPayment(invoice)}
+                className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-[13px] flex items-center justify-center gap-2 transition-colors"
+              >
+                <HiOutlineCash className="w-4 h-4" />
+                Record Payment — {formatCurrency(invoice.balanceAmount)} due
+              </button>
+            )}
+
+            {canCancel && (
+              <button
+                onClick={() => onCancel!(invoice)}
+                className="w-full py-2.5 rounded-xl border-2 border-red-200 text-red-600 hover:bg-red-50 font-semibold text-[13px] flex items-center justify-center gap-2 transition-colors"
+              >
+                <HiOutlineBan className="w-4 h-4" />
+                Cancel Invoice
+              </button>
+            )}
+          </div>
+
+          {/* Cancelled state notice */}
+          {invoice.status === "Cancelled" && (
+            <div className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5">
+              <HiOutlineBan className="w-4 h-4 text-gray-400 shrink-0" />
+              <div className="text-[12px] text-gray-500">
+                This invoice has been cancelled. Stock has been restored.
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </Drawer>
+  );
+};
 
 export default InvoiceDetailDrawer;

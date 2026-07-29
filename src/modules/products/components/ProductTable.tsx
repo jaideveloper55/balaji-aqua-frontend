@@ -10,6 +10,9 @@ import {
   HiOutlineTrash,
   HiOutlineDotsVertical,
   HiOutlineInbox,
+  HiOutlineBeaker,
+  HiOutlineCheckCircle,
+  HiOutlineBan,
 } from "react-icons/hi";
 import type { Product, ProductStatus } from "../types/Product";
 import {
@@ -33,19 +36,38 @@ interface ProductTableProps {
   onEdit: (product: Product) => void;
   onDelete?: (product: Product) => void;
   onToggleSellable?: (product: Product, value: boolean) => void;
+  onOpenBom?: (product: Product) => void;
+  onToggleStatus?: (product: Product) => void;
 }
 
-const ROW_ACTIONS: MenuProps["items"] = [
-  { key: "view", icon: <HiOutlineEye size={14} />, label: "View Details" },
-  { key: "edit", icon: <HiOutlinePencil size={14} />, label: "Edit Product" },
-  { type: "divider" },
-  {
-    key: "delete",
-    icon: <HiOutlineTrash size={14} />,
-    label: "Delete",
-    danger: true,
-  },
-];
+const buildRowActions = (product: Product): MenuProps["items"] => {
+  const isInactive = product.status === "INACTIVE";
+  return [
+    { key: "view", icon: <HiOutlineEye size={14} />, label: "View Details" },
+    { key: "edit", icon: <HiOutlinePencil size={14} />, label: "Edit Product" },
+    {
+      key: "bom",
+      icon: <HiOutlineBeaker size={14} />,
+      label: "Bill of Materials",
+    },
+    { type: "divider" },
+    {
+      key: "toggleStatus",
+      icon: isInactive ? (
+        <HiOutlineCheckCircle size={14} />
+      ) : (
+        <HiOutlineBan size={14} />
+      ),
+      label: isInactive ? "Reactivate" : "Deactivate",
+    },
+    {
+      key: "delete",
+      icon: <HiOutlineTrash size={14} />,
+      label: "Delete",
+      danger: true,
+    },
+  ];
+};
 
 const ProductTable: React.FC<ProductTableProps> = ({
   products,
@@ -60,6 +82,8 @@ const ProductTable: React.FC<ProductTableProps> = ({
   onEdit,
   onDelete,
   onToggleSellable,
+  onOpenBom,
+  onToggleStatus,
 }) => {
   const handleMenuClick = useCallback(
     (record: Product, key: string, domEvent: any) => {
@@ -69,16 +93,19 @@ const ProductTable: React.FC<ProductTableProps> = ({
         onView ? onView(record) : onEdit(record);
       } else if (key === "edit") {
         onEdit(record);
+      } else if (key === "bom") {
+        onOpenBom?.(record);
+      } else if (key === "toggleStatus") {
+        onToggleStatus?.(record);
       } else if (key === "delete") {
         onDelete?.(record);
       }
     },
-    [onView, onEdit, onDelete]
+    [onView, onEdit, onDelete, onOpenBom, onToggleStatus]
   );
 
   const columns: ColumnsType<Product> = useMemo(
     () => [
-      // ─── PRODUCT ───
       {
         title: "Product",
         key: "product",
@@ -331,7 +358,7 @@ const ProductTable: React.FC<ProductTableProps> = ({
         render: (_, record) => (
           <Dropdown
             menu={{
-              items: ROW_ACTIONS,
+              items: buildRowActions(record),
               onClick: ({ key, domEvent }) =>
                 handleMenuClick(record, key, domEvent),
             }}

@@ -4,17 +4,25 @@ import {
   HiOutlineArrowDown,
   HiOutlineArrowUp,
   HiOutlineCash,
+  HiOutlineExclamationCircle,
 } from "react-icons/hi";
 import CustomModal from "../../../components/common/CustomModal";
 import CustomInput from "../../../components/common/CustomInput";
-import CustomSelect from "../../../components/common/CustomSelect";
+import type { AddCashPayload, SpendCashPayload } from "../api/Expenses.api";
+
+interface PettyCashFormValues {
+  amount: string;
+  description: string;
+  handledByName: string;
+}
 
 interface Props {
   open: boolean;
   onClose: () => void;
   type: "in" | "out";
-  onSubmit: (data: any) => void;
+  onSubmit: (data: AddCashPayload | SpendCashPayload) => void;
   currentBalance: number;
+  isSubmitting?: boolean;
 }
 
 const PettyCashModal = ({
@@ -23,50 +31,87 @@ const PettyCashModal = ({
   type,
   onSubmit,
   currentBalance,
+  isSubmitting = false,
 }: Props) => {
+  const isOut = type === "out";
+
   const {
     control,
     handleSubmit,
     reset,
     watch,
+    setValue,
     formState: { errors },
-  } = useForm<any>({
+  } = useForm<PettyCashFormValues>({
     defaultValues: {
       amount: "",
-      reason: "",
-      handledBy: "",
+      description: "",
+      handledByName: "",
     },
   });
 
   useEffect(() => {
-    if (open) {
-      reset({
-        amount: "",
-        reason: "",
-        handledBy: "",
-      });
-    }
+    if (!open) return;
+    reset({ amount: "", description: "", handledByName: "" });
   }, [open, reset]);
 
   const amount = watch("amount");
-  const isOut = type === "out";
 
-  // Validate spend doesn't exceed balance
-  const exceedsBalance = isOut && amount && Number(amount) > currentBalance;
+  const exceedsBalance =
+    isOut && Number(amount) > currentBalance && Number(amount) > 0;
 
-  const handleFormSubmit = (data: any) => {
-    onSubmit({
-      ...data,
-      type,
-      amount: Number(data.amount),
-      time: new Date().toLocaleTimeString("en-IN", {
-        hour: "2-digit",
-        minute: "2-digit",
-        hour12: true,
-      }),
-    });
-    onClose();
+  const handleFormSubmit = (values: PettyCashFormValues) => {
+    const payload: AddCashPayload | SpendCashPayload = {
+      amount: Number(values.amount),
+      description: values.description,
+      handledByName: values.handledByName || undefined,
+    };
+    onSubmit(payload);
   };
+
+  const footer = (
+    <div className="flex items-center justify-between gap-3">
+      <div className="text-xs text-slate-500">
+        Current balance:{" "}
+        <span className="font-bold text-slate-900">
+          ₹{currentBalance.toLocaleString("en-IN")}
+        </span>
+      </div>
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={onClose}
+          disabled={isSubmitting}
+          className="px-4 py-2 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-100 transition-colors disabled:opacity-50"
+        >
+          Cancel
+        </button>
+        <button
+          type="button"
+          onClick={handleSubmit(handleFormSubmit)}
+          disabled={exceedsBalance || isSubmitting}
+          className={`px-5 py-2 rounded-lg text-white text-sm font-semibold shadow-md transition-all flex items-center gap-2 ${
+            exceedsBalance || isSubmitting
+              ? "bg-slate-300 cursor-not-allowed"
+              : isOut
+              ? "bg-red-600 hover:bg-red-700 hover:shadow-lg"
+              : "bg-emerald-600 hover:bg-emerald-700 hover:shadow-lg"
+          }`}
+        >
+          {isSubmitting ? (
+            <>
+              <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+              Saving...
+            </>
+          ) : isOut ? (
+            "Record Expense"
+          ) : (
+            "Add Cash"
+          )}
+        </button>
+      </div>
+    </div>
+  );
 
   return (
     <CustomModal
@@ -87,40 +132,9 @@ const PettyCashModal = ({
       }
       iconTone={isOut ? "red" : "green"}
       size="lg"
-      footer={
-        <div className="flex items-center justify-between gap-3">
-          <div className="text-xs text-slate-500">
-            Current balance:{" "}
-            <span className="font-bold text-slate-900">
-              ₹{currentBalance.toLocaleString("en-IN")}
-            </span>
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={onClose}
-              className="px-4 py-2 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-100 transition-colors"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handleSubmit(handleFormSubmit)}
-              disabled={exceedsBalance}
-              className={`px-5 py-2 rounded-lg text-white text-sm font-semibold shadow-md transition-all ${
-                exceedsBalance
-                  ? "bg-slate-300 cursor-not-allowed"
-                  : isOut
-                  ? "bg-red-600 hover:bg-red-700 hover:shadow-lg"
-                  : "bg-emerald-600 hover:bg-emerald-700 hover:shadow-lg"
-              }`}
-            >
-              {isOut ? "Record Expense" : "Add Cash"}
-            </button>
-          </div>
-        </div>
-      }
+      footer={footer}
     >
       <div className="space-y-4">
-        {/* Banner */}
         <div
           className={`rounded-xl border p-4 flex items-center gap-3 ${
             isOut
@@ -151,34 +165,31 @@ const PettyCashModal = ({
           </div>
         </div>
 
-        {/* Amount */}
         <CustomInput
           name="amount"
           control={control}
           label="Amount (₹)"
           placeholder="e.g. 500"
           isrequired
+          numbersOnly
           errors={errors}
           rules={{
             required: "Amount is required",
-            min: { value: 1, message: "Amount must be greater than 0" },
-            pattern: {
-              value: /^\d+$/,
-              message: "Enter a valid number",
-            },
+            validate: (v: string) =>
+              Number(v) > 0 || "Amount must be greater than 0",
           }}
         />
 
         {exceedsBalance && (
           <div className="rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-xs text-red-700 font-medium flex items-center gap-2">
-            ⚠ Amount exceeds current balance of ₹
+            <HiOutlineExclamationCircle size={14} className="shrink-0" />
+            Amount exceeds current balance of ₹
             {currentBalance.toLocaleString("en-IN")}
           </div>
         )}
 
-        {/* Reason */}
         <CustomInput
-          name="reason"
+          name="description"
           control={control}
           label={isOut ? "Reason / Description" : "Source / Description"}
           placeholder={
@@ -194,25 +205,17 @@ const PettyCashModal = ({
           }}
         />
 
-        {/* Handled By */}
-        <CustomSelect
-          name="handledBy"
+        <CustomInput
+          name="handledByName"
           control={control}
           label="Handled By"
-          placeholder="Who managed this transaction?"
-          isrequired
+          placeholder="e.g. Devaa Balaji"
           errors={errors}
-          rules={{ required: "Select who handled this" }}
-          options={[
-            { value: "Devaa Balaji", label: "Devaa Balaji" },
-            { value: "Suresh M.", label: "Suresh M." },
-            { value: "Karthik R.", label: "Karthik R." },
-            { value: "Divya B.", label: "Divya B." },
-            { value: "Rajesh K.", label: "Rajesh K." },
-          ]}
+          rules={{
+            minLength: { value: 2, message: "Name too short" },
+          }}
         />
 
-        {/* Quick amount chips for "Add Cash" */}
         {!isOut && (
           <div>
             <div className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">
@@ -223,9 +226,7 @@ const PettyCashModal = ({
                 <button
                   key={amt}
                   type="button"
-                  onClick={() => {
-                    reset({ amount: amt.toString() });
-                  }}
+                  onClick={() => setValue("amount", String(amt))}
                   className="px-3 py-1.5 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-semibold hover:bg-emerald-100 transition-colors"
                 >
                   ₹{amt.toLocaleString("en-IN")}

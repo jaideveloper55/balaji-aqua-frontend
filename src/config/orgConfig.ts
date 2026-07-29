@@ -162,13 +162,13 @@ const waterPlantConfig: OrgConfig = {
     //   href: "/admin/salary",
     //   group: "HR",
     // },
-    // {
-    //   id: "expenses",
-    //   icon: BsWallet2,
-    //   label: "Expense Management",
-    //   href: "/admin/expenses",
-    //   group: "Finance",
-    // },
+    {
+      id: "expenses",
+      icon: BsWallet2,
+      label: "Expense Management",
+      href: "/admin/expenses",
+      group: "Finance",
+    },
     // {
     //   id: "production",
     //   icon: BsGraphUp,

@@ -1,19 +1,17 @@
-import React, { useState, useMemo } from "react";
+import React from "react";
 import { useForm } from "react-hook-form";
-import { Table, Tag, Button, Tooltip } from "antd";
+import { Table, Tag, Button, Tooltip, Popconfirm } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import dayjs from "dayjs";
 import SearchInput from "../../../components/common/SearchInput";
 import CustomSelect from "../../../components/common/CustomSelect";
-import Expenseformmodal, { ExpenseFormValues } from "./Expenseformmodal";
-import { successNotification } from "../../../components/common/Notification";
 import {
   HiOutlineFilter,
   HiOutlinePlus,
   HiOutlineRefresh,
   HiOutlineEye,
   HiOutlinePencil,
-  HiOutlineDotsVertical,
+  HiOutlineTrash,
   HiOutlineLightningBolt,
   HiOutlineTruck,
   HiOutlineCube,
@@ -26,27 +24,23 @@ import {
   HiOutlineCreditCard,
 } from "react-icons/hi";
 import { HiOutlineWrench } from "react-icons/hi2";
-
-export interface Expense {
-  id: string;
-  expenseNo: string;
-  date: string;
-  vendor: string;
-  description: string;
-  category: string;
-  amount: number;
-  gstAmount?: number;
-  paymentMode: "CASH" | "UPI" | "BANK" | "CARD";
-  status: "PAID" | "APPROVED" | "PENDING" | "REJECTED";
-}
+import { Expense } from "../types/Expenses";
 
 interface Props {
   expenses: Expense[];
+  loading?: boolean;
+  totalCount?: number;
+  currentPage?: number;
+  pageSize?: number;
+  onPageChange?: (page: number) => void;
+  search?: string;
+  onSearchChange?: (val: string) => void;
   onAdd?: () => void;
   onView?: (e: Expense) => void;
   onEdit?: (e: Expense) => void;
+  onDelete?: (e: Expense) => void;
   onRefresh?: () => void;
-  loading?: boolean;
+  isDeleting?: boolean;
 }
 
 const inr = (n: number) =>
@@ -72,7 +66,11 @@ const PAYMENT_STYLE: Record<
   string,
   { color: string; icon: React.ReactNode; label: string }
 > = {
-  BANK: { color: "blue", icon: <HiOutlineLibrary size={13} />, label: "Bank" },
+  BANK_TRANSFER: {
+    color: "blue",
+    icon: <HiOutlineLibrary size={13} />,
+    label: "Bank",
+  },
   UPI: {
     color: "purple",
     icon: <HiOutlineDeviceMobile size={13} />,
@@ -83,6 +81,11 @@ const PAYMENT_STYLE: Record<
     color: "cyan",
     icon: <HiOutlineCreditCard size={13} />,
     label: "Card",
+  },
+  CHEQUE: {
+    color: "default",
+    icon: <HiOutlineLibrary size={13} />,
+    label: "Cheque",
   },
 };
 
@@ -120,15 +123,20 @@ const STATUS_STYLE: Record<
 
 const Allexpensespanel: React.FC<Props> = ({
   expenses,
+  loading = false,
+  totalCount = 0,
+  currentPage = 1,
+  pageSize = 10,
+  onPageChange,
+  search = "",
+  onSearchChange,
   onAdd,
   onView,
   onEdit,
+  onDelete,
   onRefresh,
-  loading = false,
+  isDeleting = false,
 }) => {
-  const [search, setSearch] = useState("");
-
-  // Filters via react-hook-form so CustomSelect can be used
   const {
     control: filterControl,
     watch: filterWatch,
@@ -142,53 +150,18 @@ const Allexpensespanel: React.FC<Props> = ({
     },
   });
 
-  const category = filterWatch("category");
-  const status = filterWatch("status");
-  const payment = filterWatch("payment");
+  const categoryFilter = filterWatch("category");
+  const statusFilter = filterWatch("status");
+  const paymentFilter = filterWatch("payment");
 
-  // Modal state — managed internally so "Add Expense" always works
-  const [modalOpen, setModalOpen] = useState(false);
-  const [editTarget, setEditTarget] = useState<Expense | null>(null);
+  const filtered = expenses.filter((e) => {
+    if (categoryFilter && e.categoryName !== categoryFilter) return false;
+    if (statusFilter && e.status !== statusFilter) return false;
+    if (paymentFilter && e.paymentMode !== paymentFilter) return false;
+    return true;
+  });
 
-  const openAdd = () => {
-    setEditTarget(null);
-    setModalOpen(true);
-  };
-  const openEdit = (e: Expense) => {
-    setEditTarget(e);
-    setModalOpen(true);
-  };
-
-  const handleFormSubmit = (values: ExpenseFormValues) => {
-    successNotification(
-      editTarget ? "Expense Updated" : "Expense Added",
-      `${values.vendor} · ₹${Number(values.amount).toLocaleString("en-IN")}`
-    );
-    setModalOpen(false);
-    onAdd?.(); // let parent refetch if needed
-  };
-
-  const filtered = useMemo(() => {
-    return expenses.filter((e) => {
-      if (search) {
-        const q = search.toLowerCase();
-        const hit =
-          e.vendor.toLowerCase().includes(q) ||
-          e.description.toLowerCase().includes(q) ||
-          e.expenseNo.toLowerCase().includes(q);
-        if (!hit) return false;
-      }
-      if (category && e.category !== category) return false;
-      if (status && e.status !== status) return false;
-      if (payment && e.paymentMode !== payment) return false;
-      return true;
-    });
-  }, [expenses, search, category, status, payment]);
-
-  const total = useMemo(
-    () => filtered.reduce((s, e) => s + (e.amount ?? 0), 0),
-    [filtered]
-  );
+  const pageTotal = filtered.reduce((s, e) => s + (e.amount ?? 0), 0);
 
   const columns: ColumnsType<Expense> = [
     {
@@ -215,7 +188,7 @@ const Allexpensespanel: React.FC<Props> = ({
       render: (_, r) => (
         <div className="min-w-0">
           <div className="text-[14px] font-semibold text-slate-800 truncate">
-            {r.vendor}
+            {r.vendorName}
           </div>
           <div className="text-[12px] text-slate-500 truncate">
             {r.description}
@@ -228,7 +201,7 @@ const Allexpensespanel: React.FC<Props> = ({
     },
     {
       title: "Category",
-      dataIndex: "category",
+      dataIndex: "categoryName",
       key: "category",
       width: 180,
       render: (cat: string) => {
@@ -313,7 +286,7 @@ const Allexpensespanel: React.FC<Props> = ({
     {
       title: "Actions",
       key: "actions",
-      width: 120,
+      width: 130,
       align: "center",
       render: (_, r) => (
         <div
@@ -328,25 +301,40 @@ const Allexpensespanel: React.FC<Props> = ({
               <HiOutlineEye size={16} />
             </button>
           </Tooltip>
+
           <Tooltip title="Edit">
             <button
-              onClick={() => {
-                onEdit?.(r);
-                openEdit(r);
-              }}
+              onClick={() => onEdit?.(r)}
               className="p-2 rounded-lg hover:bg-blue-50 text-slate-400 hover:text-blue-600"
             >
               <HiOutlinePencil size={16} />
             </button>
           </Tooltip>
-          <button className="p-2 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600">
-            <HiOutlineDotsVertical size={16} />
-          </button>
+
+          {/* Popconfirm prevents accidental deletes */}
+          <Popconfirm
+            title="Delete this expense?"
+            description="This action cannot be undone."
+            onConfirm={() => onDelete?.(r)}
+            okText="Delete"
+            cancelText="Cancel"
+            okButtonProps={{
+              danger: true,
+              loading: isDeleting,
+            }}
+          >
+            <Tooltip title="Delete">
+              <button className="p-2 rounded-lg hover:bg-rose-50 text-slate-400 hover:text-rose-600">
+                <HiOutlineTrash size={16} />
+              </button>
+            </Tooltip>
+          </Popconfirm>
         </div>
       ),
     },
   ];
 
+  // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <div className="space-y-4">
       {/* Filters bar */}
@@ -360,16 +348,14 @@ const Allexpensespanel: React.FC<Props> = ({
           </div>
           <div className="flex items-center gap-3">
             <span className="text-[13px] text-slate-500">
-              <span className="font-bold text-slate-800">
-                {filtered.length}
-              </span>{" "}
+              <span className="font-bold text-slate-800">{totalCount}</span>{" "}
               results · Total:{" "}
-              <span className="font-bold text-rose-600">{inr(total)}</span>
+              <span className="font-bold text-rose-600">{inr(pageTotal)}</span>
             </span>
             <Button
               type="primary"
               icon={<HiOutlinePlus size={15} />}
-              onClick={openAdd}
+              onClick={onAdd}
               className="!bg-rose-600 hover:!bg-rose-700 !rounded-xl !h-9 !font-semibold !border-0"
             >
               Add Expense
@@ -378,12 +364,14 @@ const Allexpensespanel: React.FC<Props> = ({
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+          {/* Search — controlled by parent via props */}
           <SearchInput
             value={search}
-            onChange={setSearch}
+            onChange={(val) => onSearchChange?.(val)}
             placeholder="Search vendor, description, number..."
             expandOnFocus={false}
           />
+
           <CustomSelect
             name="category"
             control={filterControl}
@@ -395,6 +383,7 @@ const Allexpensespanel: React.FC<Props> = ({
               label: c,
             }))}
           />
+
           <CustomSelect
             name="status"
             control={filterControl}
@@ -405,6 +394,7 @@ const Allexpensespanel: React.FC<Props> = ({
               label: STATUS_STYLE[s].label,
             }))}
           />
+
           <div className="flex gap-2">
             <div className="flex-1">
               <CustomSelect
@@ -418,6 +408,7 @@ const Allexpensespanel: React.FC<Props> = ({
                 }))}
               />
             </div>
+
             <Button
               icon={
                 <HiOutlineRefresh
@@ -427,10 +418,10 @@ const Allexpensespanel: React.FC<Props> = ({
               }
               onClick={() => {
                 filterReset();
-                setSearch("");
+                onSearchChange?.("");
                 onRefresh?.();
               }}
-              className="!rounded-xl  !flex !items-center !justify-center shrink-0"
+              className="!rounded-xl !flex !items-center !justify-center shrink-0"
             />
           </div>
         </div>
@@ -446,9 +437,12 @@ const Allexpensespanel: React.FC<Props> = ({
           size="middle"
           showSorterTooltip={false}
           pagination={{
-            pageSize: 10,
-            showSizeChanger: true,
+            current: currentPage,
+            pageSize: pageSize,
+            total: totalCount,
+            showSizeChanger: false,
             showTotal: (t, range) => `${range[0]}–${range[1]} of ${t}`,
+            onChange: (page) => onPageChange?.(page),
           }}
           locale={{ emptyText: "No expenses found for these filters." }}
           onRow={(r) => ({
@@ -458,14 +452,6 @@ const Allexpensespanel: React.FC<Props> = ({
           className="expenses-table"
         />
       </div>
-
-      {/* Add / Edit modal — managed internally */}
-      <Expenseformmodal
-        open={modalOpen}
-        editExpense={editTarget}
-        onClose={() => setModalOpen(false)}
-        onSubmit={handleFormSubmit}
-      />
     </div>
   );
 };

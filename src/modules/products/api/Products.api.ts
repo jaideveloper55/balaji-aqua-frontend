@@ -3,6 +3,8 @@ import type {
   ProductQueryParams,
   CreateProductPayload,
   UpdateProductPayload,
+  SetBomPayload,
+  BomResponse,
 } from "../types/Product";
 
 // ─── GET /products ────────────────────────────────────────────────────────────
@@ -33,3 +35,21 @@ export const deleteProductApi = (id: string) =>
 // ─── DELETE /products/bulk ────────────────────────────────────────────────────
 export const deleteProductsApi = (ids: string[]) =>
   authAxios.delete("/products/bulk", { data: { ids } });
+
+// ─── DELETE /products/:id/force ───────────────────────────────────────────────
+// SUPER_ADMIN only. Destroys invoice items and stock movements too.
+export const forceDeleteProductApi = (id: string) =>
+  authAxios.delete(`/products/${id}/force`);
+
+// ─── GET /products/:id/bom ────────────────────────────────────────────────────
+export const getProductBomApi = (id: string) =>
+  authAxios.get<BomResponse>(`/products/${id}/bom`);
+
+// ─── PUT /products/:id/bom ────────────────────────────────────────────────────
+// Replaces the entire recipe — omitted lines are deleted.
+export const setProductBomApi = (id: string, payload: SetBomPayload) =>
+  authAxios.put<BomResponse>(`/products/${id}/bom`, payload);
+
+// ─── DELETE /products/:id/bom ─────────────────────────────────────────────────
+export const clearProductBomApi = (id: string) =>
+  authAxios.delete(`/products/${id}/bom`);

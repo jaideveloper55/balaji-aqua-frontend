@@ -28,31 +28,26 @@ interface Props {
   selectedCustomer: Customer | null;
   paymentMode: string;
   amountReceived: number;
-  changeAmount: number;
   grandTotal: number;
   onPaymentModeChange: (mode: string) => void;
   onAmountReceivedChange: (val: number) => void;
   onConfirm: (
     reference?: string,
     dueDate?: string,
-    splits?: PaymentSplit[]
+    splits?: PaymentSplit[],
+    extraPayment?: number
   ) => void;
   onClose: () => void;
 }
 
-// ─── Canara Bank payment details ──────────────────────────────────────────────
 const BUSINESS_UPI_ID = "8015929891@cnrb";
 const BUSINESS_NAME = "SRIBALAJI AQUA WATER";
-
-// Static QR image saved at public/images/bank-qr.jpeg
 const BUSINESS_QR_IMAGE = "/images/bank-qr.jpeg";
-
 const BANK_DETAILS = {
   bankName: "Canara Bank",
   accountHolder: "SRIBALAJI AQUA WATER",
   accountNumber: "64943070000322",
   ifscCode: "CNRB0016494",
-  mobile: "+91 80159 29891",
 };
 
 type FormShape = { dueDate: Dayjs | null };
@@ -96,7 +91,6 @@ const PaymentModal: React.FC<Props> = ({
   selectedCustomer,
   paymentMode,
   amountReceived,
-  changeAmount,
   grandTotal,
   onPaymentModeChange,
   onAmountReceivedChange,
@@ -112,6 +106,8 @@ const PaymentModal: React.FC<Props> = ({
   const [splitRefs, setSplitRefs] = useState<
     Record<PaymentSplit["mode"], string>
   >({ CASH: "", UPI: "", BANK_TRANSFER: "" });
+
+  const previousDue = selectedCustomer?.outstanding ?? 0;
 
   const {
     control,
@@ -132,11 +128,35 @@ const PaymentModal: React.FC<Props> = ({
   const splitCredit = Math.max(0, grandTotal - splitEntered);
   const splitOverpaid = splitEntered > grandTotal;
 
+  // ─── Unified amount logic ───
+  // Overpayment beyond grandTotal goes to outstanding automatically.
+  // If no outstanding, it becomes change to return.
+  const extraForOutstanding = useMemo(() => {
+    if (isSplit || paymentMode === "credit" || previousDue <= 0) return 0;
+    const overpaid = amountReceived - grandTotal;
+    if (overpaid <= 0) return 0;
+    return Math.min(overpaid, previousDue);
+  }, [amountReceived, grandTotal, previousDue, isSplit, paymentMode]);
+
+  const changeToReturn = useMemo(() => {
+    if (isSplit || paymentMode === "credit") return 0;
+    const excess = amountReceived - grandTotal;
+    if (excess <= 0) return 0;
+    if (previousDue > 0) return Math.max(0, excess - previousDue);
+    return excess;
+  }, [amountReceived, grandTotal, previousDue, isSplit, paymentMode]);
+
+  const remainingDueAfter = useMemo(
+    () => Math.max(0, previousDue - extraForOutstanding),
+    [previousDue, extraForOutstanding]
+  );
+
   const isPartial =
     !isSplit &&
     paymentMode !== "credit" &&
     amountReceived > 0 &&
     amountReceived < grandTotal;
+
   const showDueDateSection =
     (!isSplit && (paymentMode === "credit" || isPartial)) ||
     (isSplit && splitCredit > 0);
@@ -157,27 +177,7 @@ const PaymentModal: React.FC<Props> = ({
     setUpiVerified(false);
   }, [paymentMode]);
 
-  const paymentMethods = [
-    { key: "cash", label: "Cash", icon: <HiOutlineCash className="w-5 h-5" /> },
-    { key: "upi", label: "UPI", icon: <HiMiniQrCode className="w-5 h-5" /> },
-    {
-      key: "card",
-      label: "Card",
-      icon: <HiOutlineCreditCard className="w-5 h-5" />,
-    },
-    {
-      key: "bank",
-      label: "Bank",
-      icon: <HiBuildingLibrary className="w-5 h-5" />,
-    },
-    {
-      key: "credit",
-      label: "Credit",
-      icon: <HiOutlineExclamationCircle className="w-5 h-5" />,
-    },
-  ];
-
-  const validateDueDate = (): boolean => {
+  const validateDueDate = () => {
     if (!dueDate) {
       message.warning("Please select a due date");
       return false;
@@ -204,7 +204,7 @@ const PaymentModal: React.FC<Props> = ({
         splitAmounts[row.mode] > 0 &&
         !splitRefs[row.mode].trim()
       ) {
-        message.warning(`Enter a reference for the ${row.label} payment`);
+        message.warning("Enter a reference for the " + row.label + " payment");
         return;
       }
     }
@@ -221,7 +221,8 @@ const PaymentModal: React.FC<Props> = ({
     onConfirm(
       undefined,
       splitCredit > 0 ? dueDate?.toISOString() : undefined,
-      splits
+      splits,
+      undefined
     );
   };
 
@@ -232,15 +233,17 @@ const PaymentModal: React.FC<Props> = ({
     }
     if (showDueDateSection && !validateDueDate()) return;
     onConfirm(
-      paymentMode === "upi" ? upiReference : undefined,
-      showDueDateSection ? dueDate?.toISOString() : undefined
+      paymentMode === "upi" || paymentMode === "bank"
+        ? upiReference
+        : undefined,
+      showDueDateSection ? dueDate?.toISOString() : undefined,
+      undefined,
+      extraForOutstanding > 0 ? extraForOutstanding : undefined
     );
   };
 
-  const handleConfirm = () => {
-    if (isSplit) handleConfirmSplit();
-    else handleConfirmSingle();
-  };
+  const handleConfirm = () =>
+    isSplit ? handleConfirmSplit() : handleConfirmSingle();
 
   const handleVerifyUPI = () => {
     if (!upiReference.trim()) {
@@ -260,37 +263,80 @@ const PaymentModal: React.FC<Props> = ({
       await navigator.clipboard.writeText(BUSINESS_UPI_ID);
       message.success("UPI ID copied!");
     } catch {
-      message.info(`UPI ID: ${BUSINESS_UPI_ID}`);
+      message.info("UPI ID: " + BUSINESS_UPI_ID);
     }
   };
 
   const applyPreset = (build: () => Dayjs) =>
     setValue("dueDate", build(), { shouldValidate: true });
-  const isPresetActive = (build: () => Dayjs): boolean =>
+  const isPresetActive = (build: () => Dayjs) =>
     dueDate ? dueDate.isSame(build(), "day") : false;
   const dueDaysFromNow = dueDate
     ? dueDate.diff(dayjs().startOf("day"), "day")
     : 0;
 
+  // Quick-fill buttons for Amount Received
+  const quickFillOptions = useMemo(() => {
+    const opts: { label: string; amount: number }[] = [];
+    opts.push({
+      label: "Bill (" + formatCurrency(grandTotal) + ")",
+      amount: grandTotal,
+    });
+    if (previousDue > 0) {
+      opts.push({
+        label: "Bill + Due (" + formatCurrency(grandTotal + previousDue) + ")",
+        amount: grandTotal + previousDue,
+      });
+    }
+    return opts;
+  }, [grandTotal, previousDue]);
+
   const confirmLabel = (() => {
     if (isSplit) {
       if (splitEntered > 0 && splitCredit > 0)
-        return `Pay ${formatCurrency(splitEntered)} now · ${formatCurrency(
-          splitCredit
-        )} on credit`;
-      if (splitEntered > 0) return `Confirm ${formatCurrency(splitEntered)}`;
-      return `Credit Sale ${formatCurrency(grandTotal)}`;
+        return (
+          "Pay " +
+          formatCurrency(splitEntered) +
+          " now \u00B7 " +
+          formatCurrency(splitCredit) +
+          " on credit"
+        );
+      if (splitEntered > 0) return "Confirm " + formatCurrency(splitEntered);
+      return "Credit Sale " + formatCurrency(grandTotal);
     }
-    if (isPartial) return `Pay ₹${amountReceived} (Partial)`;
+    if (isPartial)
+      return "Pay " + formatCurrency(amountReceived) + " (Partial)";
     if (paymentMode === "credit")
-      return `Confirm Credit Sale ${formatCurrency(grandTotal)}`;
-    return `Confirm ${formatCurrency(grandTotal)}`;
+      return "Confirm Credit Sale " + formatCurrency(grandTotal);
+    if (extraForOutstanding > 0)
+      return "Confirm " + formatCurrency(amountReceived) + " (Bill + Due)";
+    return "Confirm " + formatCurrency(grandTotal);
   })();
 
   const confirmDisabled =
     isProcessing ||
     (!isSplit && paymentMode === "upi" && !upiVerified) ||
     (isSplit && splitOverpaid);
+
+  const paymentMethods = [
+    { key: "cash", label: "Cash", icon: <HiOutlineCash className="w-5 h-5" /> },
+    { key: "upi", label: "UPI", icon: <HiMiniQrCode className="w-5 h-5" /> },
+    {
+      key: "card",
+      label: "Card",
+      icon: <HiOutlineCreditCard className="w-5 h-5" />,
+    },
+    {
+      key: "bank",
+      label: "Bank",
+      icon: <HiBuildingLibrary className="w-5 h-5" />,
+    },
+    {
+      key: "credit",
+      label: "Credit",
+      icon: <HiOutlineExclamationCircle className="w-5 h-5" />,
+    },
+  ];
 
   const modalFooter = (
     <div className="flex gap-2">
@@ -304,12 +350,12 @@ const PaymentModal: React.FC<Props> = ({
       <button
         onClick={handleConfirm}
         disabled={confirmDisabled}
-        className={`flex-[2] py-2.5 rounded-xl font-semibold text-[13px] flex items-center justify-center gap-2 transition-all
-          ${
-            confirmDisabled
-              ? "bg-gray-100 text-gray-400 cursor-not-allowed"
-              : "bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg shadow-emerald-200 active:scale-[0.98]"
-          }`}
+        className={
+          "flex-[2] py-2.5 rounded-xl font-semibold text-[13px] flex items-center justify-center gap-2 transition-all " +
+          (confirmDisabled
+            ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+            : "bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg shadow-emerald-200 active:scale-[0.98]")
+        }
       >
         {isProcessing ? (
           <>
@@ -332,7 +378,7 @@ const PaymentModal: React.FC<Props> = ({
       onClose={onClose}
       title="Process Payment"
       subtitle={
-        selectedCustomer?.name ? `Bill for ${selectedCustomer.name}` : undefined
+        selectedCustomer?.name ? "Bill for " + selectedCustomer.name : undefined
       }
       icon={<HiOutlineCash className="w-5 h-5" />}
       iconTone="green"
@@ -340,43 +386,56 @@ const PaymentModal: React.FC<Props> = ({
       footer={modalFooter}
     >
       <div className="space-y-4">
-        {/* Bill summary */}
+        {/* ── Bill Summary ── */}
         <div className="bg-gradient-to-br from-emerald-50 to-green-50 rounded-xl p-4 border border-emerald-100">
           <div className="text-[11px] text-emerald-600 font-medium uppercase tracking-wide mb-1">
             Bill For
           </div>
           <div className="text-[15px] font-bold text-gray-900 mb-2">
-            {selectedCustomer?.name || "—"}
+            {selectedCustomer?.name || "\u2014"}
           </div>
           <div className="flex justify-between items-end">
-            <span className="text-[12px] text-gray-500">Amount Due</span>
+            <span className="text-[12px] text-gray-500">Current Invoice</span>
             <span className="text-2xl font-bold text-emerald-600">
               {formatCurrency(grandTotal)}
             </span>
           </div>
+          {previousDue > 0 && (
+            <div className="flex justify-between items-center mt-2 pt-2 border-t border-emerald-100">
+              <span className="text-[11px] text-amber-600 font-medium flex items-center gap-1">
+                <HiOutlineExclamationCircle className="w-3.5 h-3.5" />
+                Previous outstanding
+              </span>
+              <span className="text-[13px] font-bold text-amber-600">
+                {formatCurrency(previousDue)}
+              </span>
+            </div>
+          )}
         </div>
 
-        {/* Single / Split toggle */}
+        {/* ── Single / Split Toggle ── */}
         <div className="flex items-center gap-1 bg-gray-100 rounded-xl p-1">
           <button
             onClick={() => setIsSplit(false)}
-            className={`flex-1 py-2 rounded-lg text-[12px] font-semibold transition-all ${
-              !isSplit ? "bg-white text-gray-900 shadow-sm" : "text-gray-500"
-            }`}
+            className={
+              "flex-1 py-2 rounded-lg text-[12px] font-semibold transition-all " +
+              (!isSplit ? "bg-white text-gray-900 shadow-sm" : "text-gray-500")
+            }
           >
             Single Payment
           </button>
           <button
             onClick={() => setIsSplit(true)}
-            className={`flex-1 py-2 rounded-lg text-[12px] font-semibold transition-all ${
-              isSplit ? "bg-white text-gray-900 shadow-sm" : "text-gray-500"
-            }`}
+            className={
+              "flex-1 py-2 rounded-lg text-[12px] font-semibold transition-all " +
+              (isSplit ? "bg-white text-gray-900 shadow-sm" : "text-gray-500")
+            }
           >
             Split Payment
           </button>
         </div>
 
-        {/* ════ SPLIT MODE ════ */}
+        {/* ── SPLIT MODE ── */}
         {isSplit ? (
           <div className="space-y-3">
             <div className="text-[11px] text-gray-500">
@@ -405,7 +464,7 @@ const PaymentModal: React.FC<Props> = ({
                         [row.mode]: v || 0,
                       }))
                     }
-                    prefix="₹"
+                    prefix={"\u20B9"}
                     className="w-32"
                   />
                 </div>
@@ -419,7 +478,7 @@ const PaymentModal: React.FC<Props> = ({
                         [row.mode]: e.target.value,
                       }))
                     }
-                    placeholder={`${row.label} reference / transaction ID`}
+                    placeholder={row.label + " reference / transaction ID"}
                     className="w-full px-3 py-2 rounded-lg border border-gray-200 text-[12px] font-mono placeholder:text-gray-300 focus:outline-none focus:border-blue-400 bg-white"
                   />
                 )}
@@ -458,9 +517,8 @@ const PaymentModal: React.FC<Props> = ({
             </div>
           </div>
         ) : (
-          /* ════ SINGLE MODE ════ */
+          /* ── SINGLE MODE ── */
           <>
-            {/* Payment Method Selector */}
             <div>
               <label className="text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-2 block">
                 Payment Method
@@ -472,12 +530,12 @@ const PaymentModal: React.FC<Props> = ({
                     <button
                       key={m.key}
                       onClick={() => onPaymentModeChange(m.key)}
-                      className={`p-2.5 rounded-xl border-2 flex flex-col items-center gap-1 transition-all
-                        ${
-                          isActive
-                            ? "border-emerald-300 bg-emerald-50 text-emerald-700 ring-2 ring-emerald-100"
-                            : "border-gray-100 hover:border-gray-200 text-gray-500"
-                        }`}
+                      className={
+                        "p-2.5 rounded-xl border-2 flex flex-col items-center gap-1 transition-all " +
+                        (isActive
+                          ? "border-emerald-300 bg-emerald-50 text-emerald-700 ring-2 ring-emerald-100"
+                          : "border-gray-100 hover:border-gray-200 text-gray-500")
+                      }
                     >
                       {m.icon}
                       <span className="text-[10px] font-medium">{m.label}</span>
@@ -487,34 +545,122 @@ const PaymentModal: React.FC<Props> = ({
               </div>
             </div>
 
-            {/* CASH */}
+            {/* ── Cash: unified Amount Received with auto outstanding logic ── */}
             {paymentMode === "cash" && (
-              <div className="space-y-2">
+              <div className="space-y-2.5">
                 <label className="text-[11px] font-bold text-gray-500 uppercase tracking-wider block">
                   Amount Received
                 </label>
+
+                {/* Quick-fill buttons */}
+                <div className="flex gap-2 flex-wrap">
+                  {quickFillOptions.map((opt) => (
+                    <button
+                      key={opt.amount}
+                      onClick={() => onAmountReceivedChange(opt.amount)}
+                      className={
+                        "px-3 py-1.5 rounded-lg text-[11px] font-medium border transition-all " +
+                        (Math.abs(amountReceived - opt.amount) < 0.01
+                          ? "bg-emerald-600 text-white border-emerald-600"
+                          : "bg-white text-gray-600 border-gray-200 hover:border-emerald-300")
+                      }
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+
                 <InputNumber
                   size="large"
                   value={amountReceived}
                   onChange={(v) => onAmountReceivedChange(v || 0)}
-                  prefix="₹"
+                  prefix={"\u20B9"}
                   className="w-full"
                   autoFocus
                 />
-                {changeAmount > 0 && (
-                  <div className="flex justify-between bg-amber-50 rounded-lg px-3 py-2 border border-amber-100">
-                    <span className="text-[12px] text-amber-700 font-medium">
-                      Change to return
-                    </span>
-                    <span className="text-[14px] font-bold text-amber-700">
-                      {formatCurrency(changeAmount)}
-                    </span>
+
+                {/* ── Live breakdown of where the money goes ── */}
+                {amountReceived > 0 && (
+                  <div className="bg-gray-50 rounded-xl p-3 space-y-1.5 text-[12px]">
+                    {/* Bill portion */}
+                    <div className="flex justify-between text-gray-600">
+                      <span>Toward this bill</span>
+                      <span className="font-semibold text-gray-900">
+                        {formatCurrency(Math.min(amountReceived, grandTotal))}
+                      </span>
+                    </div>
+
+                    {/* Partial: customer underpaid */}
+                    {isPartial && (
+                      <div className="flex justify-between text-amber-600">
+                        <span>Bill balance (pay later)</span>
+                        <span className="font-semibold">
+                          {formatCurrency(grandTotal - amountReceived)}
+                        </span>
+                      </div>
+                    )}
+
+                    {/* Extra going toward outstanding */}
+                    {extraForOutstanding > 0 && (
+                      <>
+                        <div className="h-px bg-gray-200 my-1" />
+                        <div className="flex justify-between text-blue-700">
+                          <span>Toward old dues</span>
+                          <span className="font-semibold">
+                            {formatCurrency(extraForOutstanding)}
+                          </span>
+                        </div>
+                        <div className="flex justify-between text-gray-500 text-[11px]">
+                          <span>Outstanding after</span>
+                          <span className="font-medium">
+                            {formatCurrency(remainingDueAfter)}
+                          </span>
+                        </div>
+                      </>
+                    )}
+
+                    {/* Change to return */}
+                    {changeToReturn > 0 && (
+                      <>
+                        <div className="h-px bg-gray-200 my-1" />
+                        <div className="flex justify-between text-orange-600 font-semibold">
+                          <span>Change to return</span>
+                          <span>{formatCurrency(changeToReturn)}</span>
+                        </div>
+                      </>
+                    )}
+
+                    {/* Exact amount */}
+                    {!isPartial &&
+                      extraForOutstanding === 0 &&
+                      changeToReturn === 0 && (
+                        <div className="flex justify-between text-emerald-700 font-semibold pt-1">
+                          <span>Exact amount</span>
+                          <span>{"\u2713"}</span>
+                        </div>
+                      )}
                   </div>
                 )}
+
+                {/* Hint */}
+                {previousDue > 0 &&
+                  Math.abs(amountReceived - grandTotal) < 0.01 && (
+                    <p className="text-[12px] text-gray-500">
+                      Tip: Enter more than{" "}
+                      <span className="font-medium text-gray-700">
+                        {formatCurrency(grandTotal)}
+                      </span>{" "}
+                      to automatically reduce the{" "}
+                      <span className="font-semibold text-red-500 pr-1">
+                        {formatCurrency(previousDue)}
+                      </span>
+                      outstanding.
+                    </p>
+                  )}
               </div>
             )}
 
-            {/* UPI — uses static Canara Bank QR image */}
+            {/* ── UPI ── */}
             {paymentMode === "upi" && (
               <div className="space-y-3">
                 {!upiVerified ? (
@@ -524,42 +670,50 @@ const PaymentModal: React.FC<Props> = ({
                         <div className="text-[11px] font-semibold text-blue-600 uppercase tracking-wide mb-1">
                           Step 1 — Customer Scans
                         </div>
-                        <div className="text-[12px] text-gray-500">
-                          Show this QR or open their UPI app
+                        <div className="text-[12px] font-bold text-blue-900">
+                          {"Total: " +
+                            formatCurrency(
+                              previousDue > 0
+                                ? grandTotal + previousDue
+                                : grandTotal
+                            )}
+                          {previousDue > 0 && (
+                            <span className="text-[10px] font-normal text-gray-500 ml-1">
+                              (Invoice + Due)
+                            </span>
+                          )}
                         </div>
                       </div>
-
-                      {/* ── Static Canara Bank QR image ── */}
                       <div className="flex justify-center mb-3">
-                        <div className="bg-white p-2 rounded-lg border border-gray-200">
-                          <img
-                            src={BUSINESS_QR_IMAGE}
-                            alt="Scan to pay — Canara Bank UPI"
-                            className="w-48 h-48 object-contain"
-                            onError={(e) => {
-                              // Fallback: generate QR from UPI ID if image not found
-                              const upiLink = `upi://pay?pa=${encodeURIComponent(
-                                BUSINESS_UPI_ID
-                              )}&pn=${encodeURIComponent(
-                                BUSINESS_NAME
-                              )}&am=${grandTotal}&cu=INR`;
-                              (
-                                e.target as HTMLImageElement
-                              ).src = `https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=${encodeURIComponent(
-                                upiLink
-                              )}`;
-                            }}
-                          />
-                        </div>
+                        <img
+                          src={BUSINESS_QR_IMAGE}
+                          alt="UPI QR"
+                          className="w-48 h-48 object-contain border border-gray-200 rounded-lg p-1"
+                          onError={(e) => {
+                            const total =
+                              previousDue > 0
+                                ? grandTotal + previousDue
+                                : grandTotal;
+                            const l =
+                              "upi://pay?pa=" +
+                              encodeURIComponent(BUSINESS_UPI_ID) +
+                              "&pn=" +
+                              encodeURIComponent(BUSINESS_NAME) +
+                              "&am=" +
+                              total +
+                              "&cu=INR";
+                            (e.target as HTMLImageElement).src =
+                              "https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=" +
+                              encodeURIComponent(l);
+                          }}
+                        />
                       </div>
-
-                      {/* UPI ID row */}
                       <div className="bg-gray-50 rounded-lg px-3 py-2 flex items-center justify-between">
                         <div>
-                          <div className="text-[10px] text-gray-500 uppercase tracking-wide">
+                          <div className="text-[10px] text-gray-500 uppercase">
                             UPI ID
                           </div>
-                          <div className="text-[13px] font-mono font-semibold text-gray-800">
+                          <div className="text-[13px] font-mono font-semibold">
                             {BUSINESS_UPI_ID}
                           </div>
                         </div>
@@ -574,14 +728,12 @@ const PaymentModal: React.FC<Props> = ({
                         Works with GPay, PhonePe, Paytm, BHIM & all UPI apps
                       </div>
                     </div>
-
                     <div className="bg-blue-50/40 border border-blue-100 rounded-xl p-3.5">
                       <div className="text-[11px] font-semibold text-blue-600 uppercase tracking-wide mb-1">
                         Step 2 — Enter Reference
                       </div>
                       <div className="text-[12px] text-gray-600 mb-2.5">
-                        After customer pays, enter the UPI Transaction ID from
-                        your SMS or UPI app
+                        After customer pays, enter the UPI Transaction ID
                       </div>
                       <div className="flex gap-2">
                         <input
@@ -589,14 +741,13 @@ const PaymentModal: React.FC<Props> = ({
                           value={upiReference}
                           onChange={(e) => setUpiReference(e.target.value)}
                           placeholder="e.g. 425912345678 or UPI Ref ID"
-                          className="flex-1 px-3 py-2 rounded-lg border border-gray-200 text-[13px] font-mono placeholder:text-gray-300 focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-100 bg-white"
+                          className="flex-1 px-3 py-2 rounded-lg border border-gray-200 text-[13px] font-mono placeholder:text-gray-300 focus:outline-none focus:border-blue-400 bg-white"
                         />
                         <button
                           onClick={handleVerifyUPI}
                           className="px-4 py-2 rounded-lg bg-blue-600 text-white text-[12px] font-semibold hover:bg-blue-700 flex items-center gap-1"
                         >
-                          <HiOutlineCheck className="w-4 h-4" />
-                          Verify
+                          <HiOutlineCheck className="w-4 h-4" /> Verify
                         </button>
                       </div>
                     </div>
@@ -612,7 +763,7 @@ const PaymentModal: React.FC<Props> = ({
                           Payment Verified
                         </div>
                         <div className="text-[11px] text-emerald-700">
-                          Reference:{" "}
+                          {"Ref: "}
                           <span className="font-mono">{upiReference}</span>
                         </div>
                       </div>
@@ -622,7 +773,7 @@ const PaymentModal: React.FC<Props> = ({
                         setUpiVerified(false);
                         setUpiReference("");
                       }}
-                      className="text-[11px] text-emerald-700 underline hover:text-emerald-800"
+                      className="text-[11px] text-emerald-700 underline"
                     >
                       Change reference
                     </button>
@@ -631,7 +782,7 @@ const PaymentModal: React.FC<Props> = ({
               </div>
             )}
 
-            {/* CARD */}
+            {/* ── Card ── */}
             {paymentMode === "card" && (
               <div className="bg-purple-50/40 border border-purple-100 rounded-xl p-4 text-center">
                 <HiOutlineCreditCard className="w-10 h-10 text-purple-400 mx-auto mb-2" />
@@ -640,50 +791,37 @@ const PaymentModal: React.FC<Props> = ({
                 </div>
                 <div className="text-[11px] text-gray-500">
                   Swipe customer's card on your card machine, then click Confirm
-                  below
                 </div>
               </div>
             )}
 
-            {/* BANK */}
+            {/* ── Bank Transfer ── */}
             {paymentMode === "bank" && (
               <div className="bg-indigo-50/40 border border-indigo-100 rounded-xl p-4 space-y-3">
                 <div className="text-[11px] font-semibold text-indigo-600 uppercase tracking-wide">
                   Bank Details
                 </div>
                 <div className="grid grid-cols-2 gap-2 text-[12px]">
-                  <div className="bg-white rounded-lg p-2.5 border border-indigo-100">
-                    <div className="text-[10px] text-gray-400 uppercase mb-0.5">
-                      Bank
+                  {(
+                    [
+                      ["Bank", BANK_DETAILS.bankName],
+                      ["Account Holder", BANK_DETAILS.accountHolder],
+                      ["Account No.", BANK_DETAILS.accountNumber],
+                      ["IFSC", BANK_DETAILS.ifscCode],
+                    ] as [string, string][]
+                  ).map(([label, value]) => (
+                    <div
+                      key={label}
+                      className="bg-white rounded-lg p-2.5 border border-indigo-100"
+                    >
+                      <div className="text-[10px] text-gray-400 uppercase mb-0.5">
+                        {label}
+                      </div>
+                      <div className="font-semibold text-gray-800 text-[11px] font-mono">
+                        {value}
+                      </div>
                     </div>
-                    <div className="font-semibold text-gray-800">
-                      {BANK_DETAILS.bankName}
-                    </div>
-                  </div>
-                  <div className="bg-white rounded-lg p-2.5 border border-indigo-100">
-                    <div className="text-[10px] text-gray-400 uppercase mb-0.5">
-                      Account Holder
-                    </div>
-                    <div className="font-semibold text-gray-800 text-[11px]">
-                      {BANK_DETAILS.accountHolder}
-                    </div>
-                  </div>
-                  <div className="bg-white rounded-lg p-2.5 border border-indigo-100">
-                    <div className="text-[10px] text-gray-400 uppercase mb-0.5">
-                      Account No.
-                    </div>
-                    <div className="font-mono font-semibold text-gray-800">
-                      {BANK_DETAILS.accountNumber}
-                    </div>
-                  </div>
-                  <div className="bg-white rounded-lg p-2.5 border border-indigo-100">
-                    <div className="text-[10px] text-gray-400 uppercase mb-0.5">
-                      IFSC
-                    </div>
-                    <div className="font-mono font-semibold text-gray-800">
-                      {BANK_DETAILS.ifscCode}
-                    </div>
-                  </div>
+                  ))}
                 </div>
                 <input
                   type="text"
@@ -695,7 +833,7 @@ const PaymentModal: React.FC<Props> = ({
               </div>
             )}
 
-            {/* CREDIT */}
+            {/* ── Credit Sale ── */}
             {paymentMode === "credit" && (
               <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
                 <div className="flex items-start gap-2">
@@ -705,9 +843,17 @@ const PaymentModal: React.FC<Props> = ({
                       Credit Sale (Pay Later)
                     </div>
                     <div className="text-[11px] text-amber-700">
-                      This invoice will be added to{" "}
-                      <strong>{selectedCustomer?.name}'s</strong> outstanding
-                      balance. No payment collected now.
+                      {"This invoice will be added to "}
+                      <strong>{selectedCustomer?.name + "'s"}</strong>
+                      {" outstanding balance."}
+                      {previousDue > 0 && (
+                        <span>
+                          {" New outstanding: "}
+                          <strong>
+                            {formatCurrency(previousDue + grandTotal)}
+                          </strong>
+                        </span>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -716,7 +862,7 @@ const PaymentModal: React.FC<Props> = ({
           </>
         )}
 
-        {/* Due date section */}
+        {/* ── Due Date Section ── */}
         {showDueDateSection && (
           <div className="bg-blue-50/40 border border-blue-100 rounded-xl p-3.5 space-y-2.5">
             <div className="flex items-center gap-2">
@@ -726,23 +872,20 @@ const PaymentModal: React.FC<Props> = ({
               </label>
             </div>
             <div className="flex gap-1.5 flex-wrap">
-              {DUE_PRESETS.map((preset) => {
-                const active = isPresetActive(preset.build);
-                return (
-                  <button
-                    key={preset.label}
-                    onClick={() => applyPreset(preset.build)}
-                    className={`px-3 py-1.5 rounded-lg text-[11px] font-medium border transition-all
-                      ${
-                        active
-                          ? "bg-blue-600 text-white border-blue-600"
-                          : "bg-white text-gray-600 border-gray-200 hover:border-blue-300"
-                      }`}
-                  >
-                    {preset.label}
-                  </button>
-                );
-              })}
+              {DUE_PRESETS.map((preset) => (
+                <button
+                  key={preset.label}
+                  onClick={() => applyPreset(preset.build)}
+                  className={
+                    "px-3 py-1.5 rounded-lg text-[11px] font-medium border transition-all " +
+                    (isPresetActive(preset.build)
+                      ? "bg-blue-600 text-white border-blue-600"
+                      : "bg-white text-gray-600 border-gray-200 hover:border-blue-300")
+                  }
+                >
+                  {preset.label}
+                </button>
+              ))}
             </div>
             <CustomDateRange
               name="dueDate"
@@ -756,9 +899,12 @@ const PaymentModal: React.FC<Props> = ({
               <div className="text-[11px] text-gray-500">
                 {dueDaysFromNow === 0
                   ? "Due today"
-                  : `Due in ${dueDaysFromNow} day${
-                      dueDaysFromNow === 1 ? "" : "s"
-                    } · ${dueDate.format("dddd, DD MMM YYYY")}`}
+                  : "Due in " +
+                    dueDaysFromNow +
+                    " day" +
+                    (dueDaysFromNow === 1 ? "" : "s") +
+                    " \u00B7 " +
+                    dueDate.format("dddd, DD MMM YYYY")}
               </div>
             )}
           </div>

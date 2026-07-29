@@ -1,34 +1,40 @@
 import React, { useEffect } from "react";
 import { useForm } from "react-hook-form";
-import { HiOutlineCog} from "react-icons/hi";
+import { HiOutlineCog, HiOutlineFolder } from "react-icons/hi";
 import CustomModal from "../../../components/common/CustomModal";
 import CustomInput from "../../../components/common/CustomInput";
 import CustomSelect from "../../../components/common/CustomSelect";
-import type { ExpenseCategory } from "../types/Expenses";
 import CustomTextArea from "../../../components/common/Customtextarea";
 
 export interface BudgetFormValues {
   name: string;
   monthlyBudget: string;
   alertThreshold: string;
-  rollover: string;
+  rolloverRule: string;
   notes: string;
+}
+
+interface ApiCategory {
+  id: string;
+  name: string;
+  description?: string;
+  icon?: string;
+  bg?: string;
+  color?: string;
+  monthlyBudget?: number;
+  spentThisMonth?: number;
+  transactions?: number;
+  percentUsed?: number;
 }
 
 interface Props {
   open: boolean;
-  category: ExpenseCategory | null;
-  isCustom?: boolean; // true when adding a brand-new category
+  category: ApiCategory | null;
+  isCustom?: boolean;
   onClose: () => void;
   onSubmit: (values: BudgetFormValues) => void;
-  loading?: boolean;
+  isSubmitting?: boolean;
 }
-
-const ROLLOVER_OPTIONS = [
-  { value: "none", label: "No rollover — reset each month" },
-  { value: "carry", label: "Carry unused budget to next month" },
-  { value: "deduct", label: "Deduct overspend from next month" },
-];
 
 const ALERT_OPTIONS = [
   { value: "80", label: "Alert at 80% used" },
@@ -37,13 +43,19 @@ const ALERT_OPTIONS = [
   { value: "off", label: "No alerts" },
 ];
 
+const ROLLOVER_OPTIONS = [
+  { value: "NONE", label: "No rollover — reset each month" },
+  { value: "CARRY", label: "Carry unused budget to next month" },
+  { value: "DEDUCT", label: "Deduct overspend from next month" },
+];
+
 const Configurebudgetmodal: React.FC<Props> = ({
   open,
   category,
   isCustom = false,
   onClose,
   onSubmit,
-  loading = false,
+  isSubmitting = false,
 }) => {
   const {
     control,
@@ -55,21 +67,22 @@ const Configurebudgetmodal: React.FC<Props> = ({
       name: "",
       monthlyBudget: "",
       alertThreshold: "90",
-      rollover: "none",
+      rolloverRule: "NONE",
       notes: "",
     },
   });
 
   useEffect(() => {
-    if (open) {
-      reset({
-        name: category?.name ?? "",
-        monthlyBudget: category?.budget ? String(category.budget) : "",
-        alertThreshold: "90",
-        rollover: "none",
-        notes: "",
-      });
-    }
+    if (!open) return;
+    reset({
+      name: category?.name ?? "",
+      monthlyBudget: category?.monthlyBudget
+        ? String(category.monthlyBudget)
+        : "",
+      alertThreshold: "90",
+      rolloverRule: "NONE",
+      notes: "",
+    });
   }, [open, category, reset]);
 
   const title = isCustom ? "Add Custom Category" : "Configure Budget";
@@ -84,7 +97,7 @@ const Configurebudgetmodal: React.FC<Props> = ({
       <button
         type="button"
         onClick={onClose}
-        disabled={loading}
+        disabled={isSubmitting}
         className="flex-1 py-2.5 rounded-xl border border-gray-200 text-gray-600 text-[13px] font-medium hover:bg-gray-50 disabled:opacity-50"
       >
         Cancel
@@ -92,10 +105,10 @@ const Configurebudgetmodal: React.FC<Props> = ({
       <button
         type="button"
         onClick={handleSubmit(onSubmit)}
-        disabled={loading}
+        disabled={isSubmitting}
         className="flex-[2] py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-[13px] font-semibold flex items-center justify-center gap-2 disabled:opacity-50"
       >
-        {loading ? (
+        {isSubmitting ? (
           <>
             <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
             Saving...
@@ -121,31 +134,31 @@ const Configurebudgetmodal: React.FC<Props> = ({
       footer={footer}
     >
       <div className="space-y-4">
-        {/* Category preview (existing) */}
         {!isCustom && category && (
           <div
             className="flex items-center gap-3 p-3 rounded-xl border border-slate-100"
-            style={{ background: category.bg }}
+            style={{ background: category.bg ?? "#f8fafc" }}
           >
             <div
-              className="w-11 h-11 rounded-xl flex items-center justify-center"
-              style={{ color: category.color, background: "#fff" }}
+              className="w-11 h-11 rounded-xl flex items-center justify-center text-lg"
+              style={{ color: category.color ?? "#64748b", background: "#fff" }}
             >
-              {category.icon}
+              {category.icon ?? <HiOutlineFolder className="w-5 h-5" />}
             </div>
             <div>
               <p className="text-[14px] font-semibold text-slate-800">
                 {category.name}
               </p>
               <p className="text-[12px] text-slate-500">
-                Currently ₹{category.spent.toLocaleString("en-IN")} spent ·{" "}
-                {category.transactions} transactions
+                Currently ₹
+                {(category.spentThisMonth ?? 0).toLocaleString("en-IN")} spent ·{" "}
+                {category.transactions ?? 0} transaction
+                {(category.transactions ?? 0) === 1 ? "" : "s"}
               </p>
             </div>
           </div>
         )}
 
-        {/* Category name — only editable for custom */}
         {isCustom && (
           <CustomInput
             name="name"
@@ -174,7 +187,6 @@ const Configurebudgetmodal: React.FC<Props> = ({
           }}
         />
 
-        {/* Alert threshold + rollover */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <CustomSelect
             name="alertThreshold"
@@ -184,8 +196,9 @@ const Configurebudgetmodal: React.FC<Props> = ({
             placeholder="Select threshold"
             options={ALERT_OPTIONS}
           />
+
           <CustomSelect
-            name="rollover"
+            name="rolloverRule"
             control={control}
             errors={errors}
             label="Rollover Rule"

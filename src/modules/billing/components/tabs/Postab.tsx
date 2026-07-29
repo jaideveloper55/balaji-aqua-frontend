@@ -50,8 +50,8 @@ interface Props {
 
 const POSTab: React.FC<Props> = (p) => {
   return (
-    <div className="flex h-[calc(100vh-130px)]">
-      <div className="w-1/2 flex flex-col py-5 overflow-hidden border-r border-gray-100">
+    <div className="flex h-[calc(100dvh-130px)] min-h-0">
+      <div className="w-1/2 flex flex-col min-h-0 py-5 overflow-hidden border-r border-gray-100">
         <CustomerBar
           selectedCustomer={p.selectedCustomer}
           customerMode={p.customerMode}
@@ -66,12 +66,14 @@ const POSTab: React.FC<Props> = (p) => {
           onOpenQuickAdd={p.onOpenQuickAdd}
         />
 
-        {/* Product area with loading overlay */}
-        <div className="flex-1 relative overflow-hidden">
+        {/* Product area with loading overlay.
+            flex flex-col is required: ProductGrid returns a fragment, so its
+            search bar and scroll container become direct children here. */}
+        <div className="flex-1 min-h-0 relative flex flex-col overflow-hidden">
           {p.isLoadingProducts && (
             <div
               className="absolute inset-0 z-10 flex flex-col items-center
-              justify-center bg-white/70 backdrop-blur-[1px]"
+                justify-center bg-white/70 backdrop-blur-[1px]"
             >
               <Spin size="large" />
               <p className="text-[12px] text-slate-400 mt-3 font-medium">
@@ -90,7 +92,7 @@ const POSTab: React.FC<Props> = (p) => {
           />
         </div>
 
-        <div className="bg-white border-t border-gray-100 px-5 py-2.5 flex items-center justify-end">
+        <div className="bg-white border-t border-gray-100 px-5 py-2.5 flex items-center justify-end shrink-0">
           <div className="flex items-center gap-2">
             <span className="text-[11px] text-gray-500">GST 18%</span>
             <Switch

@@ -43,9 +43,11 @@ import {
   deleteProductApi,
   deleteProductsApi,
   updateProductApi,
+  forceDeleteProductApi,
 } from "../api/Products.api";
 import ProductExportDrawer from "../components/Productexportdrawer";
 import ProductTable from "../components/ProductTable";
+import BomModal from "../components/BomModal";
 
 const FILTER_DEFAULTS: ProductFilterFormValues = {
   categoryFilter: "all",
@@ -74,9 +76,11 @@ const ProductsPage = () => {
   const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([]);
   const [activeTab, setActiveTab] = useState<TabKey>("products");
   const [dismissedAlerts, setDismissedAlerts] = useState<string[]>([]);
-  const [deleteTarget, setDeleteTarget] = useState<Product | null>(null);
-  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
   const categoryManagerRef = useRef<CategoryManagerHandle>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Product | null>(null);
+  const [bomTarget, setBomTarget] = useState<Product | null>(null);
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
+  const [deleteBlocked, setDeleteBlocked] = useState(false);
 
   const { watch } = useForm<ProductFilterFormValues>({
     defaultValues: FILTER_DEFAULTS,
@@ -108,19 +112,19 @@ const ProductsPage = () => {
   const { data: productsData, isLoading: isLoadingProducts } = useQuery({
     queryKey: ["getProducts", queryParams],
     queryFn: () => getProductsApi(queryParams).then((res) => res.data),
-    staleTime: 1000 * 30,
+    staleTime: 0,
   });
 
   const { data: statsData } = useQuery({
     queryKey: ["getProductStats"],
     queryFn: () => getProductStatsApi().then((res) => res.data),
-    staleTime: 1000 * 60,
+    staleTime: 0,
   });
 
   const { data: alertsData } = useQuery({
     queryKey: ["getProductAlerts"],
     queryFn: () => getProductAlertsApi().then((res) => res.data),
-    staleTime: 1000 * 60,
+    staleTime: 0,
   });
 
   const deleteMutation = useMutation({
@@ -132,12 +136,15 @@ const ProductsPage = () => {
       queryClient.invalidateQueries({ queryKey: ["getProductStats"] });
       queryClient.invalidateQueries({ queryKey: ["getProductAlerts"] });
       setDeleteTarget(null);
+      setDeleteBlocked(false);
     },
-    onError: (err: any) =>
+    onError: (err: any) => {
+      if (err?.statusCode === 409) setDeleteBlocked(true);
       errorNotification(
         "Delete Failed",
         err?.message ?? "Could not delete product"
-      ),
+      );
+    },
   });
 
   const toggleSellableMutation = useMutation({
@@ -150,6 +157,45 @@ const ProductsPage = () => {
       successNotification("Updated", "Sellable status changed");
     },
     onError: () => errorNotification("Error", "Could not update product"),
+  });
+
+  const toggleStatusMutation = useMutation({
+    mutationFn: ({ id, status }: { id: string; status: ProductStatus }) =>
+      updateProductApi(id, { status }).then((r) => r.data),
+    onSuccess: (_data, vars) => {
+      queryClient.invalidateQueries({ queryKey: ["getProducts"] });
+      queryClient.invalidateQueries({ queryKey: ["getProductStats"] });
+      queryClient.invalidateQueries({ queryKey: ["billing-pos-products"] });
+      successNotification(
+        "Updated",
+        vars.status === "INACTIVE"
+          ? "Product deactivated — hidden from POS and billing"
+          : "Product reactivated"
+      );
+    },
+    onError: (err: any) =>
+      errorNotification(
+        "Failed",
+        err?.response?.data?.message ?? "Could not change status"
+      ),
+  });
+
+  const forceDeleteMutation = useMutation({
+    mutationFn: (id: string) =>
+      forceDeleteProductApi(id).then((res) => res.data),
+    onSuccess: (data: any) => {
+      successNotification("Deleted", data.message);
+      if (data.warning) errorNotification("Data destroyed", data.warning);
+      queryClient.invalidateQueries({ queryKey: ["getProducts"] });
+      queryClient.invalidateQueries({ queryKey: ["getProductStats"] });
+      setDeleteTarget(null);
+      setDeleteBlocked(false);
+    },
+    onError: (err: any) =>
+      errorNotification(
+        "Failed",
+        err?.response?.data?.message ?? "Could not force delete"
+      ),
   });
 
   const bulkDeleteMutation = useMutation({
@@ -220,10 +266,17 @@ const ProductsPage = () => {
 
   const handleConfirmDelete = useCallback(async () => {
     if (!deleteTarget) return;
-    await deleteMutation.mutateAsync(deleteTarget.id);
-  }, [deleteTarget, deleteMutation]);
+    if (deleteBlocked) {
+      await forceDeleteMutation.mutateAsync(deleteTarget.id);
+    } else {
+      await deleteMutation.mutateAsync(deleteTarget.id);
+    }
+  }, [deleteTarget, deleteBlocked, deleteMutation, forceDeleteMutation]);
 
-  const handleCloseDelete = useCallback(() => setDeleteTarget(null), []);
+  const handleCloseDelete = useCallback(() => {
+    setDeleteTarget(null);
+    setDeleteBlocked(false); // reset so the next product starts fresh
+  }, []);
 
   const handleConfirmBulkDelete = useCallback(async () => {
     await bulkDeleteMutation.mutateAsync(selectedRowKeys as string[]);
@@ -385,6 +438,13 @@ const ProductsPage = () => {
           onToggleSellable={(product, val) =>
             toggleSellableMutation.mutate({ id: product.id, isSellable: val })
           }
+          onOpenBom={setBomTarget}
+          onToggleStatus={(product) =>
+            toggleStatusMutation.mutate({
+              id: product.id,
+              status: product.status === "INACTIVE" ? "ACTIVE" : "INACTIVE",
+            })
+          }
           onPageChange={handlePageChange}
         />
       ) : (
@@ -421,9 +481,12 @@ const ProductsPage = () => {
         open={!!deleteTarget}
         onClose={handleCloseDelete}
         onConfirm={handleConfirmDelete}
-        loading={deleteMutation.isPending}
+        loading={deleteMutation.isPending || forceDeleteMutation.isPending}
         itemType="Product"
         itemName={deleteTarget?.name || ""}
+        confirmLabel={
+          deleteBlocked ? "Delete permanently anyway" : "Delete Product"
+        }
         details={
           deleteTarget
             ? [
@@ -442,7 +505,14 @@ const ProductsPage = () => {
               ]
             : []
         }
-        warningMessage="This product will be permanently removed from your inventory. Any sales records, orders, or analytics referencing it may be affected."
+        warningMessage={
+          deleteBlocked
+            ? "This product appears on existing invoices. Deleting it will " +
+              "also delete those invoice line items — affected invoices will " +
+              "keep their totals but show incomplete item lists. This cannot " +
+              "be undone."
+            : "This product will be permanently removed from your inventory."
+        }
       />
 
       <DeleteConfirmModal
@@ -454,6 +524,12 @@ const ProductsPage = () => {
         itemName={`${selectedRowKeys.length} selected products`}
         confirmLabel={`Delete ${selectedRowKeys.length} Products`}
         warningMessage={`All ${selectedRowKeys.length} selected products will be permanently removed from your inventory. This affects related sales records and analytics.`}
+      />
+
+      <BomModal
+        open={!!bomTarget}
+        onClose={() => setBomTarget(null)}
+        product={bomTarget}
       />
       <ProductExportDrawer
         open={exportOpen}

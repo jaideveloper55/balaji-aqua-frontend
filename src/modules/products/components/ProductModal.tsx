@@ -135,6 +135,10 @@ const ProductModal: React.FC<ProductModalProps> = ({
       successNotification("Product Added", "New product created successfully");
       queryClient.invalidateQueries({ queryKey: ["getProducts"] });
       queryClient.invalidateQueries({ queryKey: ["getProductStats"] });
+      queryClient.invalidateQueries({ queryKey: ["getProductAlerts"] });
+      queryClient.invalidateQueries({ queryKey: ["billing-pos-products"] });
+      queryClient.invalidateQueries({ queryKey: ["inventory-stock"] });
+      queryClient.invalidateQueries({ queryKey: ["inventory-summary"] });
     },
     onError: (err: any) =>
       errorNotification(
@@ -156,6 +160,10 @@ const ProductModal: React.FC<ProductModalProps> = ({
       successNotification("Product Updated", "Changes saved successfully");
       queryClient.invalidateQueries({ queryKey: ["getProducts"] });
       queryClient.invalidateQueries({ queryKey: ["getProductStats"] });
+      queryClient.invalidateQueries({ queryKey: ["getProductAlerts"] });
+      queryClient.invalidateQueries({ queryKey: ["billing-pos-products"] });
+      queryClient.invalidateQueries({ queryKey: ["inventory-stock"] });
+      queryClient.invalidateQueries({ queryKey: ["inventory-summary"] });
     },
     onError: (err: any) =>
       errorNotification(
@@ -166,7 +174,6 @@ const ProductModal: React.FC<ProductModalProps> = ({
 
   const loading = createMutation.isPending || updateMutation.isPending;
 
-  // ─── Form ─────────────────────────────────────────────────────────────────
   const {
     control,
     handleSubmit,

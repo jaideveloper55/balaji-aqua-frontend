@@ -194,7 +194,7 @@ const CartPanel: React.FC<Props> = ({
           <Table
             dataSource={cart}
             columns={columns}
-            rowKey="id" // ← use id not productId as row key
+            rowKey="id"
             pagination={false}
             size="small"
             className="billing-cart-table"
