@@ -64,6 +64,8 @@ import {
 } from "../api/billing.api";
 import ThermalReceipt from "../components/ThermalReceipt";
 import GatePass from "../components/GatePass";
+import { useAuthStore } from "../../../store/auth.store";
+import CorrectInvoiceModal from "../components/modals/CorrectInvoiceModal";
 
 type ExportType = "invoices" | "payments" | "outstanding" | "summary";
 
@@ -151,6 +153,7 @@ const BillingPage = () => {
   const [showInvoiceDetail, setShowInvoiceDetail] = useState(false);
   const [showAddPayment, setShowAddPayment] = useState(false);
   const [showExport, setShowExport] = useState(false);
+  const [correctTarget, setCorrectTarget] = useState<Invoice | null>(null);
   const [exportDefaultType, setExportDefaultType] =
     useState<ExportType>("invoices");
   const [generatedInvoice, setGeneratedInvoice] = useState<Invoice | null>(
@@ -160,7 +163,6 @@ const BillingPage = () => {
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
   const [invoiceStatusFilter, setInvoiceStatusFilter] = useState("all");
   const [invoiceSearch, setInvoiceSearch] = useState("");
-  const [invoiceDateRange, setInvoiceDateRange] = useState<DateRange>(null);
   const [paymentsSearch, setPaymentsSearch] = useState("");
   const [paymentsModeFilter, setPaymentsModeFilter] = useState<string>("all");
   const [paymentsDateRange, setPaymentsDateRange] = useState<DateRange>(null);
@@ -191,6 +193,7 @@ const BillingPage = () => {
   const [prevOutstanding, setPrevOutstanding] = useState(0);
 
   const productSearchRef = useRef<HTMLInputElement>(null);
+  const { user } = useAuthStore();
 
   // Fetch Cart
   const { data: cartData } = useQuery({
@@ -334,12 +337,8 @@ const BillingPage = () => {
       status: STATUS_FILTER_MAP[invoiceStatusFilter],
       search: invoiceSearch || undefined,
     };
-    if (invoiceDateRange?.[0])
-      f.dateFrom = invoiceDateRange[0].format("YYYY-MM-DD");
-    if (invoiceDateRange?.[1])
-      f.dateTo = invoiceDateRange[1].format("YYYY-MM-DD");
     return f;
-  }, [invoiceStatusFilter, invoiceSearch, invoiceDateRange]);
+  }, [invoiceStatusFilter, invoiceSearch]);
 
   const paymentApiFilters: PaymentFilters = useMemo(() => {
     const onCollection = activeTab === "collection";
@@ -1194,19 +1193,25 @@ const BillingPage = () => {
 
         {activeTab === "invoices" && (
           <InvoicesTab
-            onExport={() => openExport("invoices")}
             invoices={invoices}
             stats={invoiceStats}
             search={invoiceSearch}
             statusFilter={invoiceStatusFilter}
-            dateRange={invoiceDateRange}
             onSearchChange={setInvoiceSearch}
             onStatusFilterChange={setInvoiceStatusFilter}
-            onDateRangeChange={setInvoiceDateRange}
             onView={handleViewInvoice}
             onPrint={(inv) => handlePrint(inv)}
+            onExport={() => openExport("invoices")}
+            userRole={user?.role}
+            onCorrect={setCorrectTarget}
           />
         )}
+
+        <CorrectInvoiceModal
+          open={!!correctTarget}
+          invoice={correctTarget}
+          onClose={() => setCorrectTarget(null)}
+        />
 
         {activeTab === "payments" && (
           <PaymentsTab
