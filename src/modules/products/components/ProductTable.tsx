@@ -1,18 +1,15 @@
 import React, { useMemo, useCallback } from "react";
-import { Switch, Table, Tooltip, Dropdown } from "antd";
+import { Switch, Table, Tooltip, Dropdown, MenuProps } from "antd";
 import type { ColumnsType } from "antd/es/table";
-import type { MenuProps } from "antd";
 import {
   HiOutlineCube,
   HiOutlineTag,
-  HiOutlineEye,
-  HiOutlinePencil,
-  HiOutlineTrash,
   HiOutlineDotsVertical,
   HiOutlineInbox,
   HiOutlineBeaker,
-  HiOutlineCheckCircle,
-  HiOutlineBan,
+  HiOutlineEye,
+  HiOutlinePencil,
+  HiOutlineTrash,
 } from "react-icons/hi";
 import type { Product, ProductStatus } from "../types/Product";
 import {
@@ -40,35 +37,6 @@ interface ProductTableProps {
   onToggleStatus?: (product: Product) => void;
 }
 
-const buildRowActions = (product: Product): MenuProps["items"] => {
-  const isInactive = product.status === "INACTIVE";
-  return [
-    { key: "view", icon: <HiOutlineEye size={14} />, label: "View Details" },
-    { key: "edit", icon: <HiOutlinePencil size={14} />, label: "Edit Product" },
-    {
-      key: "bom",
-      icon: <HiOutlineBeaker size={14} />,
-      label: "Bill of Materials",
-    },
-    { type: "divider" },
-    {
-      key: "toggleStatus",
-      icon: isInactive ? (
-        <HiOutlineCheckCircle size={14} />
-      ) : (
-        <HiOutlineBan size={14} />
-      ),
-      label: isInactive ? "Reactivate" : "Deactivate",
-    },
-    {
-      key: "delete",
-      icon: <HiOutlineTrash size={14} />,
-      label: "Delete",
-      danger: true,
-    },
-  ];
-};
-
 const ProductTable: React.FC<ProductTableProps> = ({
   products,
   totalProducts,
@@ -83,7 +51,6 @@ const ProductTable: React.FC<ProductTableProps> = ({
   onDelete,
   onToggleSellable,
   onOpenBom,
-  onToggleStatus,
 }) => {
   const handleMenuClick = useCallback(
     (record: Product, key: string, domEvent: any) => {
@@ -95,14 +62,29 @@ const ProductTable: React.FC<ProductTableProps> = ({
         onEdit(record);
       } else if (key === "bom") {
         onOpenBom?.(record);
-      } else if (key === "toggleStatus") {
-        onToggleStatus?.(record);
       } else if (key === "delete") {
         onDelete?.(record);
       }
     },
-    [onView, onEdit, onDelete, onOpenBom, onToggleStatus]
+    [onView, onEdit, onDelete, onOpenBom]
   );
+
+  const buildRowActions = (_product: Product): MenuProps["items"] => [
+    { key: "view", icon: <HiOutlineEye size={14} />, label: "View Details" },
+    { key: "edit", icon: <HiOutlinePencil size={14} />, label: "Edit Product" },
+    {
+      key: "bom",
+      icon: <HiOutlineBeaker size={14} />,
+      label: "Bill of Materials",
+    },
+    { type: "divider" },
+    {
+      key: "delete",
+      icon: <HiOutlineTrash size={14} />,
+      label: "Delete",
+      danger: true,
+    },
+  ];
 
   const columns: ColumnsType<Product> = useMemo(
     () => [

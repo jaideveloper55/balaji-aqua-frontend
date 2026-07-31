@@ -184,18 +184,28 @@ const ProductsPage = () => {
     mutationFn: (id: string) =>
       forceDeleteProductApi(id).then((res) => res.data),
     onSuccess: (data: any) => {
-      successNotification("Deleted", data.message);
-      if (data.warning) errorNotification("Data destroyed", data.warning);
+      const warning = data?.warning;
+      successNotification(
+        "Deleted",
+        warning ? `Product deleted. ${warning}` : "Product permanently deleted"
+      );
       queryClient.invalidateQueries({ queryKey: ["getProducts"] });
       queryClient.invalidateQueries({ queryKey: ["getProductStats"] });
+      queryClient.invalidateQueries({ queryKey: ["getProductAlerts"] });
+      queryClient.invalidateQueries({ queryKey: ["billing-pos-products"] });
       setDeleteTarget(null);
       setDeleteBlocked(false);
     },
-    onError: (err: any) =>
+    onError: (err: any) => {
+      if (err?.statusCode === 409) {
+        setDeleteBlocked(true);
+        return;
+      }
       errorNotification(
-        "Failed",
-        err?.response?.data?.message ?? "Could not force delete"
-      ),
+        "Delete Failed",
+        err?.message ?? "Could not delete product"
+      );
+    },
   });
 
   const bulkDeleteMutation = useMutation({
@@ -266,16 +276,19 @@ const ProductsPage = () => {
 
   const handleConfirmDelete = useCallback(async () => {
     if (!deleteTarget) return;
-    if (deleteBlocked) {
-      await forceDeleteMutation.mutateAsync(deleteTarget.id);
-    } else {
+
+    try {
       await deleteMutation.mutateAsync(deleteTarget.id);
+    } catch (err: any) {
+      if (err?.statusCode === 409) {
+        await forceDeleteMutation.mutateAsync(deleteTarget.id);
+      }
     }
-  }, [deleteTarget, deleteBlocked, deleteMutation, forceDeleteMutation]);
+  }, [deleteTarget, deleteMutation, forceDeleteMutation]);
 
   const handleCloseDelete = useCallback(() => {
     setDeleteTarget(null);
-    setDeleteBlocked(false); // reset so the next product starts fresh
+    setDeleteBlocked(false);
   }, []);
 
   const handleConfirmBulkDelete = useCallback(async () => {
