@@ -24,7 +24,19 @@ import {
   HiOutlineCreditCard,
 } from "react-icons/hi";
 import { HiOutlineWrench } from "react-icons/hi2";
-import { Expense } from "../types/Expenses";
+
+export interface Expense {
+  id: string;
+  expenseNo: string;
+  date: string;
+  vendorName: string;
+  description: string;
+  categoryName: string;
+  amount: number;
+  gstAmount?: number;
+  paymentMode: "CASH" | "UPI" | "BANK_TRANSFER" | "CHEQUE" | "CARD";
+  status: "PAID" | "APPROVED" | "PENDING" | "REJECTED";
+}
 
 interface Props {
   expenses: Expense[];
@@ -161,7 +173,7 @@ const Allexpensespanel: React.FC<Props> = ({
     return true;
   });
 
-  const pageTotal = filtered.reduce((s, e) => s + (e.amount ?? 0), 0);
+  const pageTotal = filtered.reduce((s, e) => s + Number(e.amount ?? 0), 0);
 
   const columns: ColumnsType<Expense> = [
     {
@@ -225,15 +237,15 @@ const Allexpensespanel: React.FC<Props> = ({
       key: "amount",
       width: 140,
       align: "right",
-      sorter: (a, b) => a.amount - b.amount,
+      sorter: (a, b) => Number(a.amount) - Number(b.amount),
       render: (v: number, r) => (
         <div>
           <div className="text-[14px] font-bold text-rose-600 tabular-nums">
-            −{inr(v)}
+            −{inr(Number(v))}
           </div>
           {r.gstAmount ? (
             <div className="text-[10px] text-slate-400">
-              incl. {inr(r.gstAmount)} GST
+              incl. {inr(Number(r.gstAmount))} GST
             </div>
           ) : null}
         </div>
@@ -334,7 +346,6 @@ const Allexpensespanel: React.FC<Props> = ({
     },
   ];
 
-  // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <div className="space-y-4">
       {/* Filters bar */}
@@ -364,7 +375,6 @@ const Allexpensespanel: React.FC<Props> = ({
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-          {/* Search — controlled by parent via props */}
           <SearchInput
             value={search}
             onChange={(val) => onSearchChange?.(val)}

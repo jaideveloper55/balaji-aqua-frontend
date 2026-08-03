@@ -56,33 +56,20 @@ const DeleteConfirmModal: React.FC<DeleteConfirmModalProps> = ({
       size="md"
       showCloseButton={loading}
       footer={
-        <div className="flex items-center justify-between gap-3">
-          <p className="text-[11px] text-slate-400 flex items-center gap-1.5">
-            <HiOutlineExclamation
-              size={12}
-              className="text-amber-500 shrink-0"
-            />
-            <span>You can't undo this</span>
-          </p>
-          <div className="flex items-center gap-3">
-            <Button
-              onClick={onClose}
-              disabled={loading}
-              className="!rounded-lg"
-            >
-              Cancel
-            </Button>
-            <Button
-              danger
-              type="primary"
-              onClick={handleConfirm}
-              loading={loading}
-              icon={!loading && <HiOutlineTrash size={14} />}
-              className="!rounded-lg !font-semibold !shadow-sm !shadow-red-500/25"
-            >
-              {confirmLabel || `Delete ${itemType}`}
-            </Button>
-          </div>
+        <div className="flex items-center justify-between w-full">
+          <Button onClick={onClose} disabled={loading} className="!rounded-lg">
+            Cancel
+          </Button>
+          <Button
+            danger
+            type="primary"
+            onClick={handleConfirm}
+            loading={loading}
+            icon={!loading && <HiOutlineTrash size={14} />}
+            className="!rounded-lg !font-semibold !shadow-sm !shadow-red-500/25"
+          >
+            {confirmLabel || `Delete ${itemType}`}
+          </Button>
         </div>
       }
     >

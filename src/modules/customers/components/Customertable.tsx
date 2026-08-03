@@ -12,7 +12,7 @@ import {
   HiOutlineOfficeBuilding,
   HiOutlineCog,
 } from "react-icons/hi";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { getCustomersApi, removeCustomerApi } from "../api/customers.api";
 import {
   successNotification,
@@ -42,6 +42,8 @@ const CustomerTable: React.FC<CustomerTableProps> = ({
   onDelete,
   onSelectionChange,
 }) => {
+  const queryClient = useQueryClient();
+
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
 
@@ -53,7 +55,6 @@ const CustomerTable: React.FC<CustomerTableProps> = ({
   const [deleteTarget, setDeleteTarget] = useState<Customer | null>(null);
   const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([]);
 
-  // Query params
   const query: CustomerQuery = {
     page,
     limit: pageSize,
@@ -63,7 +64,7 @@ const CustomerTable: React.FC<CustomerTableProps> = ({
     toDate,
   };
 
-  //  Fetch Customers
+  // Fetch customers
   const { data, isLoading, isFetching, isError, error } = useQuery({
     queryKey: ["getCustomers", query],
     queryFn: () => getCustomersApi(query).then((res) => res.data),
@@ -79,24 +80,31 @@ const CustomerTable: React.FC<CustomerTableProps> = ({
     }
   }, [isError, error]);
 
-  //  Delete Customer
+  // Delete customer mutation
   const deleteCustomer = useMutation({
     mutationKey: ["deleteCustomer"],
     mutationFn: (id: string) => removeCustomerApi(id),
     onSuccess: (response) => {
       successNotification(
-        "Success",
+        "Deleted",
         response.data.message ?? "Customer deleted successfully"
       );
+      queryClient.invalidateQueries({ queryKey: ["getCustomers"] });
+      queryClient.invalidateQueries({ queryKey: ["getCustomerStats"] });
       setDeleteTarget(null);
     },
     onError: (error: any) => {
-      errorNotification("Error", error.message);
+      errorNotification(
+        "Delete Failed",
+        error?.response?.data?.message ??
+          error.message ??
+          "Could not delete customer"
+      );
     },
   });
 
   const customers = data?.data ?? [];
-  const total = data?.pagination.total ?? 0;
+  const total = data?.pagination?.total ?? 0;
 
   const handleSearchChange = useCallback((value: string) => {
     setSearch(value);
@@ -122,7 +130,7 @@ const CustomerTable: React.FC<CustomerTableProps> = ({
     setPageSize(pagination.pageSize ?? 10);
   };
 
-  // ─── Row selection ────────────────────────────────────────────────────────
+  // Row selection
   const rowSelection = {
     selectedRowKeys,
     onChange: (keys: React.Key[], selectedRows: Customer[]) => {
@@ -377,7 +385,6 @@ const CustomerTable: React.FC<CustomerTableProps> = ({
         onDateRangeChange={handleDateRangeChange}
       />
 
-      {/* Selection summary bar */}
       {selectedRowKeys.length > 0 && (
         <div className="flex items-center justify-between px-4 py-2.5 bg-blue-50 border border-blue-100 rounded-xl">
           <span className="text-[13px] font-semibold text-blue-700">
@@ -432,7 +439,6 @@ const CustomerTable: React.FC<CustomerTableProps> = ({
             deleteCustomer.mutate(deleteTarget.id, {
               onSuccess: () => {
                 onDelete?.(deleteTarget);
-                setDeleteTarget(null);
                 resolve();
               },
               onError: (err) => reject(err),
@@ -452,11 +458,13 @@ const CustomerTable: React.FC<CustomerTableProps> = ({
             : []
         }
         warningMessage={
-          deleteTarget && deleteTarget.outstandingBalance > 0
-            ? `⚠️ This customer has an outstanding balance of ₹${deleteTarget.outstandingBalance.toLocaleString(
+          deleteTarget && Number(deleteTarget.outstandingBalance) > 0
+            ? `⚠️ This customer has an outstanding balance of ₹${Number(
+                deleteTarget.outstandingBalance
+              ).toLocaleString(
                 "en-IN"
               )}. Deleting will remove their entire history including ledger entries and price rules.`
-            : `This customer and all their data — ledger entries, pricing rules, and order history — will be permanently removed. This cannot be undone.`
+            : `This customer and all their data ledger entries, pricing rules, and order history  will be permanently removed. This cannot be undone.`
         }
         confirmLabel="Yes, delete customer"
       />

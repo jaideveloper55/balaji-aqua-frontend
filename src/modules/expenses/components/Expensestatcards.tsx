@@ -1,19 +1,19 @@
 import {
   HiOutlineCash,
   HiOutlineTrendingUp,
-  HiOutlineClock,
-  HiOutlineExclamation,
   HiOutlineTrendingDown,
+  HiOutlineCalendar,
+  HiOutlineLightningBolt,
 } from "react-icons/hi";
 
 interface ExpenseStatCardsProps {
   totalThisMonth?: number;
-  invoiceCount?: number;
   trendPercent?: number;
-  pendingApproval?: number;
+  thisWeekSpend?: number;
+  weekTrend?: number;
   topCategory?: { name: string; amount: number } | null;
-  cashPercent?: number;
-  digitalPercent?: number;
+  pettyCashBalance?: number;
+  reconciledTill?: string | null;
 }
 
 const formatINR = (n: number) =>
@@ -21,19 +21,33 @@ const formatINR = (n: number) =>
     style: "currency",
     currency: "INR",
     maximumFractionDigits: 0,
-  }).format(n);
+  }).format(n ?? 0);
 
 const ExpenseStatCards = ({
   totalThisMonth = 0,
   trendPercent = 0,
-  pendingApproval = 0,
+  thisWeekSpend = 0,
+  weekTrend = 0,
   topCategory = null,
-  cashPercent = 0,
-  digitalPercent = 0,
+  pettyCashBalance = 0,
+  reconciledTill = null,
 }: ExpenseStatCardsProps) => {
   const monthName = new Date().toLocaleDateString("en-IN", { month: "long" });
-
   const trendUp = trendPercent > 0;
+  const weekUp = weekTrend > 0;
+
+  const reconciledLabel = reconciledTill
+    ? (() => {
+        const diffDays = Math.floor(
+          (new Date().setHours(0, 0, 0, 0) -
+            new Date(reconciledTill).setHours(0, 0, 0, 0)) /
+            (1000 * 60 * 60 * 24)
+        );
+        if (diffDays === 0) return "Reconciled today";
+        if (diffDays === 1) return "Reconciled yesterday";
+        return `Last reconciled ${diffDays}d ago`;
+      })()
+    : "Never reconciled";
 
   const cards = [
     {
@@ -43,27 +57,35 @@ const ExpenseStatCards = ({
       iconBg: "bg-rose-50",
       iconColor: "text-rose-600",
       ring: "ring-rose-100",
+      hover: "hover:border-rose-200 hover:shadow-rose-100/50",
+      subtitle: `${monthName} ${new Date().getFullYear()}`,
       delta: `${trendUp ? "↑" : "↓"} ${Math.abs(trendPercent).toFixed(
         1
       )}% vs last month`,
-      deltaColor: trendUp ? "text-rose-600" : "text-emerald-600",
-      hover: "hover:border-rose-200 hover:shadow-rose-100/50",
-      subtitle: `${monthName} ${new Date().getFullYear()}`,
+      deltaColor: trendUp ? "text-rose-500" : "text-emerald-600",
       showTrend: true,
+      trendUp,
     },
+
     {
-      label: "PENDING APPROVAL",
-      value: pendingApproval,
-      icon: <HiOutlineClock className="w-6 h-6" />,
+      label: "THIS WEEK",
+      value: formatINR(thisWeekSpend),
+      icon: <HiOutlineCalendar className="w-6 h-6" />,
       iconBg: "bg-amber-50",
       iconColor: "text-amber-600",
       ring: "ring-amber-100",
-      delta: pendingApproval > 0 ? "Needs your action" : "All processed",
-      deltaColor: pendingApproval > 0 ? "text-amber-600" : "text-emerald-600",
       hover: "hover:border-amber-200 hover:shadow-amber-100/50",
-      subtitle: "Awaiting review",
+      subtitle: "Mon – today",
+      delta:
+        thisWeekSpend === 0
+          ? "No spends yet"
+          : `${weekUp ? "↑" : "↓"} ${Math.abs(weekTrend).toFixed(
+              1
+            )}% vs last week`,
+      deltaColor: weekUp ? "text-rose-500" : "text-emerald-600",
       showTrend: false,
     },
+
     {
       label: "TOP CATEGORY",
       value: topCategory?.name ?? "—",
@@ -71,24 +93,25 @@ const ExpenseStatCards = ({
       iconBg: "bg-purple-50",
       iconColor: "text-purple-600",
       ring: "ring-purple-100",
-      delta: topCategory ? formatINR(topCategory.amount) : "—",
-      deltaColor: "text-purple-600",
       hover: "hover:border-purple-200 hover:shadow-purple-100/50",
       subtitle: "Highest spend",
+      delta: topCategory ? formatINR(topCategory.amount) : "—",
+      deltaColor: "text-purple-600",
       isText: true,
       showTrend: false,
     },
+
     {
-      label: "CASH vs DIGITAL",
-      value: `${cashPercent}%`,
-      icon: <HiOutlineExclamation className="w-6 h-6" />,
-      iconBg: "bg-blue-50",
-      iconColor: "text-blue-600",
-      ring: "ring-blue-100",
-      delta: `${digitalPercent}% digital payments`,
-      deltaColor: "text-blue-600",
-      hover: "hover:border-blue-200 hover:shadow-blue-100/50",
-      subtitle: "Cash payments",
+      label: "CASH ON HAND",
+      value: formatINR(pettyCashBalance),
+      icon: <HiOutlineLightningBolt className="w-6 h-6" />,
+      iconBg: pettyCashBalance > 0 ? "bg-emerald-50" : "bg-slate-50",
+      iconColor: pettyCashBalance > 0 ? "text-emerald-600" : "text-slate-400",
+      ring: pettyCashBalance > 0 ? "ring-emerald-100" : "ring-slate-100",
+      hover: "hover:border-emerald-200 hover:shadow-emerald-100/50",
+      subtitle: "Petty cash box",
+      delta: reconciledLabel,
+      deltaColor: reconciledTill ? "text-emerald-600" : "text-slate-400",
       showTrend: false,
     },
   ];

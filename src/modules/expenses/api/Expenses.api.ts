@@ -1,31 +1,5 @@
-/**
- * expenses.api.ts
- *
- * This file mirrors the exact same pattern as billing.api.ts
- * Every function maps to one backend endpoint.
- *
- * PATTERN:
- *   authAxios.get("/endpoint", { params })   → GET  (read data)
- *   authAxios.post("/endpoint", data)        → POST (create new)
- *   authAxios.patch("/endpoint/id", data)    → PATCH (partial update)
- *   authAxios.delete("/endpoint/id")         → DELETE
- *
- * WHY authAxios (not plain axios)?
- *   authAxios is your pre-configured axios instance from lib/axios.ts
- *   It automatically adds the Authorization: Bearer <token> header to every request
- *   Without it, every API call would return 401 Unauthorized
- */
 import authAxios from "../../../lib/axios";
 
-// ─────────────────────────────────────────────────────────────────────────────
-// TYPESCRIPT TYPES
-// These describe the shape of data we SEND to the backend (request body/params)
-// The backend response shape is handled by the components using the raw data
-// ─────────────────────────────────────────────────────────────────────────────
-
-// ── Expense Types ─────────────────────────────────────────────────────────────
-
-/** All payment modes supported by the backend */
 export type PaymentMode = "CASH" | "UPI" | "BANK_TRANSFER" | "CHEQUE" | "CARD";
 
 /** Expense approval status */
@@ -262,44 +236,18 @@ export const deleteExpenseApi = (id: string) =>
 // Maps to: CategoriesController → /expense-categories
 // ══════════════════════════════════════════════════════════════════════════════
 
-/**
- * GET /expense-categories/overview
- * Powers the "Monthly Budget Overview" section:
- *   ₹84,500 / ₹1,10,000 · 77% bar · category cards with % used
- */
 export const getCategoryOverviewApi = () =>
   authAxios.get("/expense-categories/overview");
 
-/**
- * GET /expense-categories/simple
- * Lightweight dropdown data — only id + name, no budget calculations
- * Used in: "Select category" dropdown in Add Expense modal
- *          "Select category" dropdown in Add Recurring modal
- *          "All Categories" filter dropdown in All Expenses tab
- */
 export const getCategoriesSimpleApi = () =>
   authAxios.get("/expense-categories/simple");
 
-/**
- * GET /expense-categories?search=
- * Full category list with budget data — for the Categories grid
- * Response includes: spentThisMonth, budgetRemaining, transactionCount
- */
 export const getCategoriesApi = (filters: CategoryFilters = {}) =>
   authAxios.get("/expense-categories", { params: filters });
 
-/**
- * GET /expense-categories/:id
- * Single category detail
- */
 export const getCategoryApi = (id: string) =>
   authAxios.get(`/expense-categories/${id}`);
 
-/**
- * POST /expense-categories
- * "Create Category" modal (Add Custom Category)
- * Fields: name, monthlyBudget, alertThreshold, rolloverRule, notes
- */
 export const createCategoryApi = (data: CreateCategoryPayload) =>
   authAxios.post("/expense-categories", data);
 

@@ -43,12 +43,6 @@ const ALERT_OPTIONS = [
   { value: "off", label: "No alerts" },
 ];
 
-const ROLLOVER_OPTIONS = [
-  { value: "NONE", label: "No rollover — reset each month" },
-  { value: "CARRY", label: "Carry unused budget to next month" },
-  { value: "DEDUCT", label: "Deduct overspend from next month" },
-];
-
 const Configurebudgetmodal: React.FC<Props> = ({
   open,
   category,
@@ -171,23 +165,22 @@ const Configurebudgetmodal: React.FC<Props> = ({
           />
         )}
 
-        {/* Monthly budget */}
-        <CustomInput
-          name="monthlyBudget"
-          control={control}
-          label="Monthly Budget (₹)"
-          placeholder="0"
-          errors={errors}
-          isrequired
-          numbersOnly
-          rules={{
-            required: "Monthly budget is required",
-            validate: (v: string) =>
-              Number(v) >= 0 || "Budget cannot be negative",
-          }}
-        />
-
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Monthly budget */}
+          <CustomInput
+            name="monthlyBudget"
+            control={control}
+            label="Monthly Budget (₹)"
+            placeholder="0"
+            errors={errors}
+            isrequired
+            numbersOnly
+            rules={{
+              required: "Monthly budget is required",
+              validate: (v: string) =>
+                Number(v) >= 0 || "Budget cannot be negative",
+            }}
+          />
           <CustomSelect
             name="alertThreshold"
             control={control}
@@ -195,15 +188,6 @@ const Configurebudgetmodal: React.FC<Props> = ({
             label="Alert Threshold"
             placeholder="Select threshold"
             options={ALERT_OPTIONS}
-          />
-
-          <CustomSelect
-            name="rolloverRule"
-            control={control}
-            errors={errors}
-            label="Rollover Rule"
-            placeholder="Select rule"
-            options={ROLLOVER_OPTIONS}
           />
         </div>
 

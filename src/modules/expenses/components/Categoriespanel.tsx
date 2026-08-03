@@ -6,7 +6,52 @@ import {
   HiOutlinePlus,
   HiOutlineTrendingUp,
   HiOutlineTrendingDown,
+  HiOutlineFolder,
+  HiOutlineLightningBolt,
+  HiOutlineTruck,
+  HiOutlineArchive,
+  HiOutlineOfficeBuilding,
+  HiOutlineClipboardCheck,
+  HiOutlineSpeakerphone,
+  HiOutlineCreditCard,
 } from "react-icons/hi";
+import { HiOutlineWrench, HiOutlineCube } from "react-icons/hi2";
+
+const resolveIcon = (iconKey?: string | null): React.ReactNode => {
+  switch (iconKey) {
+    case "lightning-bolt":
+    case "utilities":
+      return <HiOutlineLightningBolt size={22} />;
+    case "truck":
+    case "vehicle":
+      return <HiOutlineTruck size={22} />;
+    case "cube":
+    case "plant":
+      return <HiOutlineCube size={22} />;
+    case "archive":
+    case "packaging":
+      return <HiOutlineArchive size={22} />;
+    case "office-building":
+    case "rent":
+      return <HiOutlineOfficeBuilding size={22} />;
+    case "wrench":
+    case "repairs":
+      return <HiOutlineWrench size={22} />;
+    case "clipboard-check":
+    case "compliance":
+      return <HiOutlineClipboardCheck size={22} />;
+    case "speakerphone":
+    case "marketing":
+      return <HiOutlineSpeakerphone size={22} />;
+    case "credit-card":
+    case "loan":
+      return <HiOutlineCreditCard size={22} />;
+    case "folder":
+    case "office":
+    default:
+      return <HiOutlineFolder size={22} />;
+  }
+};
 
 import Configurebudgetmodal from "./Configurebudgetmodal";
 import type { BudgetFormValues } from "./Configurebudgetmodal";
@@ -88,7 +133,6 @@ const Categoriespanel: React.FC = () => {
       );
       setModalOpen(false);
       setActiveCategory(null);
-
       queryClient.invalidateQueries({ queryKey: ["categories"] });
       queryClient.invalidateQueries({ queryKey: ["categories-simple"] });
       queryClient.invalidateQueries({ queryKey: ["category-overview"] });
@@ -207,14 +251,13 @@ const Categoriespanel: React.FC = () => {
                 <div className="flex items-start justify-between mb-4">
                   <div className="flex items-center gap-3">
                     <div
-                      className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0 text-lg"
+                      className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0"
                       style={{
                         background: cat.bg ?? "#f1f5f9",
                         color: cat.color ?? "#64748b",
                       }}
                     >
-                      {/* icon from backend or fallback emoji */}
-                      {cat.icon ?? "📦"}
+                      {resolveIcon(cat.icon)}
                     </div>
                     <div>
                       <h3 className="text-[15px] font-bold text-slate-900">
@@ -243,7 +286,7 @@ const Categoriespanel: React.FC = () => {
                       of {budget > 0 ? inr(budget) : "no budget"} budget
                     </p>
                   </div>
-                  {/* trend — shown if backend returns it */}
+
                   {cat.trend != null && cat.trend !== 0 && (
                     <span
                       className={`inline-flex items-center gap-0.5 text-[12px] font-semibold ${

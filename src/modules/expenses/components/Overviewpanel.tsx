@@ -7,6 +7,7 @@ import {
   HiOutlineCash,
   HiOutlinePlus,
   HiOutlineFolder,
+  HiOutlineCheckCircle,
 } from "react-icons/hi";
 import { CATEGORY_META } from "../constants/Expenses.constants";
 import {
@@ -46,7 +47,11 @@ const PAYMENT_LABEL: Record<string, string> = {
   CHEQUE: "CHEQUE",
 };
 
-const OverviewPanel = () => {
+interface Props {
+  onAddExpense?: () => void;
+}
+
+const OverviewPanel = ({ onAddExpense }: Props) => {
   const { data: statsData, isLoading: isLoadingStats } = useQuery({
     queryKey: ["expense-stats"],
     queryFn: () => getExpenseStatsApi().then((res) => res.data),
@@ -70,7 +75,6 @@ const OverviewPanel = () => {
 
   const rawCategories: { name: string; amount: number }[] =
     statsData?.byCategory ?? [];
-
   const totalSpend = rawCategories.reduce((s, c) => s + c.amount, 0);
   const maxAmount = Math.max(...rawCategories.map((c) => c.amount), 1);
 
@@ -175,7 +179,7 @@ const OverviewPanel = () => {
           </div>
         </div>
 
-        {/* Recent expenses */}
+        {/* Recent Expenses */}
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
           <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
             <div>
@@ -215,10 +219,10 @@ const OverviewPanel = () => {
                   return (
                     <div
                       key={e.id}
-                      className="flex items-center gap-3 px-5 py-3 hover:bg-slate-50/50 transition-colors cursor-pointer group"
+                      className="flex items-center gap-3 px-5 py-3 hover:bg-slate-50/50 transition-colors cursor-pointer"
                     >
                       <div
-                        className={`w-10 h-10 rounded-xl ${meta.iconBg} border flex items-center justify-center text-lg shrink-0`}
+                        className={`w-10 h-10 rounded-xl ${meta.iconBg} border flex items-center justify-center shrink-0`}
                       >
                         {meta.icon}
                       </div>
@@ -268,9 +272,12 @@ const OverviewPanel = () => {
           <div className="p-4 space-y-3">
             <Spin spinning={isLoadingOverview}>
               {budgetAlerts.length === 0 && !isLoadingOverview ? (
-                <p className="text-xs text-slate-400 text-center py-4">
-                  All categories within budget 🎉
-                </p>
+                <div className="flex flex-col items-center gap-1.5 py-4">
+                  <HiOutlineCheckCircle className="w-5 h-5 text-emerald-400" />
+                  <p className="text-xs text-slate-400 text-center">
+                    All categories within budget
+                  </p>
+                </div>
               ) : (
                 budgetAlerts.map((b) => {
                   const metaKey = Object.keys(CATEGORY_META).find(
@@ -280,7 +287,7 @@ const OverviewPanel = () => {
                   );
                   const meta = metaKey
                     ? CATEGORY_META[metaKey]
-                    : { label: b.name, icon: <HiOutlineFolder size={16} /> };
+                    : { label: b.name, icon: <HiOutlineFolder size={14} /> };
 
                   const isCritical = b.percentUsed >= 90;
                   const isWarning = b.percentUsed >= 75 && b.percentUsed < 90;
@@ -324,9 +331,7 @@ const OverviewPanel = () => {
                               ? "bg-amber-500"
                               : "bg-slate-400"
                           }`}
-                          style={{
-                            width: `${Math.min(b.percentUsed, 100)}%`,
-                          }}
+                          style={{ width: `${Math.min(b.percentUsed, 100)}%` }}
                         />
                       </div>
                       <div className="flex items-center justify-between text-[10px] text-slate-500">
@@ -341,7 +346,7 @@ const OverviewPanel = () => {
           </div>
         </div>
 
-        {/* Quick Add card */}
+        {/* Quick Add */}
         <div className="bg-gradient-to-br from-rose-50 via-rose-50 to-pink-50 border border-rose-200 rounded-2xl p-5">
           <div className="flex items-center gap-2 mb-2">
             <div className="p-1.5 rounded-lg bg-white shadow-sm">
@@ -352,8 +357,13 @@ const OverviewPanel = () => {
           <p className="text-xs text-slate-600 mb-4">
             Snap a receipt photo and we'll auto-fill the expense details
           </p>
-          <button className="px-3 py-2 rounded-lg bg-rose-600 text-white text-xs font-semibold hover:bg-rose-700 transition-colors">
-            <HiOutlinePlus size={13} /> New Expense
+
+          <button
+            onClick={onAddExpense}
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-rose-600 text-white text-xs font-semibold hover:bg-rose-700 transition-colors"
+          >
+            <HiOutlinePlus size={13} />
+            New Expense
           </button>
         </div>
 
@@ -381,7 +391,6 @@ const OverviewPanel = () => {
                   FROM SALARY
                 </span>
               </span>
-
               <span className="font-semibold text-slate-400 italic text-[11px]">
                 {salaries > 0 ? formatINR(salaries) : "Pending"}
               </span>
