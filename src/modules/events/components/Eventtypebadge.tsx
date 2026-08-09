@@ -7,12 +7,13 @@ interface Props {
 
 const EventTypeBadge = ({ type }: Props) => {
   const meta = EVENT_TYPE_META[type];
+  const Icon = meta.icon;
 
   return (
     <span
       className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium ring-1 ring-inset ${meta.bg} ${meta.text} ${meta.ring}`}
     >
-      <span aria-hidden>{meta.emoji}</span>
+      <Icon className="w-3.5 h-3.5" aria-hidden />
       {meta.label}
     </span>
   );

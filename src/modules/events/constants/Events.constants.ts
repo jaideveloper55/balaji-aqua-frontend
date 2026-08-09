@@ -1,10 +1,82 @@
+import type { ComponentType } from "react";
+import {
+  HiOutlineHeart,
+  HiOutlineSparkles,
+  HiOutlineCake,
+  HiOutlineOfficeBuilding,
+  HiOutlineSun,
+  HiOutlineHome,
+  HiOutlineDotsCircleHorizontal,
+} from "react-icons/hi";
+
 import type {
-  EventStatus,
   EventType,
-  PaymentStatus,
+  EventOrderStatus,
+  EventPaymentStatus,
 } from "../types/Events";
 
-// ─── Event Type Display ─────────────────────────────────────────────────────
+export const EVENT_TYPE_META: Record<
+  EventType,
+  {
+    label: string;
+    icon: ComponentType<{ className?: string }>;
+    bg: string;
+    text: string;
+    ring: string;
+  }
+> = {
+  WEDDING: {
+    label: "Wedding",
+    icon: HiOutlineHeart,
+    bg: "bg-rose-50",
+    text: "text-rose-700",
+    ring: "ring-rose-200",
+  },
+  ENGAGEMENT: {
+    label: "Engagement",
+    icon: HiOutlineSparkles,
+    bg: "bg-pink-50",
+    text: "text-pink-700",
+    ring: "ring-pink-200",
+  },
+  BIRTHDAY: {
+    label: "Birthday",
+    icon: HiOutlineCake,
+    bg: "bg-amber-50",
+    text: "text-amber-700",
+    ring: "ring-amber-200",
+  },
+  CORPORATE: {
+    label: "Corporate",
+    icon: HiOutlineOfficeBuilding,
+    bg: "bg-indigo-50",
+    text: "text-indigo-700",
+    ring: "ring-indigo-200",
+  },
+  RELIGIOUS: {
+    label: "Religious",
+    icon: HiOutlineSun,
+    bg: "bg-orange-50",
+    text: "text-orange-700",
+    ring: "ring-orange-200",
+  },
+  HOUSE_WARMING: {
+    label: "House Warming",
+    icon: HiOutlineHome,
+    bg: "bg-emerald-50",
+    text: "text-emerald-700",
+    ring: "ring-emerald-200",
+  },
+  OTHER: {
+    label: "Other",
+    icon: HiOutlineDotsCircleHorizontal,
+    bg: "bg-slate-50",
+    text: "text-slate-700",
+    ring: "ring-slate-200",
+  },
+};
+
+// ─── Event Type Options (for dropdowns) ──────────────────────────────────────
 export const EVENT_TYPE_OPTIONS: Array<{ value: EventType; label: string }> = [
   { value: "WEDDING", label: "Wedding" },
   { value: "ENGAGEMENT", label: "Engagement" },
@@ -15,64 +87,9 @@ export const EVENT_TYPE_OPTIONS: Array<{ value: EventType; label: string }> = [
   { value: "OTHER", label: "Other" },
 ];
 
-export const EVENT_TYPE_META: Record<
-  EventType,
-  { label: string; emoji: string; bg: string; text: string; ring: string }
-> = {
-  WEDDING: {
-    label: "Wedding",
-    emoji: "💍",
-    bg: "bg-rose-50",
-    text: "text-rose-700",
-    ring: "ring-rose-200",
-  },
-  ENGAGEMENT: {
-    label: "Engagement",
-    emoji: "💐",
-    bg: "bg-pink-50",
-    text: "text-pink-700",
-    ring: "ring-pink-200",
-  },
-  BIRTHDAY: {
-    label: "Birthday",
-    emoji: "🎂",
-    bg: "bg-amber-50",
-    text: "text-amber-700",
-    ring: "ring-amber-200",
-  },
-  CORPORATE: {
-    label: "Corporate",
-    emoji: "🏢",
-    bg: "bg-indigo-50",
-    text: "text-indigo-700",
-    ring: "ring-indigo-200",
-  },
-  RELIGIOUS: {
-    label: "Religious",
-    emoji: "🕉️",
-    bg: "bg-orange-50",
-    text: "text-orange-700",
-    ring: "ring-orange-200",
-  },
-  HOUSE_WARMING: {
-    label: "House Warming",
-    emoji: "🏠",
-    bg: "bg-emerald-50",
-    text: "text-emerald-700",
-    ring: "ring-emerald-200",
-  },
-  OTHER: {
-    label: "Other",
-    emoji: "✨",
-    bg: "bg-slate-50",
-    text: "text-slate-700",
-    ring: "ring-slate-200",
-  },
-};
-
-// ─── Event Status Display ───────────────────────────────────────────────────
+// ─── Event Status ─────────────────────────────────────────────────────────────
 export const EVENT_STATUS_OPTIONS: Array<{
-  value: EventStatus;
+  value: EventOrderStatus;
   label: string;
 }> = [
   { value: "DRAFT", label: "Draft" },
@@ -84,7 +101,7 @@ export const EVENT_STATUS_OPTIONS: Array<{
 ];
 
 export const EVENT_STATUS_META: Record<
-  EventStatus,
+  EventOrderStatus,
   { label: string; dot: string; bg: string; text: string }
 > = {
   DRAFT: {
@@ -125,9 +142,9 @@ export const EVENT_STATUS_META: Record<
   },
 };
 
-// ─── Payment Status ─────────────────────────────────────────────────────────
+// ─── Payment Status ───────────────────────────────────────────────────────────
 export const PAYMENT_STATUS_META: Record<
-  PaymentStatus,
+  EventPaymentStatus,
   { label: string; bg: string; text: string }
 > = {
   UNPAID: { label: "Unpaid", bg: "bg-red-50", text: "text-red-700" },
@@ -135,6 +152,7 @@ export const PAYMENT_STATUS_META: Record<
   PAID: { label: "Paid", bg: "bg-emerald-50", text: "text-emerald-700" },
 };
 
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 export const DEFAULT_PAGE_SIZE = 10;
 
 export const formatINR = (n: number) =>
@@ -142,7 +160,7 @@ export const formatINR = (n: number) =>
     style: "currency",
     currency: "INR",
     maximumFractionDigits: 0,
-  }).format(n);
+  }).format(n ?? 0);
 
 export const formatDate = (iso: string) =>
   new Date(iso).toLocaleDateString("en-IN", {

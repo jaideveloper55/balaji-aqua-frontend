@@ -1,10 +1,28 @@
-import { useState, useMemo } from "react";
-import { message } from "antd";
+import { useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { Spin } from "antd";
 import { HiOutlinePlus, HiOutlineDownload } from "react-icons/hi";
 import { MdEventNote } from "react-icons/md";
-import { useEvents } from "../hooks/useEvents";
-import { EventFilters, EventOrder } from "../types/Events";
+import {
+  getEventStatsApi,
+  getEventOrdersApi,
+  createEventOrderApi,
+  updateEventOrderApi,
+  updateEventStatusApi,
+  cancelEventOrderApi,
+} from "../api/Events.api";
+
+import type {
+  EventFilters,
+  EventOrder,
+  EventOrderStatus,
+  EventCancellationReason,
+  CreateEventOrderPayload,
+  UpdateEventOrderPayload,
+} from "../types/Events";
+
 import { DEFAULT_PAGE_SIZE } from "../constants/Events.constants";
+
 import EventStatCards from "../components/Eventstatcards";
 import EventFilterBar from "../components/Eventfilterbar";
 import EventDetailsDrawer from "../drawers/Eventdetailsdrawer";
@@ -13,10 +31,13 @@ import CancelEventModal from "../modals/Canceleventmodal";
 import EventTable from "../components/Eventtable";
 import PrintEventModal from "../modals/Printeventmodal";
 import CustomPageHeader from "../../../components/common/CustomPageHeader";
+import {
+  successNotification,
+  errorNotification,
+} from "../../../components/common/Notification";
 
 const EventOrdersPage = () => {
-  const { stats, filterEvents, createEvent, updateStatus, cancelEvent } =
-    useEvents();
+  const queryClient = useQueryClient();
 
   const [filters, setFilters] = useState<EventFilters>({
     page: 1,
@@ -28,21 +49,130 @@ const EventOrdersPage = () => {
   const [selected, setSelected] = useState<EventOrder | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
+  const [editingEvent, setEditingEvent] = useState<EventOrder | null>(null);
   const [cancelTarget, setCancelTarget] = useState<EventOrder | null>(null);
   const [printTarget, setPrintTarget] = useState<EventOrder | null>(null);
 
-  const filtered = useMemo(
-    () => filterEvents(filters),
-    [filterEvents, filters]
-  );
+  const { data: stats, isLoading: isLoadingStats } = useQuery({
+    queryKey: ["event-stats"],
+    queryFn: () => getEventStatsApi().then((res) => res.data),
+    staleTime: 1000 * 60 * 2,
+  });
+
+  const {
+    data: eventsData,
+    isLoading: isLoadingEvents,
+    isFetching: isFetchingEvents,
+  } = useQuery({
+    queryKey: ["events", filters],
+    queryFn: () => getEventOrdersApi(filters).then((res) => res.data),
+    staleTime: 1000 * 30,
+  });
+
+  const events = eventsData?.data ?? [];
+  const pagination = eventsData?.pagination ?? {
+    page: 1,
+    limit: DEFAULT_PAGE_SIZE,
+    total: 0,
+    totalPages: 1,
+  };
+
+  const createMutation = useMutation({
+    mutationFn: (data: CreateEventOrderPayload) =>
+      createEventOrderApi(data).then((res) => res.data),
+    onSuccess: (created) => {
+      successNotification(
+        "Event Order Created",
+        `${created.eventNumber} · ${created.eventName}`
+      );
+      setCreateOpen(false);
+      queryClient.invalidateQueries({ queryKey: ["events"] });
+      queryClient.invalidateQueries({ queryKey: ["event-stats"] });
+    },
+    onError: (err: any) => {
+      errorNotification(
+        "Failed to Create Event",
+        err?.response?.data?.message ?? "Please check all required fields"
+      );
+    },
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: UpdateEventOrderPayload }) =>
+      updateEventOrderApi(id, data).then((res) => res.data),
+    onSuccess: () => {
+      successNotification("Event Updated", "Changes saved successfully");
+      setEditingEvent(null);
+      setCreateOpen(false);
+      queryClient.invalidateQueries({ queryKey: ["events"] });
+      queryClient.invalidateQueries({ queryKey: ["event-stats"] });
+    },
+    onError: (err: any) => {
+      errorNotification(
+        "Update Failed",
+        err?.response?.data?.message ?? "Could not update event"
+      );
+    },
+  });
+
+  const statusMutation = useMutation({
+    mutationFn: ({ id, status }: { id: string; status: EventOrderStatus }) =>
+      updateEventStatusApi(id, status).then((res) => res.data),
+    onSuccess: (_data, variables) => {
+      const friendlyStatus = variables.status.replace(/_/g, " ").toLowerCase();
+      successNotification(
+        "Status Updated",
+        `Event marked as ${friendlyStatus}`
+      );
+      setDetailsOpen(false);
+      queryClient.invalidateQueries({ queryKey: ["events"] });
+      queryClient.invalidateQueries({ queryKey: ["event-stats"] });
+    },
+    onError: (err: any) => {
+      errorNotification(
+        "Status Update Failed",
+        err?.response?.data?.message ?? "Could not update event status"
+      );
+    },
+  });
+
+  const cancelMutation = useMutation({
+    mutationFn: ({
+      id,
+      reason,
+      note,
+    }: {
+      id: string;
+      reason: EventCancellationReason;
+      note?: string;
+    }) => cancelEventOrderApi(id, { reason, note }).then((res) => res.data),
+    onSuccess: () => {
+      successNotification(
+        "Event Cancelled",
+        "Reserved stock has been released"
+      );
+      setCancelTarget(null);
+      setDetailsOpen(false);
+      queryClient.invalidateQueries({ queryKey: ["events"] });
+      queryClient.invalidateQueries({ queryKey: ["event-stats"] });
+    },
+    onError: (err: any) => {
+      errorNotification(
+        "Cancellation Failed",
+        err?.response?.data?.message ?? "Could not cancel this event"
+      );
+    },
+  });
 
   const handleView = (e: EventOrder) => {
     setSelected(e);
     setDetailsOpen(true);
   };
 
-  const handleEdit = (_e: EventOrder) => {
-    message.info("Edit flow — wire up similarly to Create");
+  const handleEdit = (e: EventOrder) => {
+    setDetailsOpen(false);
+    setEditingEvent(e);
+    setCreateOpen(true);
   };
 
   const handlePrint = (e: EventOrder) => {
@@ -50,41 +180,41 @@ const EventOrdersPage = () => {
   };
 
   const handleMarkComplete = (e: EventOrder) => {
-    updateStatus(e.id, "COMPLETED");
-    message.success(`Marked ${e.eventNumber} as completed`);
-    setDetailsOpen(false);
+    statusMutation.mutate({ id: e.id, status: "COMPLETED" });
   };
 
   const handleCancel = (e: EventOrder) => {
     setCancelTarget(e);
   };
 
-  const handleConfirmCancel = (id: string, reason: string) => {
-    cancelEvent(id, reason);
-    message.success("Event cancelled");
-    setCancelTarget(null);
-    setDetailsOpen(false);
+  const handleConfirmCancel = (id: string, reason: string, note?: string) => {
+    cancelMutation.mutate({
+      id,
+      reason: reason as EventCancellationReason,
+      note,
+    });
   };
 
   return (
     <div className="space-y-5">
-      {/* Page Header */}
       <CustomPageHeader
         icon={<MdEventNote className="w-6 h-6 text-white" />}
-        iconBg="bg-blue-600"
+        iconBg="bg-blue-500"
         title="Event / Function Orders"
         subtitle="Manage bulk water and beverage orders for events and functions"
         actions={
           <>
             <button
-              onClick={() => message.info("Export coming soon")}
+              onClick={() =>
+                successNotification("Coming Soon", "Export feature in progress")
+              }
               className="px-4 py-2.5 rounded-xl border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 font-medium text-sm transition flex items-center gap-2 shadow-sm"
             >
               <HiOutlineDownload /> Export
             </button>
             <button
               onClick={() => setCreateOpen(true)}
-              className="px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-medium text-sm transition flex items-center gap-2 shadow-sm"
+              className="px-4 py-2.5 rounded-xl bg-blue-500 hover:bg-blue-600 text-white font-medium text-sm transition flex items-center gap-2 shadow-sm"
             >
               <HiOutlinePlus className="w-5 h-5" /> Create Event Order
             </button>
@@ -92,26 +222,35 @@ const EventOrdersPage = () => {
         }
       />
 
-      {/* Stats */}
-      <EventStatCards stats={stats} />
+      <Spin spinning={isLoadingStats}>
+        <EventStatCards stats={stats} />
+      </Spin>
 
-      {/* Filters */}
-      <EventFilterBar filters={filters} onChange={setFilters} />
-
-      {/* Table */}
-      <EventTable
-        data={filtered}
-        page={filters.page ?? 1}
-        pageSize={filters.limit ?? DEFAULT_PAGE_SIZE}
-        onPageChange={(page, limit) => setFilters({ ...filters, page, limit })}
-        onView={handleView}
-        onEdit={handleEdit}
-        onCancel={handleCancel}
-        onMarkComplete={handleMarkComplete}
-        onPrint={handlePrint}
+      <EventFilterBar
+        filters={filters}
+        onChange={(newFilters) => setFilters({ ...newFilters, page: 1 })}
       />
 
-      {/* Drawer & Modals */}
+      <Spin
+        spinning={isLoadingEvents || isFetchingEvents}
+        tip={isLoadingEvents ? "Loading events..." : "Refreshing..."}
+      >
+        <EventTable
+          data={events}
+          page={pagination.page}
+          pageSize={pagination.limit}
+          total={pagination.total}
+          onPageChange={(page: number, limit: number) =>
+            setFilters((prev) => ({ ...prev, page, limit }))
+          }
+          onView={handleView}
+          onEdit={handleEdit}
+          onCancel={handleCancel}
+          onMarkComplete={handleMarkComplete}
+          onPrint={handlePrint}
+        />
+      </Spin>
+
       <EventDetailsDrawer
         event={selected}
         open={detailsOpen}
@@ -121,13 +260,25 @@ const EventOrdersPage = () => {
         onMarkComplete={handleMarkComplete}
       />
 
+      {/* ─── Create Modal ─────────────────────────────────────────────────── */}
+      {/* CreateEventModal handles BOTH create and edit */}
       <CreateEventModal
         open={createOpen}
-        onClose={() => setCreateOpen(false)}
-        onSubmit={(form) => {
-          createEvent(form);
-          message.success("Event order created");
+        onClose={() => {
+          setCreateOpen(false);
+          setEditingEvent(null);
         }}
+        initialData={editingEvent}
+        onSubmit={(form: CreateEventOrderPayload) => {
+          if (editingEvent) {
+            const { items, advancePaid, advancePaymentMode, ...updatePayload } =
+              form;
+            updateMutation.mutate({ id: editingEvent.id, data: updatePayload });
+          } else {
+            createMutation.mutate(form);
+          }
+        }}
+        isSubmitting={createMutation.isPending || updateMutation.isPending}
       />
 
       <CancelEventModal
@@ -135,8 +286,10 @@ const EventOrdersPage = () => {
         open={!!cancelTarget}
         onClose={() => setCancelTarget(null)}
         onConfirm={handleConfirmCancel}
+        isSubmitting={cancelMutation.isPending}
       />
 
+      {/* ─── Print Modal ──────────────────────────────────────────────────── */}
       <PrintEventModal
         event={printTarget}
         open={!!printTarget}

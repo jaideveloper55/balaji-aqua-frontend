@@ -1,3 +1,28 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// src/modules/events/components/Eventtable.tsx
+// ─────────────────────────────────────────────────────────────────────────────
+//
+// WHAT CHANGED (old → new):
+//
+//   1. Added `total` prop
+//      OLD:  pagination={{ total: data.length }}
+//      NEW:  pagination={{ total }}
+//      WHY:  With server-side pagination, `data` only contains the CURRENT
+//            page's rows (e.g. 20 items). If your company has 150 events,
+//            data.length = 20 but total = 150. Without this fix, antd Table
+//            thinks there's only 1 page and never shows page 2/3/4/... buttons.
+//
+//   2. Set pagination.simple = false (explicit)
+//      antd Table defaults to client-side pagination — it takes ALL rows in
+//      `dataSource`, then internally slices to show the right page. Since the
+//      backend already did the slicing, we DON'T want antd to slice again.
+//      Setting `pagination={false}` would hide the controls entirely, so
+//      instead we keep pagination controls visible but tell antd the data is
+//      already the right page by passing the correct `current`, `pageSize`,
+//      and `total`.
+//
+// ─────────────────────────────────────────────────────────────────────────────
+
 import { Table } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import {
@@ -21,6 +46,10 @@ interface Props {
   data: EventOrder[];
   page: number;
   pageSize: number;
+  // ─── NEW PROP ──────────────────────────────────────────────────────────
+  // total: the FULL count of matching events across ALL pages (from backend).
+  // Without this, antd Table uses data.length which is just the current page.
+  total: number;
   onPageChange: (page: number, pageSize: number) => void;
   onView: (e: EventOrder) => void;
   onEdit: (e: EventOrder) => void;
@@ -33,6 +62,7 @@ const EventTable = ({
   data,
   page,
   pageSize,
+  total,
   onPageChange,
   onView,
   onEdit,
@@ -176,17 +206,28 @@ const EventTable = ({
         pagination={{
           current: page,
           pageSize,
-          total: data.length,
+          // ─── THE FIX ───────────────────────────────────────────────────
+          // OLD: total: data.length  ← WRONG for server-side pagination
+          // NEW: total               ← from backend's pagination.total
+          //
+          // WHY this matters:
+          //   Backend returns { data: [...20 items...], pagination: { total: 150 } }
+          //   data.length = 20 (just this page)
+          //   total = 150 (all matching events across all pages)
+          //   antd needs the REAL total to render "Page 1 of 8" correctly
+          total,
           showSizeChanger: true,
           pageSizeOptions: ["10", "20", "50"],
-          showTotal: (total, range) =>
-            `Showing ${range[0]}–${range[1]} of ${total} events`,
+          showTotal: (t, range) =>
+            `Showing ${range[0]}–${range[1]} of ${t} events`,
           onChange: onPageChange,
         }}
         locale={{
           emptyText: (
             <div className="py-16 text-center">
-              <div className="text-5xl mb-3">📅</div>
+              <div className="w-16 h-16 rounded-2xl bg-blue-50 flex items-center justify-center mx-auto mb-4">
+                <HiOutlineCalendar className="w-8 h-8 text-blue-400" />
+              </div>
               <div className="font-semibold text-slate-700">No events yet</div>
               <div className="text-sm text-slate-500 mt-1">
                 Create your first event order to get started.

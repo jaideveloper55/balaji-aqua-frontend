@@ -6,9 +6,11 @@ import {
   Select,
   DatePicker,
   Tooltip,
+  Spin,
 } from "antd";
 import dayjs, { Dayjs } from "dayjs";
 import { useForm, Controller } from "react-hook-form";
+import { useQuery } from "@tanstack/react-query";
 import {
   HiOutlinePlus,
   HiOutlineTrash,
@@ -22,21 +24,25 @@ import {
   HiOutlineArrowLeft,
   HiOutlineCheck,
   HiOutlineExclamationCircle,
+  HiOutlineArchive,
+  HiOutlinePencilAlt,
 } from "react-icons/hi";
 
 import CustomModal from "../../../components/common/CustomModal";
 import CustomInput from "../../../components/common/CustomInput";
 import CustomSelect from "../../../components/common/CustomSelect";
-
 import { EVENT_TYPE_OPTIONS, formatINR } from "../constants/Events.constants";
-import { DUMMY_PRODUCTS, DUMMY_CUSTOMERS } from "../data/eventsdummy";
-import type { CreateEventForm } from "../types/Events";
+import type { CreateEventOrderPayload } from "../types/Events";
+import { getCustomersApi } from "../../customers/api/customers.api";
+import type { EventOrder } from "../types/Events";
+import { getProductsApi } from "../../products/api/Products.api";
 
-// ─── Types ────────────────────────────────────────────────────────────────
 interface Props {
   open: boolean;
   onClose: () => void;
-  onSubmit: (form: CreateEventForm) => void;
+  onSubmit: (form: CreateEventOrderPayload) => void;
+  isSubmitting?: boolean;
+  initialData?: EventOrder | null;
 }
 
 interface Line {
@@ -44,6 +50,24 @@ interface Line {
   productName: string;
   quantity: number;
   unitPrice: number;
+}
+
+// Internal form type — what react-hook-form manages
+// (NOT the same as CreateEventOrderPayload — we assemble that in submit())
+interface FormValues {
+  eventName: string;
+  eventType: string;
+  expectedGuests: number;
+  customerId?: string | null;
+  customerName: string;
+  customerPhone: string;
+  venueName: string;
+  venueCity: string;
+  venueAddress: string;
+  venuePincode?: string;
+  onSiteContactName?: string;
+  onSiteContactPhone?: string;
+  notes?: string;
 }
 
 type StepKey = "event" | "customer" | "venue" | "items" | "money";
@@ -94,8 +118,15 @@ const STEPS: StepDef[] = [
   },
 ];
 
-// ─── Component ────────────────────────────────────────────────────────────
-const CreateEventModal = ({ open, onClose, onSubmit }: Props) => {
+const CreateEventModal = ({
+  open,
+  onClose,
+  onSubmit,
+  isSubmitting = false,
+  initialData = null,
+}: Props) => {
+  // isEditMode: true when editing an existing event, false for new creation
+  const isEditMode = !!initialData;
   const {
     control,
     handleSubmit,
@@ -104,17 +135,14 @@ const CreateEventModal = ({ open, onClose, onSubmit }: Props) => {
     setValue,
     watch,
     trigger,
-  } = useForm<CreateEventForm>({
+  } = useForm<FormValues>({
     mode: "onChange",
     defaultValues: {
       eventType: "WEDDING",
-      gstEnabled: true,
       expectedGuests: 100,
-      items: [],
     },
   });
 
-  // ─── State ──────────────────────────────────────────────────────────────
   const [currentStep, setCurrentStep] = useState<StepKey>("event");
   const [lines, setLines] = useState<Line[]>([]);
   const [eventDate, setEventDate] = useState<Dayjs | null>(null);
@@ -124,13 +152,60 @@ const CreateEventModal = ({ open, onClose, onSubmit }: Props) => {
   const [advancePaid, setAdvancePaid] = useState(0);
   const [securityDeposit, setSecurityDeposit] = useState(0);
   const [gstEnabled, setGstEnabled] = useState(true);
-  const [submitting, setSubmitting] = useState(false);
 
   const stepIndex = STEPS.findIndex((s) => s.key === currentStep);
   const isLastStep = stepIndex === STEPS.length - 1;
   const isFirstStep = stepIndex === 0;
 
-  // ─── Reset on close ─────────────────────────────────────────────────────
+  const { data: productsData, isLoading: loadingProducts } = useQuery({
+    queryKey: ["products-dropdown"],
+    queryFn: () => getProductsApi({ status: "ACTIVE" }).then((res) => res.data),
+    staleTime: 1000 * 60 * 10,
+    enabled: open,
+  });
+
+  const products = productsData?.data ?? [];
+
+  const { data: customersData, isLoading: loadingCustomers } = useQuery({
+    queryKey: ["customers-dropdown"],
+    queryFn: () =>
+      getCustomersApi({ status: "ACTIVE" }).then((res) => res.data),
+    staleTime: 1000 * 60 * 5,
+    enabled: open,
+  });
+
+  const customers = customersData?.data ?? [];
+
+  useEffect(() => {
+    if (open && initialData) {
+      reset({
+        eventName: initialData.eventName,
+        eventType: initialData.eventType,
+        expectedGuests: initialData.expectedGuests,
+        customerId: initialData.customerId ?? null,
+        customerName: initialData.customerName,
+        customerPhone: initialData.customerPhone,
+        venueName: initialData.venueName,
+        venueCity: initialData.venueCity,
+        venueAddress: initialData.venueAddress,
+        venuePincode: initialData.venuePincode ?? undefined,
+        onSiteContactName: initialData.onSiteContactName ?? undefined,
+        onSiteContactPhone: initialData.onSiteContactPhone ?? undefined,
+        notes: initialData.notes ?? undefined,
+      });
+      // Populate local date/time state
+      if (initialData.eventDate) setEventDate(dayjs(initialData.eventDate));
+      if (initialData.deliveryTime)
+        setDeliveryTime(dayjs(`2000-01-01T${initialData.deliveryTime}`));
+      if (initialData.pickupTime)
+        setPickupTime(dayjs(`2000-01-01T${initialData.pickupTime}`));
+      // Populate pricing state
+      setDiscount(initialData.discount ?? 0);
+      setGstEnabled(initialData.gstEnabled ?? true);
+    }
+  }, [open, initialData, reset]);
+
+  // Reset on close
   useEffect(() => {
     if (!open) {
       reset();
@@ -142,7 +217,6 @@ const CreateEventModal = ({ open, onClose, onSubmit }: Props) => {
       setAdvancePaid(0);
       setSecurityDeposit(0);
       setCurrentStep("event");
-      setSubmitting(false);
     }
   }, [open, reset]);
 
@@ -165,7 +239,6 @@ const CreateEventModal = ({ open, onClose, onSubmit }: Props) => {
     );
   };
 
-  // ─── Totals ─────────────────────────────────────────────────────────────
   const totals = useMemo(() => {
     const subtotal = lines.reduce((s, l) => s + l.quantity * l.unitPrice, 0);
     const taxable = Math.max(0, subtotal - discount);
@@ -215,13 +288,11 @@ const CreateEventModal = ({ open, onClose, onSubmit }: Props) => {
       items: currentStep !== "items" && lines.length === 0,
       money: false,
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [errors, eventDate, deliveryTime, lines.length, currentStep]);
 
-  // ─── Step navigation ────────────────────────────────────────────────────
   const goNext = async () => {
     const err = await validateStep(currentStep);
-    if (err) return; // ant message could show this; keeping silent here
+    if (err) return;
     if (isLastStep) return;
     setCurrentStep(STEPS[stepIndex + 1].key);
   };
@@ -232,13 +303,11 @@ const CreateEventModal = ({ open, onClose, onSubmit }: Props) => {
   };
 
   const goToStep = async (target: StepKey) => {
-    // Allow free movement only to already-visited or completed steps
     const targetIdx = STEPS.findIndex((s) => s.key === target);
     if (targetIdx <= stepIndex) {
       setCurrentStep(target);
       return;
     }
-    // Validate every step in between before jumping forward
     for (let i = stepIndex; i < targetIdx; i++) {
       const err = await validateStep(STEPS[i].key);
       if (err) {
@@ -265,8 +334,9 @@ const CreateEventModal = ({ open, onClose, onSubmit }: Props) => {
     setLines((prev) => prev.filter((_, i) => i !== idx));
 
   // ─── Submit ─────────────────────────────────────────────────────────────
-  const submit = async (form: CreateEventForm) => {
-    // Final guard
+  // Assembles the CreateEventOrderPayload from form state + local state
+  const submit = async (form: FormValues) => {
+    // Final guard — validate all steps before sending
     for (const step of STEPS.slice(0, -1)) {
       const err = await validateStep(step.key);
       if (err) {
@@ -274,23 +344,59 @@ const CreateEventModal = ({ open, onClose, onSubmit }: Props) => {
         return;
       }
     }
-    setSubmitting(true);
-    try {
-      onSubmit({
-        ...form,
-        eventDate: eventDate!.toISOString(),
-        deliveryTime: deliveryTime!.format("HH:mm"),
-        pickupTime: pickupTime?.format("HH:mm"),
-        items: lines,
-        discount,
-        gstEnabled,
-        advancePaid,
-        securityDeposit,
-      });
-      onClose();
-    } finally {
-      setSubmitting(false);
-    }
+
+    // Build the payload matching CreateEventOrderPayload exactly
+    const payload: CreateEventOrderPayload = {
+      // Step 1: Event
+      eventName: form.eventName,
+      eventType: form.eventType as CreateEventOrderPayload["eventType"],
+      expectedGuests: form.expectedGuests,
+      // ─── FIXED: .format("YYYY-MM-DD") instead of .toISOString() ────
+      // WHY: .toISOString() converts to UTC first, which can shift the date
+      // back by one day for Indian timezone (UTC+5:30). For example:
+      //   User picks "15 Aug 2026" in Chennai (UTC+5:30)
+      //   .toISOString() → "2026-08-14T18:30:00.000Z" ← August 14th!
+      //   .format("YYYY-MM-DD") → "2026-08-15" ← correct
+      eventDate: eventDate!.format("YYYY-MM-DD"),
+      deliveryTime: deliveryTime!.format("HH:mm"),
+      pickupTime: pickupTime?.format("HH:mm"),
+
+      // Step 2: Customer
+      customerId: form.customerId ?? undefined,
+      customerName: form.customerName,
+      customerPhone: form.customerPhone,
+
+      // Step 3: Venue
+      // ─── FIXED: field names to match backend DTO ───────────────────
+      // OLD: contactPersonName / contactPersonPhone
+      // NEW: onSiteContactName / onSiteContactPhone
+      venueName: form.venueName,
+      venueAddress: form.venueAddress,
+      venueCity: form.venueCity,
+      venuePincode: form.venuePincode,
+      onSiteContactName: form.onSiteContactName,
+      onSiteContactPhone: form.onSiteContactPhone,
+
+      // Step 4: Items
+      items: lines.map((l) => ({
+        productId: l.productId,
+        quantity: l.quantity,
+        unitPrice: l.unitPrice,
+      })),
+
+      // Step 5: Payment
+      discount,
+      gstEnabled,
+      advancePaid: advancePaid > 0 ? advancePaid : undefined,
+      advancePaymentMode: advancePaid > 0 ? "CASH" : undefined,
+      securityDeposit: securityDeposit > 0 ? securityDeposit : undefined,
+      notes: form.notes,
+    };
+
+    onSubmit(payload);
+    // NOTE: We do NOT call onClose() here — the parent (EventsPage) closes
+    // the modal in the mutation's onSuccess callback. This way, if the API
+    // call fails, the modal stays open so the user doesn't lose their data.
   };
 
   // ─── Step content ───────────────────────────────────────────────────────
@@ -308,6 +414,7 @@ const CreateEventModal = ({ open, onClose, onSubmit }: Props) => {
                 name="eventName"
                 control={control}
                 label="Event Name"
+                size="large"
                 placeholder="e.g. Ramesh & Priya Wedding Reception"
                 isrequired
                 errors={errors}
@@ -318,6 +425,7 @@ const CreateEventModal = ({ open, onClose, onSubmit }: Props) => {
                 name="eventType"
                 control={control}
                 label="Event Type"
+                size="large"
                 placeholder="Select type"
                 isrequired
                 errors={errors}
@@ -391,35 +499,40 @@ const CreateEventModal = ({ open, onClose, onSubmit }: Props) => {
               description="Pick an existing customer or enter new details"
             />
 
-            <div className="bg-blue-50/60 border border-blue-100 rounded-xl p-4">
+            <div className="border border-blue-100 rounded-xl p-4">
               <Field
                 label="Find Existing Customer"
                 hint="Selecting one auto-fills name and phone below"
               >
-                <Select
-                  size="large"
-                  className="w-full"
-                  showSearch
-                  allowClear
-                  placeholder="Search by name or phone..."
-                  optionFilterProp="label"
-                  options={DUMMY_CUSTOMERS.map((c) => ({
-                    value: c.id,
-                    label: `${c.name} · ${c.phone}`,
-                  }))}
-                  onChange={(id) => {
-                    const c = DUMMY_CUSTOMERS.find((x) => x.id === id);
-                    setValue("customerId", id ?? null);
-                    if (c) {
-                      setValue("customerName", c.name, {
-                        shouldValidate: true,
-                      });
-                      setValue("customerPhone", c.phone, {
-                        shouldValidate: true,
-                      });
-                    }
-                  }}
-                />
+                <Spin spinning={loadingCustomers} size="small">
+                  <Select
+                    size="large"
+                    className="w-full"
+                    showSearch
+                    allowClear
+                    placeholder="Search by name or phone..."
+                    optionFilterProp="label"
+                    // ─── CHANGED: real customers from API ─────────────
+                    options={(customers as any[]).map((c: any) => ({
+                      value: c.id,
+                      label: `${c.name} · ${c.phone}`,
+                    }))}
+                    onChange={(id) => {
+                      const c = (customers as any[]).find(
+                        (x: any) => x.id === id
+                      );
+                      setValue("customerId", id ?? null);
+                      if (c) {
+                        setValue("customerName", c.name, {
+                          shouldValidate: true,
+                        });
+                        setValue("customerPhone", c.phone, {
+                          shouldValidate: true,
+                        });
+                      }
+                    }}
+                  />
+                </Spin>
               </Field>
             </div>
 
@@ -496,15 +609,16 @@ const CreateEventModal = ({ open, onClose, onSubmit }: Props) => {
                 errors={errors}
               />
               <div className="hidden md:block" />
+              {/* ─── FIXED: field names match backend DTO ──────────────── */}
               <CustomInput
-                name="contactPersonName"
+                name="onSiteContactName"
                 control={control}
                 label="On-site Contact Person"
                 placeholder="Name"
                 errors={errors}
               />
               <CustomInput
-                name="contactPersonPhone"
+                name="onSiteContactPhone"
                 control={control}
                 label="On-site Contact Phone"
                 placeholder="9876543210"
@@ -536,8 +650,8 @@ const CreateEventModal = ({ open, onClose, onSubmit }: Props) => {
             <div className="space-y-2">
               {lines.length === 0 ? (
                 <div className="text-center py-12 bg-slate-50 rounded-2xl border-2 border-dashed border-slate-200">
-                  <div className="w-14 h-14 rounded-full bg-blue-100 mx-auto flex items-center justify-center text-3xl">
-                    📦
+                  <div className="w-14 h-14 rounded-full bg-blue-100 mx-auto flex items-center justify-center">
+                    <HiOutlineArchive className="w-7 h-7 text-blue-500" />
                   </div>
                   <div className="text-sm font-semibold text-slate-700 mt-3">
                     No items added yet
@@ -561,26 +675,33 @@ const CreateEventModal = ({ open, onClose, onSubmit }: Props) => {
                       className="grid grid-cols-12 gap-2 items-center p-3 bg-white border border-slate-200 rounded-xl hover:border-blue-300 transition"
                     >
                       <div className="col-span-12 md:col-span-5">
-                        <Select
-                          size="large"
-                          className="w-full"
-                          placeholder="Select product"
-                          showSearch
-                          optionFilterProp="label"
-                          value={line.productId || undefined}
-                          onChange={(id) => {
-                            const p = DUMMY_PRODUCTS.find((x) => x.id === id)!;
-                            updateLine(idx, {
-                              productId: id,
-                              productName: p.name,
-                              unitPrice: p.basePrice,
-                            });
-                          }}
-                          options={DUMMY_PRODUCTS.map((p) => ({
-                            value: p.id,
-                            label: `${p.name} (${p.sku})`,
-                          }))}
-                        />
+                        <Spin spinning={loadingProducts} size="small">
+                          <Select
+                            size="large"
+                            className="w-full"
+                            placeholder="Select product"
+                            showSearch
+                            optionFilterProp="label"
+                            value={line.productId || undefined}
+                            // ─── CHANGED: real products from API ──────
+                            onChange={(id) => {
+                              const p = (products as any[]).find(
+                                (x: any) => x.id === id
+                              );
+                              if (p) {
+                                updateLine(idx, {
+                                  productId: id,
+                                  productName: p.name,
+                                  unitPrice: p.basePrice,
+                                });
+                              }
+                            }}
+                            options={(products as any[]).map((p: any) => ({
+                              value: p.id,
+                              label: `${p.name} (${p.sku})`,
+                            }))}
+                          />
+                        </Spin>
                       </div>
                       <div className="col-span-4 md:col-span-2">
                         <InputNumber
@@ -777,14 +898,16 @@ const CreateEventModal = ({ open, onClose, onSubmit }: Props) => {
           <button
             type="button"
             onClick={handleSubmit(submit)}
-            disabled={submitting || lines.length === 0}
+            // ─── FIXED: uses isSubmitting prop from parent ──────────────
+            disabled={isSubmitting || lines.length === 0}
             className="px-5 py-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white font-medium text-sm transition shadow-sm flex items-center gap-2"
           >
-            {submitting ? (
+            {isSubmitting ? (
               "Creating..."
             ) : (
               <>
-                <HiOutlineCheck className="w-4 h-4" /> Create Event Order
+                <HiOutlineCheck className="w-4 h-4" />
+                {isEditMode ? "Save Changes" : "Create Event Order"}
               </>
             )}
           </button>
@@ -797,9 +920,19 @@ const CreateEventModal = ({ open, onClose, onSubmit }: Props) => {
     <CustomModal
       open={open}
       onClose={onClose}
-      title="Create Event Order"
-      subtitle="Schedule a new event with delivery details"
-      icon={<HiOutlineSparkles className="w-6 h-6" />}
+      title={isEditMode ? "Edit Event Order" : "Create Event Order"}
+      subtitle={
+        isEditMode
+          ? "Update event details"
+          : "Schedule a new event with delivery details"
+      }
+      icon={
+        isEditMode ? (
+          <HiOutlinePencilAlt className="w-6 h-6" />
+        ) : (
+          <HiOutlineSparkles className="w-6 h-6" />
+        )
+      }
       iconTone="blue"
       size="5xl"
       beforeClose={handleBeforeClose}

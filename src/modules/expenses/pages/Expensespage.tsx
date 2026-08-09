@@ -366,7 +366,11 @@ const ExpensesPage = () => {
       {/* Tab panels */}
       <div>
         {activeTab === "overview" && (
-          <OverviewPanel onAddExpense={handleOpenAdd} />
+          <OverviewPanel
+            onAddExpense={handleOpenAdd}
+            onViewAllExpenses={() => setActiveTab("all")}
+            onViewCategories={() => setActiveTab("categories")}
+          />
         )}
 
         {activeTab === "all" && (

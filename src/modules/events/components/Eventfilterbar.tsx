@@ -1,13 +1,19 @@
 import { Input, Select, DatePicker } from "antd";
 import { HiOutlineSearch } from "react-icons/hi";
 import dayjs, { Dayjs } from "dayjs";
-import {
-  EVENT_STATUS_OPTIONS,
-  EVENT_TYPE_OPTIONS,
-} from "../constants/Events.constants";
+import { EVENT_TYPE_OPTIONS } from "../constants/Events.constants";
 import type { EventFilters } from "../types/Events";
 
 const { RangePicker } = DatePicker;
+
+const EVENT_STATUS_OPTIONS = [
+  { value: "DRAFT", label: "Draft" },
+  { value: "CONFIRMED", label: "Confirmed" },
+  { value: "IN_PROGRESS", label: "In Progress" },
+  { value: "DELIVERED", label: "Delivered" },
+  { value: "COMPLETED", label: "Completed" },
+  { value: "CANCELLED", label: "Cancelled" },
+];
 
 interface Props {
   filters: EventFilters;
@@ -15,6 +21,11 @@ interface Props {
 }
 
 const EventFilterBar = ({ filters, onChange }: Props) => {
+  const rangeValue: [Dayjs, Dayjs] | null =
+    filters.dateFrom && filters.dateTo
+      ? [dayjs(filters.dateFrom), dayjs(filters.dateTo)]
+      : null;
+
   return (
     <div className="bg-white rounded-2xl border border-slate-200 p-4 grid grid-cols-1 md:grid-cols-12 gap-3">
       <div className="md:col-span-4">
@@ -47,6 +58,7 @@ const EventFilterBar = ({ filters, onChange }: Props) => {
         />
       </div>
 
+      {/* ─── Status ──────────────────────────────────────────────────── */}
       <div className="md:col-span-2">
         <Select
           size="large"
@@ -61,24 +73,35 @@ const EventFilterBar = ({ filters, onChange }: Props) => {
         />
       </div>
 
+      {/* ─── Date Range ──────────────────────────────────────────────── */}
       <div className="md:col-span-3">
         <RangePicker
           size="large"
           className="w-full"
           placeholder={["Event from", "Event to"]}
-          value={
-            filters.dateRange
-              ? [dayjs(filters.dateRange[0]), dayjs(filters.dateRange[1])]
-              : null
-          }
+          // ─── FIXED: read from dateFrom + dateTo, not dateRange ──────
+          value={rangeValue}
           onChange={(dates) => {
-            const next = dates
-              ? ([
-                  (dates[0] as Dayjs).toISOString(),
-                  (dates[1] as Dayjs).toISOString(),
-                ] as [string, string])
-              : null;
-            onChange({ ...filters, dateRange: next, page: 1 });
+            if (dates && dates[0] && dates[1]) {
+              onChange({
+                ...filters,
+                // ─── FIXED: .format("YYYY-MM-DD") not .toISOString() ─
+                // .toISOString() shifts date by -5:30 for Indian timezone.
+                // "15 Aug 2026" → toISOString → "2026-08-14T18:30:00Z" ← wrong day!
+                // .format("YYYY-MM-DD") → "2026-08-15" ← always correct
+                dateFrom: (dates[0] as Dayjs).format("YYYY-MM-DD"),
+                dateTo: (dates[1] as Dayjs).format("YYYY-MM-DD"),
+                page: 1,
+              });
+            } else {
+              // User cleared the date range — remove both filter fields
+              onChange({
+                ...filters,
+                dateFrom: undefined,
+                dateTo: undefined,
+                page: 1,
+              });
+            }
           }}
         />
       </div>

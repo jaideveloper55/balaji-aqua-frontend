@@ -18,6 +18,7 @@ import {
   BsBoxSeam,
   BsCart3,
   BsBuilding,
+  BsCalendarEvent,
 } from "react-icons/bs";
 import type { IconType } from "react-icons";
 
@@ -127,13 +128,13 @@ const waterPlantConfig: OrgConfig = {
       href: "/admin/billing-pos",
       group: "Billing",
     },
-    // {
-    //   id: "event-orders",
-    //   icon: BsCalendarEvent,
-    //   label: "Event / Function Orders",
-    //   href: "/admin/event-orders",
-    //   group: "Billing",
-    // },
+    {
+      id: "event-orders",
+      icon: BsCalendarEvent,
+      label: "Event / Function Orders",
+      href: "/admin/event-orders",
+      group: "Billing",
+    },
     {
       id: "inventory",
       icon: BsClipboardData,
