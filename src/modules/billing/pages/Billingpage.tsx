@@ -21,7 +21,6 @@ import {
   getTodayString,
   getCurrentTimeString,
 } from "../utils/Helpers";
-
 import PageHeader from "../components/PageHeader";
 import POSTab from "../components/tabs/Postab";
 import InvoicesTab from "../components/tabs/Invoices";
@@ -39,7 +38,6 @@ import {
   errorNotification,
   successNotification,
 } from "../../../components/common/Notification";
-
 import CustomPageHeader from "../../../components/common/CustomPageHeader";
 import {
   POSProduct,
@@ -122,7 +120,6 @@ const STATUS_FILTER_MAP: Record<string, string | undefined> = {
   overdue: "OVERDUE",
   cancelled: "CANCELLED",
 };
-
 const TYPE_MAP: Record<string, string> = {
   RESIDENTIAL: "Residential",
   COMMERCIAL: "Commercial",
@@ -221,11 +218,9 @@ const BillingPage = () => {
   };
 
   const addToCart = (product: POSProduct, quantity: number = 1) => {
-    const { price } = getEffectivePrice(product);
     addCartItemApi({
       productId: product.id,
       quantity,
-      unitPrice: price,
     })
       .then(() => {
         queryClient.invalidateQueries({ queryKey: ["billing-cart"] });
@@ -241,7 +236,6 @@ const BillingPage = () => {
 
     const newQty = (item.quantity ?? 0) + delta;
 
-    // Minus at qty=1 → remove item
     if (newQty < 1) {
       removeCartItemApi(itemId)
         .then(() => {
@@ -264,6 +258,33 @@ const BillingPage = () => {
         errorNotification(
           "Update Failed",
           err?.message ?? "Could not update item"
+        );
+      });
+  };
+
+  const updateRate = (itemId: string, rate: number) => {
+    if (rate < 0) return;
+    updateCartItemApi(itemId, { unitPrice: rate })
+      .then(() => {
+        queryClient.invalidateQueries({ queryKey: ["billing-cart"] });
+      })
+      .catch((err: any) => {
+        errorNotification(
+          "Update Failed",
+          err?.message ?? "Could not update rate"
+        );
+      });
+  };
+
+  const resetRate = (itemId: string) => {
+    updateCartItemApi(itemId, { resetToDefaultPrice: true })
+      .then(() => {
+        queryClient.invalidateQueries({ queryKey: ["billing-cart"] });
+      })
+      .catch((err: any) => {
+        errorNotification(
+          "Reset Failed",
+          err?.message ?? "Could not reset rate"
         );
       });
   };
@@ -1163,6 +1184,8 @@ const BillingPage = () => {
             onAddToCart={addToCart}
             productSearchRef={productSearchRef}
             getEffectivePrice={getEffectivePrice}
+            onUpdateRate={updateRate}
+            onResetRate={resetRate}
             cart={cart}
             notes={notes}
             discount={discount}

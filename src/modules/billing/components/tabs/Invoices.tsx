@@ -75,14 +75,6 @@ const InvoicesTab: React.FC<Props> = ({
   const filteredInvoices = useMemo(() => {
     let result = invoices;
 
-    // Status filter — compare case-insensitively because the backend
-    // returns "PAID"/"PENDING" but the tabs use "Paid"/"Pending"
-    if (statusFilter) {
-      const sf = statusFilter.toLowerCase();
-      result = result.filter((inv) => inv.status.toLowerCase() === sf);
-    }
-
-    // Date range filter
     if (dateRange && dateRange[0] && dateRange[1]) {
       const start = dateRange[0].startOf("day");
       const end = dateRange[1].endOf("day");
@@ -92,7 +84,7 @@ const InvoicesTab: React.FC<Props> = ({
       });
     }
 
-    // Search filter
+    // Search filter (client-side, on top of backend search)
     if (search) {
       const q = search.toLowerCase();
       result = result.filter(
@@ -103,7 +95,7 @@ const InvoicesTab: React.FC<Props> = ({
     }
 
     return result;
-  }, [invoices, statusFilter, dateRange, search]);
+  }, [invoices, dateRange, search]);
 
   const columns: ColumnsType<Invoice> = [
     {
@@ -123,6 +115,7 @@ const InvoicesTab: React.FC<Props> = ({
       title: "Customer",
       dataIndex: "customerName",
       width: 160,
+      align: "center",
       render: (name: string, r) => (
         <div>
           <div className="text-[13px] font-medium text-gray-800">{name}</div>
@@ -139,7 +132,7 @@ const InvoicesTab: React.FC<Props> = ({
       title: "Amount",
       dataIndex: "grandTotal",
       width: 110,
-      align: "right",
+      align: "center",
       sorter: (a, b) => a.grandTotal - b.grandTotal,
       render: (v: number) => (
         <span className="text-[13px] font-semibold text-gray-900 tabular-nums">
@@ -151,7 +144,7 @@ const InvoicesTab: React.FC<Props> = ({
       title: "Paid",
       dataIndex: "paidAmount",
       width: 100,
-      align: "right",
+      align: "center",
       render: (v: number) => (
         <span className="text-[13px] font-medium text-emerald-600 tabular-nums">
           {formatCurrency(v)}
@@ -162,7 +155,7 @@ const InvoicesTab: React.FC<Props> = ({
       title: "Balance",
       dataIndex: "balanceAmount",
       width: 100,
-      align: "right",
+      align: "center",
       render: (v: number) =>
         v > 0 ? (
           <span className="text-[13px] font-medium text-red-500 tabular-nums">
@@ -176,6 +169,7 @@ const InvoicesTab: React.FC<Props> = ({
       title: "Due Date",
       dataIndex: "dueDate",
       width: 110,
+      align: "center",
       render: (d: string | null) =>
         d ? (
           <span className="text-[12px] text-gray-600">
@@ -189,11 +183,15 @@ const InvoicesTab: React.FC<Props> = ({
       title: "Status",
       dataIndex: "status",
       width: 100,
+      align: "center" as const,
+
       filters: STATUS_TABS.filter((t) => t.key !== "all").map((t) => ({
         text: t.label,
         value: t.key,
       })),
+
       onFilter: (val, r) => r.status === val,
+
       render: (status: string) => {
         const statusStyles: Record<
           string,
@@ -214,21 +212,29 @@ const InvoicesTab: React.FC<Props> = ({
             text: "text-blue-700",
             dot: "bg-blue-500",
           },
-          Overdue: { bg: "bg-red-50", text: "text-red-700", dot: "bg-red-500" },
+          Overdue: {
+            bg: "bg-red-50",
+            text: "text-red-700",
+            dot: "bg-red-500",
+          },
           Cancelled: {
             bg: "bg-gray-50",
             text: "text-gray-500",
             dot: "bg-gray-400",
           },
         };
+
         const s = statusStyles[status] ?? statusStyles.Pending;
+
         return (
-          <span
-            className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold ${s.bg} ${s.text}`}
-          >
-            <span className={`w-1.5 h-1.5 rounded-full ${s.dot}`} />
-            {status}
-          </span>
+          <div className="flex justify-center">
+            <span
+              className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold ${s.bg} ${s.text}`}
+            >
+              <span className={`w-1.5 h-1.5 rounded-full ${s.dot}`} />
+              {status}
+            </span>
+          </div>
         );
       },
     },
@@ -236,6 +242,7 @@ const InvoicesTab: React.FC<Props> = ({
       title: "Mode",
       dataIndex: "paymentMode",
       width: 90,
+      align: "center",
       render: (mode: string, r) => {
         if (r.status === "Paid" || r.status === "Partial") {
           return (
@@ -255,10 +262,10 @@ const InvoicesTab: React.FC<Props> = ({
       },
     },
     {
-      title: "",
+      title: "Actions",
       key: "actions",
       width: 70,
-      fixed: "right",
+      align: "center",
       render: (_: unknown, record: Invoice) => {
         const isSuperAdmin = userRole === "SUPER_ADMIN";
 
@@ -381,18 +388,20 @@ const InvoicesTab: React.FC<Props> = ({
             const count =
               tab.key === "all"
                 ? stats.total
-                : tab.key === "Paid"
+                : tab.key === "paid"
                 ? stats.paid
-                : tab.key === "Pending"
+                : tab.key === "pending"
                 ? stats.pending
-                : tab.key === "Partial"
+                : tab.key === "partial"
                 ? stats.partial
-                : stats.overdue;
+                : tab.key === "overdue"
+                ? stats.overdue
+                : 0;
             return (
               <button
                 key={tab.key}
                 onClick={() =>
-                  onStatusFilterChange(tab.key === "all" ? "" : tab.key)
+                  onStatusFilterChange(tab.key === "all" ? "all" : tab.key)
                 }
                 className={
                   "px-3 py-1.5 rounded-lg text-[12px] font-medium transition-all " +

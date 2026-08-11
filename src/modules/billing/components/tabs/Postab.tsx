@@ -24,6 +24,8 @@ interface Props {
   onProductSearchChange: (v: string) => void;
   onAddToCart: (p: POSProduct) => void;
   productSearchRef: RefObject<HTMLInputElement | null>;
+  onUpdateRate: (id: string, rate: number) => void;
+  onResetRate: (id: string) => void;
   getEffectivePrice: (p: POSProduct) => { price: number; isCustom: boolean };
   cart: CartItem[];
   notes: string;
@@ -66,9 +68,6 @@ const POSTab: React.FC<Props> = (p) => {
           onOpenQuickAdd={p.onOpenQuickAdd}
         />
 
-        {/* Product area with loading overlay.
-            flex flex-col is required: ProductGrid returns a fragment, so its
-            search bar and scroll container become direct children here. */}
         <div className="flex-1 min-h-0 relative flex flex-col overflow-hidden">
           {p.isLoadingProducts && (
             <div
@@ -116,6 +115,8 @@ const POSTab: React.FC<Props> = (p) => {
         totalItems={p.totalItems}
         showInvoiceSuccess={p.showInvoiceSuccess}
         generatedInvoice={p.generatedInvoice}
+        onUpdateRate={p.onUpdateRate}
+        onResetRate={p.onResetRate}
         onUpdateQty={p.onUpdateQty}
         onSetQty={p.onSetQty}
         onRemove={p.onRemove}

@@ -196,7 +196,7 @@ export const addCartItemApi = (data: {
 
 export const updateCartItemApi = (
   itemId: string,
-  data: { quantity: number; unitPrice?: number }
+  data: { quantity?: number; unitPrice?: number; resetToDefaultPrice?: boolean }
 ) => {
   return authAxios.patch(`/billing/cart/items/${itemId}`, data);
 };

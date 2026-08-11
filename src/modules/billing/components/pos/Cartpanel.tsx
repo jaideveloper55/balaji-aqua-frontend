@@ -26,6 +26,8 @@ interface Props {
   totalItems: number;
   showInvoiceSuccess: boolean;
   generatedInvoice: Invoice | null;
+  onUpdateRate: (id: string, rate: number) => void;
+  onResetRate: (id: string) => void;
   onUpdateQty: (id: string, delta: number) => void;
   onSetQty: (id: string, qty: number) => void;
   onRemove: (id: string) => void;
@@ -48,7 +50,8 @@ const CartPanel: React.FC<Props> = ({
   gstAmount,
   grandTotal,
   totalItems,
-
+  onUpdateRate,
+  onResetRate,
   onUpdateQty,
   onSetQty,
   onRemove,
@@ -80,18 +83,34 @@ const CartPanel: React.FC<Props> = ({
     {
       title: "Rate",
       dataIndex: "unitPrice",
-      width: 80,
+      width: 110,
       render: (price: number, r) => (
         <div>
-          <span className="font-semibold text-[13px] text-gray-800">
-            {formatCurrency(price)}
-          </span>
+          <div className="flex items-center gap-1">
+            <span className="text-gray-400 text-[12px]">₹</span>
+            <InputNumber
+              min={0}
+              value={price}
+              size="small"
+              className="w-16"
+              controls={false}
+              onChange={(val) =>
+                val !== null && val >= 0 && onUpdateRate(r.id, val)
+              }
+            />
+          </div>
           {r.isCustomPrice && (
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-1 mt-0.5">
               <HiOutlineTag className="w-2.5 h-2.5 text-emerald-500" />
               <span className="text-[10px] text-gray-400 line-through">
                 {formatCurrency(r.basePrice ?? 0)}
               </span>
+              <button
+                onClick={() => onResetRate(r.id)}
+                className="text-[10px] text-blue-500 hover:underline"
+              >
+                Reset
+              </button>
             </div>
           )}
         </div>
