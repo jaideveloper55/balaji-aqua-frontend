@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState, useMemo } from "react";
 import dayjs, { Dayjs } from "dayjs";
 import { useForm } from "react-hook-form";
 import { Table } from "antd";
@@ -16,14 +16,26 @@ import {
   HiBuildingLibrary,
 } from "react-icons/hi2";
 import { TbAlertCircle } from "react-icons/tb";
+import { HiOutlineMoon } from "react-icons/hi";
 import { formatCurrency, getInitials } from "../../utils/Helpers";
 import StatCard from "../StatCard";
 import CustomDateRange from "../../../../components/common/CustomDateRange";
 import CustomInput from "../../../../components/common/CustomInput";
 import CustomSelect from "../../../../components/common/CustomSelect";
 import { Invoice, PaymentEntry } from "../../types/billing";
+import DayClosingReport, { DayClosingData } from "../DayClosingReport";
 
 export type DateRange = [Dayjs | null, Dayjs | null] | null;
+
+interface ExpenseRow {
+  id: string;
+  expenseNo: string;
+  vendorName: string;
+  description: string;
+  categoryName: string;
+  amount: number;
+  paymentMode: string;
+}
 
 interface Props {
   dateRange?: DateRange;
@@ -48,6 +60,12 @@ interface Props {
   isLoading?: boolean;
   onDateRangeChange?: (range: DateRange) => void;
   onExport?: () => void;
+  // Day Closing extras
+  companyName?: string;
+  expenses?: ExpenseRow[];
+  totalExpenses?: number;
+  cashExpenses?: number;
+  allPayments?: PaymentEntry[];
 }
 
 const CollectionTab: React.FC<Props> = ({
@@ -72,7 +90,15 @@ const CollectionTab: React.FC<Props> = ({
   isLoading,
   onDateRangeChange,
   onExport,
+  companyName,
+  expenses,
+  totalExpenses,
+  cashExpenses,
+  allPayments,
 }) => {
+  const [showClosing, setShowClosing] = useState(false);
+  const reportRef = useRef<HTMLDivElement>(null);
+
   const safePayments = selectedPayments ?? [];
   const safeCash = selectedCash ?? 0;
   const safeUPI = selectedUPI ?? 0;
@@ -172,6 +198,137 @@ const CollectionTab: React.FC<Props> = ({
     },
   ];
 
+  // ── Build customer breakdown from payments ──────────────────────────
+  const customerBreakdown = useMemo(() => {
+    const paymentsList = allPayments ?? safePayments;
+    const map = new Map<
+      string,
+      {
+        name: string;
+        total: number;
+        cash: number;
+        upi: number;
+        bank: number;
+        credit: number;
+        count: Set<string>;
+      }
+    >();
+
+    for (const p of paymentsList) {
+      const name = p.customerName?.trim() || "Walk-in";
+      if (!map.has(name)) {
+        map.set(name, {
+          name,
+          total: 0,
+          cash: 0,
+          upi: 0,
+          bank: 0,
+          credit: 0,
+          count: new Set(),
+        });
+      }
+      const entry = map.get(name)!;
+      entry.total += p.amount ?? 0;
+      if (p.invoiceNo) entry.count.add(p.invoiceNo);
+
+      const mode = (p.mode ?? "").toLowerCase();
+      if (mode === "cash" || mode === "card") entry.cash += p.amount ?? 0;
+      else if (mode === "upi") entry.upi += p.amount ?? 0;
+      else if (mode.includes("bank")) entry.bank += p.amount ?? 0;
+      else entry.credit += p.amount ?? 0;
+    }
+
+    return Array.from(map.values())
+      .map((e) => ({
+        name: e.name,
+        totalAmount: e.total,
+        cashAmount: e.cash,
+        upiAmount: e.upi,
+        bankAmount: e.bank,
+        creditAmount: e.credit,
+        invoiceCount: e.count.size || 1,
+      }))
+      .sort((a, b) => b.totalAmount - a.totalAmount);
+  }, [allPayments, safePayments]);
+
+  // ── Build closing report data ──────────────────────────────────────
+  const closingData: DayClosingData = useMemo(
+    () => ({
+      date: from?.format("YYYY-MM-DD") ?? dayjs().format("YYYY-MM-DD"),
+      companyName: companyName ?? "",
+      invoiceCount: safeInvoiceCount,
+      totalBilled: safeInvoicedTotal,
+      creditSales: safeCreditSales,
+      cashCollected: safeCash,
+      upiCollected: safeUPI,
+      bankCollected: safeBank,
+      totalCollected: safeTotal,
+      totalOutstanding: safeOutstanding,
+      expenses: expenses ?? [],
+      totalExpenses: totalExpenses ?? 0,
+      cashExpenses: cashExpenses ?? 0,
+      customerBreakdown,
+      payments: allPayments ?? safePayments,
+    }),
+    [
+      from,
+      companyName,
+      safeInvoiceCount,
+      safeInvoicedTotal,
+      safeCreditSales,
+      safeCash,
+      safeUPI,
+      safeBank,
+      safeTotal,
+      safeOutstanding,
+      expenses,
+      totalExpenses,
+      cashExpenses,
+      customerBreakdown,
+      allPayments,
+      safePayments,
+    ]
+  );
+
+  const handlePrintClosing = () => {
+    const content = reportRef.current;
+    if (!content) return;
+
+    const printWindow = window.open("", "_blank");
+    if (!printWindow) return;
+
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Day Closing Report — ${dayjs(closingData.date).format(
+            "DD MMM YYYY"
+          )}</title>
+          <style>
+            * { margin: 0; padding: 0; box-sizing: border-box; }
+            body { font-family: 'Inter', -apple-system, sans-serif; color: #1f2937; }
+            table { border-collapse: collapse; width: 100%; }
+            @media print {
+              body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            }
+          </style>
+          <script src="https://cdn.tailwindcss.com"><\/script>
+        </head>
+        <body>
+          ${content.innerHTML}
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+
+    printWindow.onload = () => {
+      setTimeout(() => {
+        printWindow.print();
+        printWindow.close();
+      }, 500);
+    };
+  };
+
   const columns: ColumnsType<PaymentEntry> = [
     {
       title: "Customer",
@@ -259,6 +416,15 @@ const CollectionTab: React.FC<Props> = ({
               Today
             </button>
           )}
+
+          {/* ── Close Day Button ─────────────────────────────────── */}
+          <button
+            onClick={() => setShowClosing(true)}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-gray-900 text-white text-[13px] font-semibold hover:bg-gray-800 transition-colors shadow-sm"
+          >
+            <HiOutlineMoon className="w-4 h-4" /> Close Day
+          </button>
+
           <button
             onClick={() => onExport?.()}
             className="flex items-center gap-2 px-4 py-2 rounded-lg border border-gray-200 text-[13px] font-medium text-gray-600 hover:bg-gray-50 hover:border-gray-300 transition-colors"
@@ -409,6 +575,14 @@ const CollectionTab: React.FC<Props> = ({
           }}
         />
       </div>
+
+      <DayClosingReport
+        open={showClosing}
+        ref={reportRef}
+        data={closingData}
+        onClose={() => setShowClosing(false)}
+        onPrint={handlePrintClosing}
+      />
     </div>
   );
 };

@@ -64,6 +64,7 @@ import ThermalReceipt from "../components/ThermalReceipt";
 import GatePass from "../components/GatePass";
 import { useAuthStore } from "../../../store/auth.store";
 import CorrectInvoiceModal from "../components/modals/CorrectInvoiceModal";
+import { getExpensesApi } from "../../expenses/api/Expenses.api";
 
 type ExportType = "invoices" | "payments" | "outstanding" | "summary";
 
@@ -216,6 +217,48 @@ const BillingPage = () => {
   ): { price: number; isCustom: boolean } => {
     return { price: product.basePrice, isCustom: false };
   };
+
+  const dailySummaryFilters = useMemo(() => {
+    const f: { dateFrom?: string; dateTo?: string } = {};
+    if (collectionDateRange?.[0])
+      f.dateFrom = collectionDateRange[0].format("YYYY-MM-DD");
+    if (collectionDateRange?.[1])
+      f.dateTo = collectionDateRange[1].format("YYYY-MM-DD");
+    return f;
+  }, [collectionDateRange]);
+
+  const { data: expensesData } = useQuery({
+    queryKey: ["billing-expenses", dailySummaryFilters],
+    queryFn: () =>
+      getExpensesApi({
+        ...dailySummaryFilters,
+        limit: 100,
+      }).then((res) => res.data),
+    enabled: activeTab === "collection",
+    staleTime: 1000 * 60,
+  });
+
+  const expenseRows = useMemo(
+    () =>
+      (expensesData?.data ?? []).map((e: any) => ({
+        id: e.id,
+        expenseNo: e.expenseNo,
+        vendorName: e.vendorName,
+        description: e.description,
+        categoryName: e.categoryName,
+        amount: Number(e.amount),
+        paymentMode: e.paymentMode,
+      })),
+    [expensesData]
+  );
+
+  const totalExpensesAmount = expenseRows.reduce(
+    (s: number, e: any) => s + e.amount,
+    0
+  );
+  const cashExpensesAmount = expenseRows
+    .filter((e: any) => e.paymentMode === "CASH")
+    .reduce((s: number, e: any) => s + e.amount, 0);
 
   const addToCart = (product: POSProduct, quantity: number = 1) => {
     addCartItemApi({
@@ -401,15 +444,6 @@ const BillingPage = () => {
     }),
     [outstandingFilter, outstandingSearch, outstandingSortBy, outstandingPage]
   );
-
-  const dailySummaryFilters = useMemo(() => {
-    const f: { dateFrom?: string; dateTo?: string } = {};
-    if (collectionDateRange?.[0])
-      f.dateFrom = collectionDateRange[0].format("YYYY-MM-DD");
-    if (collectionDateRange?.[1])
-      f.dateTo = collectionDateRange[1].format("YYYY-MM-DD");
-    return f;
-  }, [collectionDateRange]);
 
   const { data: posProducts, isLoading: isLoadingProducts } = useQuery({
     queryKey: ["billing-pos-products", { search: productSearch }],
@@ -1288,6 +1322,13 @@ const BillingPage = () => {
               setCollectionDateRange(r);
               setCollectionPage(1);
             }}
+            companyName={
+              (user as any)?.companyName ?? (user as any)?.company?.name ?? ""
+            }
+            expenses={expenseRows}
+            totalExpenses={totalExpensesAmount}
+            cashExpenses={cashExpensesAmount}
+            allPayments={payments}
             selectedPayments={payments}
             selectedCash={dailySummary?.payments?.CASH ?? 0}
             selectedUPI={dailySummary?.payments?.UPI ?? 0}
