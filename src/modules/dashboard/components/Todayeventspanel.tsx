@@ -12,6 +12,12 @@ interface Props {
   onViewAll?: () => void;
 }
 
+// Your schema's EventType enum has SEVEN values (WEDDING, ENGAGEMENT,
+// BIRTHDAY, CORPORATE, RELIGIOUS, HOUSE_WARMING, OTHER). This originally had
+// five entries — Religious and Other were missing, so TYPE_STYLES[e.type]
+// would return undefined for either, and the very next line (style.bg)
+// would crash the whole panel. Added both below so every real event type
+// has somewhere safe to land.
 const TYPE_STYLES: Record<
   TodayEvent["type"],
   { bg: string; text: string; emoji: string }
@@ -25,6 +31,8 @@ const TYPE_STYLES: Record<
     text: "text-emerald-700",
     emoji: "🏠",
   },
+  Religious: { bg: "bg-violet-50", text: "text-violet-700", emoji: "🛕" },
+  Other: { bg: "bg-slate-50", text: "text-slate-700", emoji: "📅" },
 };
 
 const TodayEventsPanel: React.FC<Props> = ({ events, onViewAll }) => (

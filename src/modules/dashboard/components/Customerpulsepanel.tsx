@@ -7,10 +7,10 @@ import {
   HiOutlineExclamationCircle,
   HiOutlineShieldCheck,
 } from "react-icons/hi";
-import { CustomerPulse } from "../types/Dashboard";
+// import { CustomerPulse } from "../types/Dashboard";
 
 interface Props {
-  data: CustomerPulse;
+  data: any;
   onViewAll?: () => void;
 }
 

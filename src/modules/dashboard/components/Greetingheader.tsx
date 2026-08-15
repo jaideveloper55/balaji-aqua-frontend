@@ -10,6 +10,7 @@ interface Props {
   attentionCount: number;
   refreshing?: boolean;
   onRefresh?: () => void;
+  onAlertsClick?: () => void;
   onExport?: () => void;
 }
 
@@ -25,6 +26,7 @@ const Greetingheader: React.FC<Props> = ({
   attentionCount,
   refreshing = false,
   onRefresh,
+  onAlertsClick,
   onExport,
 }) => {
   const today = new Date().toLocaleDateString("en-IN", {
@@ -75,7 +77,10 @@ const Greetingheader: React.FC<Props> = ({
           />
           Refresh
         </button>
-        <button className="inline-flex items-center gap-1.5 px-3 h-9 rounded-xl border border-slate-200 text-[13px] font-medium text-slate-600 hover:bg-slate-50">
+        <button
+          onClick={onAlertsClick}
+          className="inline-flex items-center gap-1.5 px-3 h-9 rounded-xl border border-slate-200 text-[13px] font-medium text-slate-600 hover:bg-slate-50"
+        >
           <HiOutlineBell size={15} />
           Alerts
           {attentionCount > 0 && (

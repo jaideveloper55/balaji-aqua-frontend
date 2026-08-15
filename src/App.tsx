@@ -31,8 +31,6 @@ function App() {
         <Route path="/register" element={<RegisterPage />} />
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
 
-        {/* ─── PROTECTED ADMIN ROUTES ─────────────────────────────────── */}
-
         <Route
           path="/admin"
           element={
