@@ -23,7 +23,10 @@ import CustomDateRange from "../../../../components/common/CustomDateRange";
 import CustomInput from "../../../../components/common/CustomInput";
 import CustomSelect from "../../../../components/common/CustomSelect";
 import { Invoice, PaymentEntry } from "../../types/billing";
-import DayClosingReport, { DayClosingData } from "../DayClosingReport";
+import DayClosingReport, {
+  DayClosingData,
+  PettyCashRow,
+} from "../DayClosingReport";
 
 export type DateRange = [Dayjs | null, Dayjs | null] | null;
 
@@ -60,12 +63,15 @@ interface Props {
   isLoading?: boolean;
   onDateRangeChange?: (range: DateRange) => void;
   onExport?: () => void;
-  // Day Closing extras
+
   companyName?: string;
   expenses?: ExpenseRow[];
   totalExpenses?: number;
   cashExpenses?: number;
   allPayments?: PaymentEntry[];
+  pettyCashTransactions?: PettyCashRow[];
+
+  dayInvoices?: Invoice[];
 }
 
 const CollectionTab: React.FC<Props> = ({
@@ -74,6 +80,7 @@ const CollectionTab: React.FC<Props> = ({
   selectedCash,
   selectedUPI,
   selectedBank,
+
   selectedTotal,
   totalOutstanding,
   invoiceCount,
@@ -95,6 +102,8 @@ const CollectionTab: React.FC<Props> = ({
   totalExpenses,
   cashExpenses,
   allPayments,
+  pettyCashTransactions,
+  dayInvoices,
 }) => {
   const [showClosing, setShowClosing] = useState(false);
   const reportRef = useRef<HTMLDivElement>(null);
@@ -198,58 +207,64 @@ const CollectionTab: React.FC<Props> = ({
     },
   ];
 
-  // ── Build customer breakdown from payments ──────────────────────────
   const customerBreakdown = useMemo(() => {
+    const invoicesList = dayInvoices ?? [];
     const paymentsList = allPayments ?? safePayments;
-    const map = new Map<
-      string,
-      {
-        name: string;
-        total: number;
-        cash: number;
-        upi: number;
-        bank: number;
-        credit: number;
-        count: Set<string>;
-      }
-    >();
 
+    const paidByCustomer = new Map<
+      string,
+      { cash: number; upi: number; bank: number }
+    >();
     for (const p of paymentsList) {
       const name = p.customerName?.trim() || "Walk-in";
-      if (!map.has(name)) {
-        map.set(name, {
-          name,
-          total: 0,
-          cash: 0,
-          upi: 0,
-          bank: 0,
-          credit: 0,
-          count: new Set(),
-        });
+      if (!paidByCustomer.has(name)) {
+        paidByCustomer.set(name, { cash: 0, upi: 0, bank: 0 });
       }
-      const entry = map.get(name)!;
-      entry.total += p.amount ?? 0;
-      if (p.invoiceNo) entry.count.add(p.invoiceNo);
-
+      const entry = paidByCustomer.get(name)!;
       const mode = (p.mode ?? "").toLowerCase();
       if (mode === "cash" || mode === "card") entry.cash += p.amount ?? 0;
       else if (mode === "upi") entry.upi += p.amount ?? 0;
       else if (mode.includes("bank")) entry.bank += p.amount ?? 0;
-      else entry.credit += p.amount ?? 0;
     }
 
-    return Array.from(map.values())
-      .map((e) => ({
-        name: e.name,
-        totalAmount: e.total,
-        cashAmount: e.cash,
-        upiAmount: e.upi,
-        bankAmount: e.bank,
-        creditAmount: e.credit,
-        invoiceCount: e.count.size || 1,
-      }))
+    const salesByCustomer = new Map<
+      string,
+      { name: string; total: number; credit: number; count: number }
+    >();
+    for (const inv of invoicesList) {
+      if (inv.status === "Cancelled") continue;
+      const name = inv.customerName?.trim() || "Walk-in";
+      if (!salesByCustomer.has(name)) {
+        salesByCustomer.set(name, { name, total: 0, credit: 0, count: 0 });
+      }
+      const entry = salesByCustomer.get(name)!;
+      entry.total += inv.grandTotal ?? 0;
+      entry.credit += inv.balanceAmount ?? 0;
+      entry.count += 1;
+    }
+
+    return Array.from(salesByCustomer.values())
+      .map((e) => {
+        const paid = paidByCustomer.get(e.name) ?? { cash: 0, upi: 0, bank: 0 };
+        return {
+          name: e.name,
+          totalAmount: e.total,
+          cashAmount: paid.cash,
+          upiAmount: paid.upi,
+          bankAmount: paid.bank,
+          creditAmount: e.credit,
+          invoiceCount: e.count,
+        };
+      })
       .sort((a, b) => b.totalAmount - a.totalAmount);
-  }, [allPayments, safePayments]);
+  }, [dayInvoices, allPayments, safePayments]);
+
+  // ── Petty cash total ─────────────────────────────────────────────────
+  const totalPettyCashOut = useMemo(
+    () =>
+      (pettyCashTransactions ?? []).reduce((s, p) => s + (p.amount ?? 0), 0),
+    [pettyCashTransactions]
+  );
 
   // ── Build closing report data ──────────────────────────────────────
   const closingData: DayClosingData = useMemo(
@@ -267,6 +282,8 @@ const CollectionTab: React.FC<Props> = ({
       expenses: expenses ?? [],
       totalExpenses: totalExpenses ?? 0,
       cashExpenses: cashExpenses ?? 0,
+      pettyCashExpenses: pettyCashTransactions ?? [],
+      totalPettyCashOut,
       customerBreakdown,
       payments: allPayments ?? safePayments,
     }),
@@ -284,6 +301,8 @@ const CollectionTab: React.FC<Props> = ({
       expenses,
       totalExpenses,
       cashExpenses,
+      pettyCashTransactions,
+      totalPettyCashOut,
       customerBreakdown,
       allPayments,
       safePayments,
@@ -417,7 +436,6 @@ const CollectionTab: React.FC<Props> = ({
             </button>
           )}
 
-          {/* ── Close Day Button ─────────────────────────────────── */}
           <button
             onClick={() => setShowClosing(true)}
             className="flex items-center gap-2 px-4 py-2 rounded-lg bg-gray-900 text-white text-[13px] font-semibold hover:bg-gray-800 transition-colors shadow-sm"
@@ -434,7 +452,6 @@ const CollectionTab: React.FC<Props> = ({
         </div>
       </div>
 
-      {/* ── 5 stat cards ────────────────────────────────────────────────── */}
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
         <StatCard
           icon={<HiBanknotes className="w-5 h-5" />}
@@ -473,7 +490,6 @@ const CollectionTab: React.FC<Props> = ({
         />
       </div>
 
-      {/* ── Payment Mode Breakdown ──────────────────────────────────────── */}
       <div className="bg-white rounded-xl border border-gray-100 p-5">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-[13px] font-semibold text-gray-800">
@@ -531,7 +547,6 @@ const CollectionTab: React.FC<Props> = ({
           )}
         </div>
 
-        {/* ── Search + mode filter (server-side) ────────────────────────── */}
         <div className="flex items-end gap-2 flex-wrap mb-4">
           <div className="flex-1 min-w-[200px]">
             <CustomInput

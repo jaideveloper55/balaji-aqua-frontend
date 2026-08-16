@@ -12,6 +12,7 @@ import {
   HiOutlinePrinter,
   HiOutlinePencil,
   HiOutlineDotsVertical,
+  HiOutlineTrash,
 } from "react-icons/hi";
 import { HiClipboardDocumentList } from "react-icons/hi2";
 import { formatCurrency, getCustomerTypeColor } from "../../utils/Helpers";
@@ -37,6 +38,7 @@ interface Props {
   stats: InvoiceStats;
   search: string;
   statusFilter: string;
+  onDelete?: (invoice: Invoice) => void;
   onSearchChange: (value: string) => void;
   onStatusFilterChange: (value: string) => void;
   onView: (invoice: Invoice) => void;
@@ -62,6 +64,7 @@ const InvoicesTab: React.FC<Props> = ({
   onSearchChange,
   onStatusFilterChange,
   onView,
+  onDelete,
   onPrint,
   userRole,
   onCorrect,
@@ -75,12 +78,25 @@ const InvoicesTab: React.FC<Props> = ({
   const filteredInvoices = useMemo(() => {
     let result = invoices;
 
+    // Date range filter — filters against the RAW ISO date (dateRaw), never
+    // the pre-formatted display string (date). `date` comes from
+    // toLocaleDateString("en-IN"), e.g. "16/8/2026" — re-parsing that with
+    // Dayjs (with or without a format hint, since customParseFormat may not
+    // be loaded) falls back to native Date parsing, which assumes MM/DD/YYYY.
+    // Day 16 isn't a valid month → parse fails → invoice silently excluded
+    // from every date range, which is why "today" could show zero results
+    // even when today's invoices existed. dateRaw is an untouched ISO string,
+    // so Dayjs parses it unambiguously with no format guessing needed.
     if (dateRange && dateRange[0] && dateRange[1]) {
       const start = dateRange[0].startOf("day");
       const end = dateRange[1].endOf("day");
       result = result.filter((inv) => {
-        const d = Dayjs(inv.date, "D/M/YYYY");
-        return d.isValid() && d.isAfter(start) && d.isBefore(end);
+        if (!inv.dateRaw) return false;
+        const d = Dayjs(inv.dateRaw);
+        // Inclusive on both ends — a date-only value lands exactly at
+        // midnight, same as `start`, so strict isAfter(start) would always
+        // exclude a same-day match.
+        return d.isValid() && !d.isBefore(start) && !d.isAfter(end);
       });
     }
 
@@ -106,7 +122,10 @@ const InvoicesTab: React.FC<Props> = ({
         <div>
           <div className="text-[13px] font-semibold text-gray-900">{no}</div>
           <div className="text-[11px] text-gray-400">
-            {Dayjs(r.date).format("D/M/YYYY")} · {r.time}
+            {/* r.date is already formatted ("D/M/YYYY"-ish) — display as-is.
+                Re-parsing a locale string with Dayjs without an explicit
+                format is what produced "Invalid Date" here before. */}
+            {r.date} · {r.time}
           </div>
         </div>
       ),
@@ -172,9 +191,9 @@ const InvoicesTab: React.FC<Props> = ({
       align: "center",
       render: (d: string | null) =>
         d ? (
-          <span className="text-[12px] text-gray-600">
-            {Dayjs(d).format("D/M/YYYY")}
-          </span>
+          // Same fix as the Invoice column: dueDate is already formatted
+          // ("D/M/YYYY"-ish) from toLocaleDateString — don't re-parse it.
+          <span className="text-[12px] text-gray-600">{d}</span>
         ) : (
           <span className="text-[12px] text-gray-300">&mdash;</span>
         ),
@@ -291,6 +310,18 @@ const InvoicesTab: React.FC<Props> = ({
                 },
               ]
             : []),
+
+          ...(isSuperAdmin && onDelete
+            ? [
+                { type: "divider" as const },
+                {
+                  key: "delete",
+                  icon: <HiOutlineTrash size={14} />,
+                  label: "Delete Invoice",
+                  danger: true,
+                },
+              ]
+            : []),
         ];
 
         return (
@@ -302,6 +333,7 @@ const InvoicesTab: React.FC<Props> = ({
                 if (key === "view") onView(record);
                 else if (key === "print") onPrint(record);
                 else if (key === "correct") onCorrect?.(record);
+                else if (key === "delete") onDelete?.(record);
               },
             }}
             trigger={["click"]}

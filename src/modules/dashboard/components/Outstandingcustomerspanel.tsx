@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { HiOutlineExclamationCircle, HiChevronRight } from "react-icons/hi";
 
@@ -52,6 +52,20 @@ const Outstandingcustomerspanel: React.FC<Props> = ({
 }) => {
   const navigate = useNavigate();
 
+  // Most overdue first; among equal overdue days, higher balance first.
+  // The customer needing the most urgent follow-up should lead the list,
+  // not whichever one the API happened to return first.
+  const sortedCustomers = useMemo(
+    () =>
+      [...customers].sort((a, b) => {
+        if (b.overdueDays !== a.overdueDays) {
+          return b.overdueDays - a.overdueDays;
+        }
+        return b.outstandingBalance - a.outstandingBalance;
+      }),
+    [customers]
+  );
+
   return (
     <div className="bg-white rounded-2xl border border-slate-200 p-5">
       <div className="flex items-center justify-between mb-3">
@@ -76,13 +90,13 @@ const Outstandingcustomerspanel: React.FC<Props> = ({
         </button>
       </div>
 
-      {customers.length === 0 ? (
+      {sortedCustomers.length === 0 ? (
         <div className="text-center py-8 text-[13px] text-slate-400">
           No outstanding dues — all clear.
         </div>
       ) : (
         <div className="divide-y divide-slate-100">
-          {customers.map((c) => {
+          {sortedCustomers.map((c) => {
             const tone = riskTone(c.overdueDays);
             return (
               <div

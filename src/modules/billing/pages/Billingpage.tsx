@@ -27,6 +27,7 @@ import InvoicesTab from "../components/tabs/Invoices";
 import PaymentsTab, { DateRange } from "../components/tabs/Payments";
 import OutstandingTab from "../components/tabs/Outstanding";
 import CollectionTab from "../components/tabs/Collection";
+import { PettyCashRow } from "../components/DayClosingReport";
 import CustomerPickerModal from "../components/modals/Customerpickermodal";
 import QuickAddCustomerModal from "../components/modals/Quickaddcustomermodal";
 import PaymentModal from "../components/modals/Paymentmodal";
@@ -59,12 +60,17 @@ import {
   PaymentFilters,
   InvoiceFilters,
   OutstandingFilters,
+  deleteInvoiceApi,
 } from "../api/billing.api";
 import ThermalReceipt from "../components/ThermalReceipt";
 import GatePass from "../components/GatePass";
 import { useAuthStore } from "../../../store/auth.store";
 import CorrectInvoiceModal from "../components/modals/CorrectInvoiceModal";
-import { getExpensesApi } from "../../expenses/api/Expenses.api";
+import {
+  getExpensesApi,
+  getPettyCashTransactionsApi,
+} from "../../expenses/api/Expenses.api";
+import DeleteInvoiceModal from "../components/modals/Deleteinvoicemodal";
 
 type ExportType = "invoices" | "payments" | "outstanding" | "summary";
 
@@ -152,6 +158,7 @@ const BillingPage = () => {
   const [showAddPayment, setShowAddPayment] = useState(false);
   const [showExport, setShowExport] = useState(false);
   const [correctTarget, setCorrectTarget] = useState<Invoice | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Invoice | null>(null);
   const [exportDefaultType, setExportDefaultType] =
     useState<ExportType>("invoices");
   const [generatedInvoice, setGeneratedInvoice] = useState<Invoice | null>(
@@ -217,48 +224,6 @@ const BillingPage = () => {
   ): { price: number; isCustom: boolean } => {
     return { price: product.basePrice, isCustom: false };
   };
-
-  const dailySummaryFilters = useMemo(() => {
-    const f: { dateFrom?: string; dateTo?: string } = {};
-    if (collectionDateRange?.[0])
-      f.dateFrom = collectionDateRange[0].format("YYYY-MM-DD");
-    if (collectionDateRange?.[1])
-      f.dateTo = collectionDateRange[1].format("YYYY-MM-DD");
-    return f;
-  }, [collectionDateRange]);
-
-  const { data: expensesData } = useQuery({
-    queryKey: ["billing-expenses", dailySummaryFilters],
-    queryFn: () =>
-      getExpensesApi({
-        ...dailySummaryFilters,
-        limit: 100,
-      }).then((res) => res.data),
-    enabled: activeTab === "collection",
-    staleTime: 1000 * 60,
-  });
-
-  const expenseRows = useMemo(
-    () =>
-      (expensesData?.data ?? []).map((e: any) => ({
-        id: e.id,
-        expenseNo: e.expenseNo,
-        vendorName: e.vendorName,
-        description: e.description,
-        categoryName: e.categoryName,
-        amount: Number(e.amount),
-        paymentMode: e.paymentMode,
-      })),
-    [expensesData]
-  );
-
-  const totalExpensesAmount = expenseRows.reduce(
-    (s: number, e: any) => s + e.amount,
-    0
-  );
-  const cashExpensesAmount = expenseRows
-    .filter((e: any) => e.paymentMode === "CASH")
-    .reduce((s: number, e: any) => s + e.amount, 0);
 
   const addToCart = (product: POSProduct, quantity: number = 1) => {
     addCartItemApi({
@@ -445,6 +410,74 @@ const BillingPage = () => {
     [outstandingFilter, outstandingSearch, outstandingSortBy, outstandingPage]
   );
 
+  const dailySummaryFilters = useMemo(() => {
+    const f: { dateFrom?: string; dateTo?: string } = {};
+    if (collectionDateRange?.[0])
+      f.dateFrom = collectionDateRange[0].format("YYYY-MM-DD");
+    if (collectionDateRange?.[1])
+      f.dateTo = collectionDateRange[1].format("YYYY-MM-DD");
+    return f;
+  }, [collectionDateRange]);
+
+  // Expenses for the closing report — placed after dailySummaryFilters since
+  // it depends on it (queryKey references it directly, which is evaluated
+  // eagerly every render, unlike a callback — must come after declaration).
+  const { data: expensesData } = useQuery({
+    queryKey: ["billing-expenses", dailySummaryFilters],
+    queryFn: () =>
+      getExpensesApi({
+        ...dailySummaryFilters,
+        limit: 100,
+      }).then((res) => res.data),
+    enabled: activeTab === "collection",
+    staleTime: 1000 * 60,
+  });
+
+  const expenseRows = useMemo(
+    () =>
+      (expensesData?.data ?? []).map((e: any) => ({
+        id: e.id,
+        expenseNo: e.expenseNo,
+        vendorName: e.vendorName,
+        description: e.description,
+        categoryName: e.categoryName,
+        amount: Number(e.amount),
+        paymentMode: e.paymentMode,
+      })),
+    [expensesData]
+  );
+
+  const totalExpensesAmount = expenseRows.reduce(
+    (s: number, e: any) => s + e.amount,
+    0
+  );
+  const cashExpensesAmount = expenseRows
+    .filter((e: any) => e.paymentMode === "CASH")
+    .reduce((s: number, e: any) => s + e.amount, 0);
+
+  // Full (unpaginated) invoice + payment filters for the Day Closing Report.
+  // `invoiceApiFilters` above has no date filter (it's for the Invoices tab,
+  // all-time by design) and `paymentApiFilters` is paginated to
+  // COLLECTION_PAGE_SIZE for the Transactions table — neither is a complete
+  // picture of "everything that happened today," which the closing report needs.
+  const closingInvoiceFilters: InvoiceFilters = useMemo(
+    () => ({
+      limit: 500,
+      dateFrom: dailySummaryFilters.dateFrom,
+      dateTo: dailySummaryFilters.dateTo,
+    }),
+    [dailySummaryFilters]
+  );
+
+  const closingPaymentFilters: PaymentFilters = useMemo(
+    () => ({
+      limit: 500,
+      dateFrom: dailySummaryFilters.dateFrom,
+      dateTo: dailySummaryFilters.dateTo,
+    }),
+    [dailySummaryFilters]
+  );
+
   const { data: posProducts, isLoading: isLoadingProducts } = useQuery({
     queryKey: ["billing-pos-products", { search: productSearch }],
     queryFn: () =>
@@ -489,6 +522,53 @@ const BillingPage = () => {
     enabled: showInvoiceDetail && !!selectedInvoice?.id,
     staleTime: 1000 * 10,
   });
+
+  // Unpaginated invoices + payments for today (or the selected range) —
+  // feeds the Day Closing Report's Customer-wise Sales table.
+  const { data: closingInvoicesData } = useQuery({
+    queryKey: ["billing-closing-invoices", closingInvoiceFilters],
+    queryFn: () =>
+      getInvoicesApi(closingInvoiceFilters).then((res) => res.data),
+    enabled: activeTab === "collection",
+    staleTime: 1000 * 30,
+  });
+
+  const { data: closingPaymentsData } = useQuery({
+    queryKey: ["billing-closing-payments", closingPaymentFilters],
+    queryFn: () =>
+      getPaymentsApi(closingPaymentFilters).then((res) => res.data),
+    enabled: activeTab === "collection",
+    staleTime: 1000 * 30,
+  });
+
+  const closingPettyCashDate =
+    collectionDateRange?.[0]?.format("YYYY-MM-DD") ??
+    dayjs().format("YYYY-MM-DD");
+
+  const { data: closingPettyCashData } = useQuery({
+    queryKey: ["billing-closing-petty-cash", closingPettyCashDate],
+    queryFn: () =>
+      getPettyCashTransactionsApi({
+        direction: "OUT",
+        date: closingPettyCashDate,
+      }).then((res) => res.data),
+    enabled: activeTab === "collection",
+    staleTime: 1000 * 30,
+  });
+
+  const closingPettyCash: PettyCashRow[] = useMemo(() => {
+    const list = Array.isArray(closingPettyCashData)
+      ? closingPettyCashData
+      : (closingPettyCashData as any)?.data ?? [];
+    return list.map((t: any) => ({
+      id: t.id ?? t.txnNo,
+      txnNo: t.txnNo,
+      description: t.description,
+      amount: Number(t.amount),
+      handledByName: t.handledByName ?? null,
+    }));
+  }, [closingPettyCashData]);
+
   const filteredProducts: POSProduct[] = posProducts?.data ?? posProducts ?? [];
 
   // ─── Mappers ─────────────────────────────────────────────────────────────────
@@ -557,6 +637,7 @@ const BillingPage = () => {
       date: new Date(inv.invoiceDate ?? inv.createdAt).toLocaleDateString(
         "en-IN"
       ),
+      dateRaw: inv.invoiceDate ?? inv.createdAt ?? null,
       time: new Date(inv.invoiceDate ?? inv.createdAt).toLocaleTimeString(
         "en-IN",
         {
@@ -574,6 +655,11 @@ const BillingPage = () => {
   const invoices: Invoice[] = useMemo(
     () => (invoicesData?.data ?? []).map(mapInvoice),
     [invoicesData]
+  );
+
+  const closingInvoices: Invoice[] = useMemo(
+    () => (closingInvoicesData?.data ?? []).map(mapInvoice),
+    [closingInvoicesData]
   );
 
   const detailedInvoice: Invoice | null = useMemo(() => {
@@ -605,6 +691,32 @@ const BillingPage = () => {
         notes: p.notes ?? "",
       })),
     [paymentsData]
+  );
+
+  const closingPayments: PaymentEntry[] = useMemo(
+    () =>
+      (closingPaymentsData?.data ?? []).map((p: any) => ({
+        id: p.id,
+        paymentNo: p.paymentNumber,
+        invoiceNo: p.invoice?.invoiceNumber ?? "—",
+        customerId: p.customer?.customerCode ?? "",
+        customerName: p.customer?.name ?? "",
+        amount: p.amount,
+        mode: PAYMENT_MODE_LABEL[p.paymentMode] ?? p.paymentMode,
+        date: new Date(p.paymentDate ?? p.createdAt).toLocaleDateString(
+          "en-IN"
+        ),
+        time: new Date(p.paymentDate ?? p.createdAt).toLocaleTimeString(
+          "en-IN",
+          {
+            hour: "2-digit",
+            minute: "2-digit",
+          }
+        ),
+        reference: p.referenceId ?? "",
+        notes: p.notes ?? "",
+      })),
+    [closingPaymentsData]
   );
 
   const filteredPayments: PaymentEntry[] = useMemo(() => {
@@ -704,6 +816,8 @@ const BillingPage = () => {
       queryClient.invalidateQueries({ queryKey: ["billing-invoices"] });
       queryClient.invalidateQueries({ queryKey: ["billing-invoice"] });
       queryClient.invalidateQueries({ queryKey: ["billing-daily-summary"] });
+      queryClient.invalidateQueries({ queryKey: ["billing-closing-invoices"] });
+      queryClient.invalidateQueries({ queryKey: ["billing-closing-payments"] });
     },
     onError: (err: any) => {
       errorNotification(
@@ -721,6 +835,7 @@ const BillingPage = () => {
       queryClient.invalidateQueries({ queryKey: ["billing-invoices"] });
       queryClient.invalidateQueries({ queryKey: ["billing-outstanding"] });
       queryClient.invalidateQueries({ queryKey: ["billing-pos-products"] });
+      queryClient.invalidateQueries({ queryKey: ["billing-closing-invoices"] });
       setShowInvoiceDetail(false);
     },
     onError: (err: any) =>
@@ -729,6 +844,40 @@ const BillingPage = () => {
         err?.message ?? "Could not cancel invoice"
       ),
   });
+
+  const deleteInvoiceMutation = useMutation({
+    mutationKey: ["deleteInvoice"],
+    mutationFn: (id: string) => deleteInvoiceApi(id).then((res) => res.data),
+    onSuccess: (data) => {
+      successNotification(
+        "Invoice Deleted",
+        data?.message ?? "Stock restored and outstanding rolled back"
+      );
+      queryClient.invalidateQueries({ queryKey: ["billing-invoices"] });
+      queryClient.invalidateQueries({ queryKey: ["billing-outstanding"] });
+      queryClient.invalidateQueries({ queryKey: ["billing-pos-products"] });
+      queryClient.invalidateQueries({ queryKey: ["billing-payments"] });
+      queryClient.invalidateQueries({ queryKey: ["billing-daily-summary"] });
+      queryClient.invalidateQueries({ queryKey: ["billing-closing-invoices"] });
+      queryClient.invalidateQueries({ queryKey: ["billing-closing-payments"] });
+    },
+    onError: (err: any) =>
+      errorNotification(
+        "Delete Failed",
+        err?.message ?? "Could not delete invoice"
+      ),
+  });
+
+  const handleDeleteInvoice = (invoice: Invoice) => {
+    setDeleteTarget(invoice);
+  };
+
+  const confirmDeleteInvoice = () => {
+    if (!deleteTarget) return;
+    deleteInvoiceMutation.mutate(deleteTarget.id, {
+      onSuccess: () => setDeleteTarget(null),
+    });
+  };
 
   const checkoutMutation = useMutation({
     mutationKey: ["checkout"],
@@ -799,6 +948,7 @@ const BillingPage = () => {
             : "Credit",
         deliveryMode: "Counter",
         date: today,
+        dateRaw: new Date().toISOString(),
         time: getCurrentTimeString(),
         notes,
         dueDate: dueDateRaw
@@ -839,6 +989,8 @@ const BillingPage = () => {
       queryClient.invalidateQueries({ queryKey: ["billing-cart"] });
       queryClient.invalidateQueries({ queryKey: ["billing-outstanding"] });
       queryClient.invalidateQueries({ queryKey: ["billing-payments"] });
+      queryClient.invalidateQueries({ queryKey: ["billing-closing-invoices"] });
+      queryClient.invalidateQueries({ queryKey: ["billing-closing-payments"] });
     },
     onError: (err: any) => {
       setIsProcessing(false);
@@ -1254,6 +1406,7 @@ const BillingPage = () => {
             stats={invoiceStats}
             search={invoiceSearch}
             statusFilter={invoiceStatusFilter}
+            onDelete={handleDeleteInvoice}
             onSearchChange={setInvoiceSearch}
             onStatusFilterChange={setInvoiceStatusFilter}
             onView={handleViewInvoice}
@@ -1268,6 +1421,14 @@ const BillingPage = () => {
           open={!!correctTarget}
           invoice={correctTarget}
           onClose={() => setCorrectTarget(null)}
+        />
+
+        <DeleteInvoiceModal
+          open={!!deleteTarget}
+          invoice={deleteTarget}
+          isDeleting={deleteInvoiceMutation.isPending}
+          onConfirm={confirmDeleteInvoice}
+          onClose={() => setDeleteTarget(null)}
         />
 
         {activeTab === "payments" && (
@@ -1328,7 +1489,9 @@ const BillingPage = () => {
             expenses={expenseRows}
             totalExpenses={totalExpensesAmount}
             cashExpenses={cashExpensesAmount}
-            allPayments={payments}
+            dayInvoices={closingInvoices}
+            allPayments={closingPayments}
+            pettyCashTransactions={closingPettyCash}
             selectedPayments={payments}
             selectedCash={dailySummary?.payments?.CASH ?? 0}
             selectedUPI={dailySummary?.payments?.UPI ?? 0}

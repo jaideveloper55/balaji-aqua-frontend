@@ -78,6 +78,7 @@ export interface Invoice {
   customerAddress?: string;
   items: InvoiceItem[];
   subtotal: number;
+  dateRaw: string | null;
   gst: number;
   dueDate: string | null;
   dueDateRaw?: string | null;

@@ -205,6 +205,10 @@ export const removeCartItemApi = (itemId: string) => {
   return authAxios.delete(`/billing/cart/items/${itemId}`);
 };
 
+export const deleteInvoiceApi = (id: string) => {
+  return authAxios.delete(`/billing/invoices/${id}`);
+};
+
 export const updateCartSettingsApi = (data: {
   customerId?: string | null;
   walkInName?: string;

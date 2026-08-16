@@ -3,10 +3,8 @@ import dayjs from "dayjs";
 import { PaymentEntry } from "../types/billing";
 import { formatCurrency } from "../utils/Helpers";
 import CustomModal from "../../../components/common/CustomModal";
-import { HiOutlineMoon, HiOutlinePrinter } from "react-icons/hi";
+import { HiOutlineMoon, HiOutlinePrinter, HiOutlineCash } from "react-icons/hi";
 import { HiBanknotes, HiMiniQrCode, HiBuildingLibrary } from "react-icons/hi2";
-
-
 
 interface ExpenseRow {
   id: string;
@@ -16,6 +14,14 @@ interface ExpenseRow {
   categoryName: string;
   amount: number;
   paymentMode: string;
+}
+
+export interface PettyCashRow {
+  id: string;
+  txnNo: string;
+  description: string;
+  amount: number;
+  handledByName?: string | null;
 }
 
 interface CustomerSummary {
@@ -42,6 +48,8 @@ export interface DayClosingData {
   expenses: ExpenseRow[];
   totalExpenses: number;
   cashExpenses: number;
+  pettyCashExpenses: PettyCashRow[];
+  totalPettyCashOut: number;
   customerBreakdown: CustomerSummary[];
   payments: PaymentEntry[];
 }
@@ -57,7 +65,11 @@ interface Props {
 
 const DayClosingReport = forwardRef<HTMLDivElement, Props>(
   ({ open, data, onClose, onPrint }, ref) => {
-    const netCashInHand = data.cashCollected - data.cashExpenses;
+    // Petty cash is always cash (no paymentMode on that model — it's a physical box),
+    // so it's deducted alongside cash expenses, but shown as its own line since it
+    // comes from a different source than the Expenses tab.
+    const netCashInHand =
+      data.cashCollected - data.cashExpenses - data.totalPettyCashOut;
     const formattedDate = dayjs(data.date).format("DD MMM YYYY, dddd");
 
     return (
@@ -309,6 +321,54 @@ const DayClosingReport = forwardRef<HTMLDivElement, Props>(
             )}
           </div>
 
+          {/* ── Petty Cash Spend ─────────────────────────────────────── */}
+          <div>
+            <SectionHeader label="Petty Cash Spend" />
+            {data.pettyCashExpenses.length > 0 ? (
+              <table className="w-full text-[12px]">
+                <thead>
+                  <tr className="border-b-2 border-gray-200">
+                    <Th align="left">#</Th>
+                    <Th align="left">Description</Th>
+                    <Th align="left">Handled By</Th>
+                    <Th align="right">Amount</Th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {data.pettyCashExpenses.map((p, i) => (
+                    <tr
+                      key={p.id}
+                      className="border-b border-gray-100 hover:bg-gray-50/50"
+                    >
+                      <td className="py-1.5 text-gray-400">{i + 1}</td>
+                      <td className="py-1.5 text-gray-800">{p.description}</td>
+                      <td className="py-1.5 text-gray-500">
+                        {p.handledByName ?? "—"}
+                      </td>
+                      <td className="py-1.5 text-right font-medium text-red-600">
+                        {formatCurrency(p.amount)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr className="border-t-2 border-gray-300">
+                    <td colSpan={3} className="py-2 font-bold text-gray-800">
+                      Total Petty Cash Spend
+                    </td>
+                    <td className="py-2 text-right font-bold text-red-600">
+                      {formatCurrency(data.totalPettyCashOut)}
+                    </td>
+                  </tr>
+                </tfoot>
+              </table>
+            ) : (
+              <p className="text-[12px] text-gray-400 italic">
+                No petty cash spend recorded for this period
+              </p>
+            )}
+          </div>
+
           {/* ── Final Summary ──────────────────────────────────────── */}
           <div className="bg-gray-50 rounded-xl p-5 border border-gray-200">
             <SectionHeader label="Day Closing" />
@@ -344,14 +404,15 @@ const DayClosingReport = forwardRef<HTMLDivElement, Props>(
                 color="text-amber-600"
               />
               <ClosingRow
-                label="Expenses (Cash)"
-                value={`- ${formatCurrency(data.cashExpenses)}`}
-                color="text-red-600"
-              />
-              <ClosingRow
                 label="Expenses (Total)"
                 value={`- ${formatCurrency(data.totalExpenses)}`}
                 color="text-red-600"
+              />
+              <ClosingRow
+                label="Petty Cash Spend"
+                value={`- ${formatCurrency(data.totalPettyCashOut)}`}
+                color="text-red-600"
+                icon={<HiOutlineCash className="w-3.5 h-3.5 text-red-400" />}
               />
 
               <div className="col-span-2 border-t-2 border-gray-300 mt-2 pt-3 flex justify-between items-center">

@@ -4,7 +4,18 @@ import {
   HiOutlineCalendar,
   HiOutlineLocationMarker,
   HiOutlineArrowSmRight,
+  HiOutlineCheckCircle,
 } from "react-icons/hi";
+import {
+  FaChurch,
+  FaBuilding,
+  FaRing,
+  FaBirthdayCake,
+  FaHome,
+  FaPlaceOfWorship,
+  FaRegCalendarAlt,
+} from "react-icons/fa";
+import type { IconType } from "react-icons";
 import { TodayEvent } from "../types/Dashboard";
 
 interface Props {
@@ -12,27 +23,45 @@ interface Props {
   onViewAll?: () => void;
 }
 
-// Your schema's EventType enum has SEVEN values (WEDDING, ENGAGEMENT,
-// BIRTHDAY, CORPORATE, RELIGIOUS, HOUSE_WARMING, OTHER). This originally had
-// five entries — Religious and Other were missing, so TYPE_STYLES[e.type]
-// would return undefined for either, and the very next line (style.bg)
-// would crash the whole panel. Added both below so every real event type
-// has somewhere safe to land.
 const TYPE_STYLES: Record<
   TodayEvent["type"],
-  { bg: string; text: string; emoji: string }
+  { bg: string; text: string; icon: IconType }
 > = {
-  Wedding: { bg: "bg-pink-50", text: "text-pink-700", emoji: "💒" },
-  Corporate: { bg: "bg-blue-50", text: "text-blue-700", emoji: "🏢" },
-  Engagement: { bg: "bg-rose-50", text: "text-rose-700", emoji: "💍" },
-  Birthday: { bg: "bg-amber-50", text: "text-amber-700", emoji: "🎂" },
+  Wedding: {
+    bg: "bg-pink-50",
+    text: "text-pink-700",
+    icon: FaChurch,
+  },
+  Corporate: {
+    bg: "bg-blue-50",
+    text: "text-blue-700",
+    icon: FaBuilding,
+  },
+  Engagement: {
+    bg: "bg-rose-50",
+    text: "text-rose-700",
+    icon: FaRing,
+  },
+  Birthday: {
+    bg: "bg-amber-50",
+    text: "text-amber-700",
+    icon: FaBirthdayCake,
+  },
   "House Warming": {
     bg: "bg-emerald-50",
     text: "text-emerald-700",
-    emoji: "🏠",
+    icon: FaHome,
   },
-  Religious: { bg: "bg-violet-50", text: "text-violet-700", emoji: "🛕" },
-  Other: { bg: "bg-slate-50", text: "text-slate-700", emoji: "📅" },
+  Religious: {
+    bg: "bg-violet-50",
+    text: "text-violet-700",
+    icon: FaPlaceOfWorship,
+  },
+  Other: {
+    bg: "bg-slate-50",
+    text: "text-slate-700",
+    icon: FaRegCalendarAlt,
+  },
 };
 
 const TodayEventsPanel: React.FC<Props> = ({ events, onViewAll }) => (
@@ -65,21 +94,23 @@ const TodayEventsPanel: React.FC<Props> = ({ events, onViewAll }) => (
 
     <div className="p-3 flex flex-col gap-2">
       {events.length === 0 && (
-        <div className="text-center py-8 text-slate-400 text-xs">
-          No events scheduled today 🎉
+        <div className="flex flex-col items-center gap-2 py-8 text-slate-400 text-xs">
+          <HiOutlineCheckCircle size={22} className="text-slate-300" />
+          No events scheduled today
         </div>
       )}
       {events.map((e) => {
         const style = TYPE_STYLES[e.type];
+        const Icon = style.icon;
         return (
           <div
             key={e.id}
             className="flex items-start gap-3 p-3 rounded-xl border border-slate-100 hover:border-pink-200 hover:bg-pink-50/30 transition-all cursor-pointer"
           >
             <div
-              className={`w-10 h-10 rounded-xl ${style.bg} flex items-center justify-center text-lg shrink-0`}
+              className={`w-10 h-10 rounded-xl ${style.bg} flex items-center justify-center shrink-0`}
             >
-              {style.emoji}
+              <Icon size={18} className={style.text} />
             </div>
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
