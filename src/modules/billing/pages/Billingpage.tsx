@@ -419,9 +419,6 @@ const BillingPage = () => {
     return f;
   }, [collectionDateRange]);
 
-  // Expenses for the closing report — placed after dailySummaryFilters since
-  // it depends on it (queryKey references it directly, which is evaluated
-  // eagerly every render, unlike a callback — must come after declaration).
   const { data: expensesData } = useQuery({
     queryKey: ["billing-expenses", dailySummaryFilters],
     queryFn: () =>
@@ -455,11 +452,6 @@ const BillingPage = () => {
     .filter((e: any) => e.paymentMode === "CASH")
     .reduce((s: number, e: any) => s + e.amount, 0);
 
-  // Full (unpaginated) invoice + payment filters for the Day Closing Report.
-  // `invoiceApiFilters` above has no date filter (it's for the Invoices tab,
-  // all-time by design) and `paymentApiFilters` is paginated to
-  // COLLECTION_PAGE_SIZE for the Transactions table — neither is a complete
-  // picture of "everything that happened today," which the closing report needs.
   const closingInvoiceFilters: InvoiceFilters = useMemo(
     () => ({
       limit: 500,
@@ -523,8 +515,6 @@ const BillingPage = () => {
     staleTime: 1000 * 10,
   });
 
-  // Unpaginated invoices + payments for today (or the selected range) —
-  // feeds the Day Closing Report's Customer-wise Sales table.
   const { data: closingInvoicesData } = useQuery({
     queryKey: ["billing-closing-invoices", closingInvoiceFilters],
     queryFn: () =>
@@ -616,6 +606,11 @@ const BillingPage = () => {
         price: item.unitPrice,
         total: item.lineTotal,
         sku: item.sku,
+        unit: item.unit, // NEW — needed for the Product-wise Sales table's
+        // "20 Litre" style display. ⚠️ If TypeScript flags this as an
+        // unexpected property, it means the Invoice item type in
+        // types/billing.ts needs `unit: string;` added too — same one-line
+        // addition, just in a file I haven't seen directly.
       })),
       subtotal: inv.subtotal,
       gst: (inv.cgst ?? 0) + (inv.sgst ?? 0),
@@ -920,6 +915,12 @@ const BillingPage = () => {
           price: c.unitPrice,
           total: c.total,
           sku: c.sku,
+          // Same fix as mapInvoice above, needed here too: Invoice.items
+          // requires unit on every item, and this build path is unrelated
+          // to that one — no renaming needed this time, since the cart's
+          // useEffect spreads raw cart-item fields through unchanged
+          // (...item), so c.unit is already the real field name.
+          unit: c.unit,
         })),
         subtotal,
         gst: gstAmount,

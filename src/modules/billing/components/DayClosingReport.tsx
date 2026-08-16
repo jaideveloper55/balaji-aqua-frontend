@@ -34,6 +34,19 @@ interface CustomerSummary {
   invoiceCount: number;
 }
 
+// NEW — one row per product sold today. Sourced from InvoiceItem, which
+// already snapshots productName/sku/unit/quantity/lineTotal on every sale
+// line, so this is an aggregation of data you already store, not a new
+// data source.
+export interface ProductSummary {
+  productName: string;
+  sku: string;
+  unit: string;
+  quantitySold: number;
+  invoiceCount: number; // how many of today's invoices included this product
+  totalAmount: number;
+}
+
 export interface DayClosingData {
   date: string;
   companyName?: string;
@@ -51,6 +64,7 @@ export interface DayClosingData {
   pettyCashExpenses: PettyCashRow[];
   totalPettyCashOut: number;
   customerBreakdown: CustomerSummary[];
+  productBreakdown: ProductSummary[]; // NEW
   payments: PaymentEntry[];
 }
 
@@ -262,6 +276,81 @@ const DayClosingReport = forwardRef<HTMLDivElement, Props>(
                         {formatCurrency(
                           data.customerBreakdown.reduce(
                             (s, c) => s + c.totalAmount,
+                            0
+                          )
+                        )}
+                      </td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* ── Product-wise Breakdown (NEW) ────────────────────────
+              Same table pattern as Customer-wise Sales above, on purpose —
+              a report reads as one coherent document when every breakdown
+              table shares the same visual language, not a different one
+              invented per section. */}
+          {data.productBreakdown.length > 0 && (
+            <div>
+              <SectionHeader label="Product-wise Sales" />
+              <div className="overflow-x-auto">
+                <table className="w-full text-[12px]">
+                  <thead>
+                    <tr className="border-b-2 border-gray-200">
+                      <Th align="left">#</Th>
+                      <Th align="left">Product</Th>
+                      <Th align="left">SKU</Th>
+                      <Th align="center">Bills</Th>
+                      <Th align="right">Qty Sold</Th>
+                      <Th align="right">Amount</Th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {data.productBreakdown.map((p, i) => (
+                      <tr
+                        key={p.sku}
+                        className="border-b border-gray-100 hover:bg-gray-50/50"
+                      >
+                        <td className="py-1.5 text-gray-400">{i + 1}</td>
+                        <td className="py-1.5 font-medium text-gray-800">
+                          {p.productName}
+                        </td>
+                        <td className="py-1.5 text-gray-500">{p.sku}</td>
+                        <td className="py-1.5 text-center text-gray-500">
+                          {p.invoiceCount}
+                        </td>
+                        <td className="py-1.5 text-right text-gray-700">
+                          {p.quantitySold} {p.unit}
+                        </td>
+                        <td className="py-1.5 text-right font-semibold text-gray-900">
+                          {formatCurrency(p.totalAmount)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot>
+                    <tr className="border-t-2 border-gray-300">
+                      <td colSpan={3} className="py-2 font-bold text-gray-800">
+                        Total
+                      </td>
+                      <td className="py-2 text-center font-bold text-gray-800">
+                        {data.productBreakdown.reduce(
+                          (s, p) => s + p.invoiceCount,
+                          0
+                        )}
+                      </td>
+                      <td className="py-2 text-right font-bold text-gray-800">
+                        {data.productBreakdown.reduce(
+                          (s, p) => s + p.quantitySold,
+                          0
+                        )}
+                      </td>
+                      <td className="py-2 text-right font-bold text-gray-900">
+                        {formatCurrency(
+                          data.productBreakdown.reduce(
+                            (s, p) => s + p.totalAmount,
                             0
                           )
                         )}

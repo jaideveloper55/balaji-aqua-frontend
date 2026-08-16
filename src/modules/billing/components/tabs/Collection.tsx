@@ -259,6 +259,50 @@ const CollectionTab: React.FC<Props> = ({
       .sort((a, b) => b.totalAmount - a.totalAmount);
   }, [dayInvoices, allPayments, safePayments]);
 
+  const productBreakdown = useMemo(() => {
+    const invoicesList = dayInvoices ?? [];
+
+    const bySku = new Map<
+      string,
+      {
+        productName: string;
+        sku: string;
+        unit: string;
+        quantitySold: number;
+        totalAmount: number;
+        invoiceIds: Set<string>;
+      }
+    >();
+
+    for (const inv of invoicesList) {
+      if (inv.status === "Cancelled") continue;
+      for (const item of inv.items ?? []) {
+        if (!item.sku) continue;
+        if (!bySku.has(item.sku)) {
+          bySku.set(item.sku, {
+            productName: item.product,
+            sku: item.sku,
+            unit: item.unit ?? "",
+            quantitySold: 0,
+            totalAmount: 0,
+            invoiceIds: new Set(),
+          });
+        }
+        const entry = bySku.get(item.sku)!;
+        entry.quantitySold += item.qty ?? 0;
+        entry.totalAmount += item.total ?? 0;
+        entry.invoiceIds.add(inv.id);
+      }
+    }
+
+    return Array.from(bySku.values())
+      .map(({ invoiceIds, ...rest }) => ({
+        ...rest,
+        invoiceCount: invoiceIds.size,
+      }))
+      .sort((a, b) => b.totalAmount - a.totalAmount);
+  }, [dayInvoices]);
+
   // ── Petty cash total ─────────────────────────────────────────────────
   const totalPettyCashOut = useMemo(
     () =>
@@ -285,6 +329,7 @@ const CollectionTab: React.FC<Props> = ({
       pettyCashExpenses: pettyCashTransactions ?? [],
       totalPettyCashOut,
       customerBreakdown,
+      productBreakdown,
       payments: allPayments ?? safePayments,
     }),
     [
@@ -304,6 +349,7 @@ const CollectionTab: React.FC<Props> = ({
       pettyCashTransactions,
       totalPettyCashOut,
       customerBreakdown,
+      productBreakdown,
       allPayments,
       safePayments,
     ]

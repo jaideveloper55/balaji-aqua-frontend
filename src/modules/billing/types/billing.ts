@@ -60,6 +60,7 @@ export interface CartItem {
 }
 
 export interface InvoiceItem {
+  unit: string;
   product: string;
   qty: number;
   price: number;
