@@ -10,6 +10,8 @@ import {
   updateEventOrderApi,
   updateEventStatusApi,
   cancelEventOrderApi,
+  deleteEventOrderApi,
+  recordEventPaymentApi,
 } from "../api/Events.api";
 
 import type {
@@ -19,6 +21,7 @@ import type {
   EventCancellationReason,
   CreateEventOrderPayload,
   UpdateEventOrderPayload,
+  PaymentMode,
 } from "../types/Events";
 
 import { DEFAULT_PAGE_SIZE } from "../constants/Events.constants";
@@ -35,6 +38,8 @@ import {
   successNotification,
   errorNotification,
 } from "../../../components/common/Notification";
+import Deleteeventordermodal from "../components/Deleteeventordermodal";
+import Completeeventmodal from "../modals/Completeeventmodal";
 
 const EventOrdersPage = () => {
   const queryClient = useQueryClient();
@@ -52,6 +57,8 @@ const EventOrdersPage = () => {
   const [editingEvent, setEditingEvent] = useState<EventOrder | null>(null);
   const [cancelTarget, setCancelTarget] = useState<EventOrder | null>(null);
   const [printTarget, setPrintTarget] = useState<EventOrder | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<EventOrder | null>(null);
+  const [completeTarget, setCompleteTarget] = useState<EventOrder | null>(null);
 
   const { data: stats, isLoading: isLoadingStats } = useQuery({
     queryKey: ["event-stats"],
@@ -67,6 +74,36 @@ const EventOrdersPage = () => {
     queryKey: ["events", filters],
     queryFn: () => getEventOrdersApi(filters).then((res) => res.data),
     staleTime: 1000 * 30,
+  });
+
+  const recordPaymentMutation = useMutation({
+    mutationFn: ({
+      id,
+      amount,
+      paymentMode,
+    }: {
+      id: string;
+      amount: number;
+      paymentMode: PaymentMode;
+    }) =>
+      recordEventPaymentApi(id, { amount, paymentMode }).then(
+        (res) => res.data
+      ),
+  });
+
+  const deleteEventMutation = useMutation({
+    mutationKey: ["deleteEventOrder"],
+    mutationFn: (id: string) => deleteEventOrderApi(id).then((r) => r.data),
+    onSuccess: (data) => {
+      successNotification("Event Deleted", data?.message ?? "Event removed");
+      queryClient.invalidateQueries({ queryKey: ["events"] });
+      setDeleteTarget(null);
+    },
+    onError: (err: any) =>
+      errorNotification(
+        "Delete Failed",
+        err?.message ?? "Could not delete event"
+      ),
   });
 
   const events = eventsData?.data ?? [];
@@ -187,6 +224,44 @@ const EventOrdersPage = () => {
     setCancelTarget(e);
   };
 
+  const handleDelete = (event: EventOrder) => setDeleteTarget(event);
+  const confirmDelete = () => {
+    if (!deleteTarget) return;
+    deleteEventMutation.mutate(deleteTarget.id);
+  };
+
+  const handleRecordAndComplete = (
+    amount: number,
+    paymentMode: PaymentMode
+  ) => {
+    if (!completeTarget) return;
+    const id = completeTarget.id;
+    recordPaymentMutation.mutate(
+      { id, amount, paymentMode },
+      {
+        onSuccess: () => {
+          statusMutation.mutate(
+            { id, status: "COMPLETED" },
+            { onSuccess: () => setCompleteTarget(null) }
+          );
+        },
+        onError: (err: any) =>
+          errorNotification(
+            "Payment Failed",
+            err?.response?.data?.message ?? "Could not record payment"
+          ),
+      }
+    );
+  };
+
+  const handleCompleteAnyway = () => {
+    if (!completeTarget) return;
+    statusMutation.mutate(
+      { id: completeTarget.id, status: "COMPLETED" },
+      { onSuccess: () => setCompleteTarget(null) }
+    );
+  };
+
   const handleConfirmCancel = (id: string, reason: string, note?: string) => {
     cancelMutation.mutate({
       id,
@@ -246,7 +321,8 @@ const EventOrdersPage = () => {
           onView={handleView}
           onEdit={handleEdit}
           onCancel={handleCancel}
-          onMarkComplete={handleMarkComplete}
+          onComplete={handleMarkComplete}
+          onDelete={handleDelete}
           onPrint={handlePrint}
         />
       </Spin>
@@ -301,6 +377,25 @@ const EventOrdersPage = () => {
           gstNumber: "33XXXXX...",
           logoUrl: "/logo.png",
         }}
+      />
+
+      <Deleteeventordermodal
+        open={!!deleteTarget}
+        event={deleteTarget}
+        isDeleting={deleteEventMutation.isPending}
+        onConfirm={confirmDelete}
+        onClose={() => setDeleteTarget(null)}
+      />
+
+      <Completeeventmodal
+        open={!!completeTarget}
+        event={completeTarget}
+        isSubmitting={
+          recordPaymentMutation.isPending || statusMutation.isPending
+        }
+        onRecordAndComplete={handleRecordAndComplete}
+        onCompleteAnyway={handleCompleteAnyway}
+        onClose={() => setCompleteTarget(null)}
       />
     </div>
   );

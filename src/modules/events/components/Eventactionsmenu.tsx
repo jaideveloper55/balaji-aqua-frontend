@@ -6,15 +6,18 @@ import {
   HiOutlineX,
   HiOutlineDotsVertical,
   HiOutlinePrinter,
+  HiOutlineTrash,
 } from "react-icons/hi";
 import { EventOrder } from "../types/Events";
+import { useAuthStore } from "../../../store/auth.store";
 
 interface Props {
   event: EventOrder;
   onView: (e: EventOrder) => void;
   onEdit: (e: EventOrder) => void;
   onCancel: (e: EventOrder) => void;
-  onMarkComplete: (e: EventOrder) => void;
+  onDelete: (e: EventOrder) => void;
+  onComplete: (e: EventOrder) => void;
   onPrint: (e: EventOrder) => void;
 }
 
@@ -23,9 +26,12 @@ const EventActionsMenu = ({
   onView,
   onEdit,
   onCancel,
-  onMarkComplete,
+  onComplete,
   onPrint,
+  onDelete,
 }: Props) => {
+  const { user } = useAuthStore();
+  const isSuperAdmin = user?.role === "SUPER_ADMIN";
   const isLocked = event.status === "CANCELLED" || event.status === "COMPLETED";
 
   const items: MenuProps["items"] = [
@@ -66,7 +72,7 @@ const EventActionsMenu = ({
         </div>
       ),
       disabled: isLocked,
-      onClick: () => onMarkComplete(event),
+      onClick: () => onComplete(event),
     },
     {
       key: "cancel",
@@ -78,10 +84,36 @@ const EventActionsMenu = ({
       disabled: isLocked,
       onClick: () => onCancel(event),
     },
+
+    // Same plain pattern as Cancel Event above — no `danger` flag, since
+    // that AntD prop renders as a solid red hover block in this app's
+    // theme instead of the light tint AntD ships by default. Red text via
+    // className alone matches Cancel Event's already-correct look.
+    ...(isSuperAdmin
+      ? [
+          { type: "divider" as const },
+          {
+            key: "delete",
+            label: (
+              <div className="flex items-center gap-2 py-0.5 text-red-600">
+                <HiOutlineTrash /> Delete Event
+              </div>
+            ),
+            onClick: () => onDelete(event),
+          },
+        ]
+      : []),
   ];
 
   return (
-    <Dropdown menu={{ items }} trigger={["click"]} placement="bottomRight">
+    <Dropdown
+      menu={{
+        items,
+        onClick: ({ domEvent }) => domEvent.stopPropagation(),
+      }}
+      trigger={["click"]}
+      placement="bottomRight"
+    >
       <button
         className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition"
         onClick={(e) => e.stopPropagation()}

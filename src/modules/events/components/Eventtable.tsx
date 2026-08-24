@@ -1,65 +1,38 @@
-// ─────────────────────────────────────────────────────────────────────────────
-// src/modules/events/components/Eventtable.tsx
-// ─────────────────────────────────────────────────────────────────────────────
-//
-// WHAT CHANGED (old → new):
-//
-//   1. Added `total` prop
-//      OLD:  pagination={{ total: data.length }}
-//      NEW:  pagination={{ total }}
-//      WHY:  With server-side pagination, `data` only contains the CURRENT
-//            page's rows (e.g. 20 items). If your company has 150 events,
-//            data.length = 20 but total = 150. Without this fix, antd Table
-//            thinks there's only 1 page and never shows page 2/3/4/... buttons.
-//
-//   2. Set pagination.simple = false (explicit)
-//      antd Table defaults to client-side pagination — it takes ALL rows in
-//      `dataSource`, then internally slices to show the right page. Since the
-//      backend already did the slicing, we DON'T want antd to slice again.
-//      Setting `pagination={false}` would hide the controls entirely, so
-//      instead we keep pagination controls visible but tell antd the data is
-//      already the right page by passing the correct `current`, `pageSize`,
-//      and `total`.
-//
-// ─────────────────────────────────────────────────────────────────────────────
-
 import { Table } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import {
-  HiOutlinePhone,
+  HiOutlineUser,
+  HiOutlineCalendar,
   HiOutlineLocationMarker,
   HiOutlineUsers,
-  HiOutlineCalendar,
+  HiOutlinePhone,
+  HiOutlineExclamationCircle,
 } from "react-icons/hi";
-
-import {
-  formatINR,
-  formatDate,
-  PAYMENT_STATUS_META,
-} from "../constants/Events.constants";
-import type { EventOrder } from "../types/Events";
+import dayjs from "dayjs";
+import { EventOrder } from "../types/Events";
 import EventTypeBadge from "./Eventtypebadge";
 import EventStatusBadge from "./Eventstatusbadge";
 import EventActionsMenu from "./Eventactionsmenu";
+import { formatCurrency } from "../../billing/utils/Helpers";
 
 interface Props {
   data: EventOrder[];
+  isLoading?: boolean;
   page: number;
   pageSize: number;
-  // ─── NEW PROP ──────────────────────────────────────────────────────────
-  // total: the FULL count of matching events across ALL pages (from backend).
-  // Without this, antd Table uses data.length which is just the current page.
   total: number;
-  onPageChange: (page: number, pageSize: number) => void;
+  onPageChange: (page: number, limit: number) => void;
   onView: (e: EventOrder) => void;
   onEdit: (e: EventOrder) => void;
   onCancel: (e: EventOrder) => void;
-  onMarkComplete: (e: EventOrder) => void;
+  onComplete: (e: EventOrder) => void;
+  onDelete: (e: EventOrder) => void;
   onPrint: (e: EventOrder) => void;
 }
 
 const EventTable = ({
   data,
+  isLoading,
   page,
   pageSize,
   total,
@@ -67,32 +40,39 @@ const EventTable = ({
   onView,
   onEdit,
   onCancel,
-  onMarkComplete,
+  onComplete,
+  onDelete,
   onPrint,
 }: Props) => {
+  const initials = (name: string) =>
+    name
+      .split(" ")
+      .map((w) => w[0])
+      .slice(0, 2)
+      .join("")
+      .toUpperCase();
+
   const columns: ColumnsType<EventOrder> = [
     {
       title: "Event",
-      dataIndex: "eventName",
-      key: "eventName",
-      width: 320,
-      render: (_, record) => (
+      key: "event",
+      width: 260,
+      render: (_, event) => (
         <div className="flex items-start gap-3">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 text-white flex items-center justify-center shrink-0 font-semibold text-sm shadow-sm">
-            {record.eventName
-              .split(" ")
-              .slice(0, 2)
-              .map((w) => w[0])
-              .join("")
-              .toUpperCase()}
+          <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold text-sm shrink-0">
+            {initials(event.eventName)}
           </div>
           <div className="min-w-0">
-            <div className="font-semibold text-slate-900 truncate">
-              {record.eventName}
+            <div className="font-semibold text-slate-800 truncate">
+              {event.eventName}
             </div>
-            <div className="text-xs text-slate-500 mt-0.5 flex items-center gap-1.5">
-              <HiOutlineUsers className="w-3.5 h-3.5" />
-              {record.expectedGuests} guests · {record.eventNumber}
+            <div className="text-[11px] text-slate-500 flex items-center gap-2 mt-0.5">
+              <span className="flex items-center gap-1">
+                <HiOutlineUsers className="w-3 h-3" />
+                {event.expectedGuests} guests
+              </span>
+              <span>·</span>
+              <span className="font-mono">{event.eventNumber}</span>
             </div>
           </div>
         </div>
@@ -100,95 +80,93 @@ const EventTable = ({
     },
     {
       title: "Type",
-      dataIndex: "eventType",
-      key: "eventType",
-      width: 140,
-      render: (type) => <EventTypeBadge type={type} />,
+      key: "type",
+      width: 130,
+      render: (_, event) => <EventTypeBadge type={event.eventType} />,
     },
     {
       title: "Customer",
-      dataIndex: "customerName",
-      key: "customerName",
+      key: "customer",
       width: 200,
-      render: (_, r) => (
-        <div className="min-w-0">
-          <div className="font-medium text-slate-800 truncate">
-            {r.customerName}
+      render: (_, event) => (
+        <div>
+          <div className="text-[13px] font-medium text-slate-800 flex items-center gap-1.5">
+            <HiOutlineUser className="w-3.5 h-3.5 text-slate-400" />
+            {event.customerName}
           </div>
-          <div className="text-xs text-slate-500 mt-0.5 flex items-center gap-1">
+          <div className="text-[11px] text-slate-500 flex items-center gap-1 mt-0.5">
             <HiOutlinePhone className="w-3 h-3" />
-            {r.customerPhone}
+            {event.customerPhone}
           </div>
         </div>
       ),
     },
     {
       title: "Date & Venue",
-      key: "dateVenue",
-      width: 240,
-      render: (_, r) => (
-        <div className="min-w-0">
-          <div className="font-medium text-slate-800 flex items-center gap-1.5">
-            <HiOutlineCalendar className="w-4 h-4 text-blue-600" />
-            {formatDate(r.eventDate)}
-            <span className="text-slate-400 text-xs">· {r.deliveryTime}</span>
-          </div>
-          <div className="text-xs text-slate-500 mt-1 flex items-center gap-1 truncate">
-            <HiOutlineLocationMarker className="w-3 h-3 shrink-0" />
-            <span className="truncate">
-              {r.venueName}, {r.venueCity}
+      key: "date",
+      width: 220,
+      render: (_, event) => (
+        <div>
+          <div className="text-[13px] text-slate-800 flex items-center gap-1.5 font-medium">
+            <HiOutlineCalendar className="w-3.5 h-3.5 text-slate-400" />
+            {dayjs(event.eventDate).format("DD MMM YYYY")}
+            <span className="text-[11px] text-slate-500 font-normal">
+              · {event.deliveryTime}
             </span>
+          </div>
+          <div className="text-[11px] text-slate-500 flex items-center gap-1 mt-0.5 truncate">
+            <HiOutlineLocationMarker className="w-3 h-3" />
+            {event.venueName}, {event.venueCity}
           </div>
         </div>
       ),
     },
     {
       title: "Status",
-      dataIndex: "status",
       key: "status",
       width: 130,
-      render: (s) => <EventStatusBadge status={s} />,
+      render: (_, event) => (
+        <div className="flex flex-col gap-1">
+          <EventStatusBadge status={event.status} />
+        </div>
+      ),
     },
     {
       title: "Amount",
       key: "amount",
-      width: 160,
+      width: 140,
       align: "right",
-      render: (_, r) => {
-        const pay = PAYMENT_STATUS_META[r.paymentStatus];
-        return (
-          <div className="text-right">
-            <div className="font-bold text-slate-900">
-              {formatINR(r.totalAmount)}
-            </div>
-            <div className="mt-1 flex justify-end">
-              <span
-                className={`px-2 py-0.5 rounded text-[11px] font-medium ${pay.bg} ${pay.text}`}
-              >
-                {pay.label}
-                {r.balanceDue > 0 && r.paymentStatus !== "UNPAID"
-                  ? ` · ${formatINR(r.balanceDue)} due`
-                  : ""}
-              </span>
-            </div>
+      render: (_, event) => (
+        <div>
+          <div className="text-[13px] font-bold text-slate-800">
+            {formatCurrency(event.totalAmount ?? 0)}
           </div>
-        );
-      },
+          {(event.balanceDue ?? 0) > 0 && (
+            <div className="text-[10px] text-red-600 mt-0.5 flex items-center justify-end gap-0.5">
+              <HiOutlineExclamationCircle className="w-3 h-3" />
+              {formatCurrency(event.balanceDue ?? 0)} due
+            </div>
+          )}
+        </div>
+      ),
     },
     {
       title: "",
       key: "actions",
-      width: 60,
-      align: "center",
-      render: (_, r) => (
-        <EventActionsMenu
-          event={r}
-          onView={onView}
-          onEdit={onEdit}
-          onCancel={onCancel}
-          onMarkComplete={onMarkComplete}
-          onPrint={onPrint}
-        />
+      width: 50,
+      align: "right",
+      render: (_: unknown, event: EventOrder) => (
+        <div onClick={(e) => e.stopPropagation()}>
+          <EventActionsMenu
+            event={event}
+            onView={onView}
+            onEdit={onEdit}
+            onCancel={onCancel}
+            onComplete={onComplete}
+            onDelete={onDelete}
+            onPrint={onPrint}
+          />
+        </div>
       ),
     },
   ];
@@ -199,6 +177,7 @@ const EventTable = ({
         rowKey="id"
         columns={columns}
         dataSource={data}
+        loading={isLoading}
         onRow={(record) => ({
           onClick: () => onView(record),
           className: "cursor-pointer",
@@ -206,15 +185,6 @@ const EventTable = ({
         pagination={{
           current: page,
           pageSize,
-          // ─── THE FIX ───────────────────────────────────────────────────
-          // OLD: total: data.length  ← WRONG for server-side pagination
-          // NEW: total               ← from backend's pagination.total
-          //
-          // WHY this matters:
-          //   Backend returns { data: [...20 items...], pagination: { total: 150 } }
-          //   data.length = 20 (just this page)
-          //   total = 150 (all matching events across all pages)
-          //   antd needs the REAL total to render "Page 1 of 8" correctly
           total,
           showSizeChanger: true,
           pageSizeOptions: ["10", "20", "50"],

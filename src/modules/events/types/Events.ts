@@ -56,6 +56,8 @@ export interface EventOrderPayment {
 
 /** The full event order object — what GET /event-orders/:id returns */
 export interface EventOrder {
+  linkedInvoiceItemsCount: number;
+  linkedInvoiceNumber: any;
   id: string;
   eventNumber: string; // e.g. "EVT-20260503-001"
 
