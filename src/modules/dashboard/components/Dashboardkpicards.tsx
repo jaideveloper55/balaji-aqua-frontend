@@ -7,6 +7,7 @@ import {
   HiOutlineReceiptTax,
   HiOutlineTrendingUp,
 } from "react-icons/hi";
+import type { DashboardPeriod } from "../types/Dashboard";
 
 export interface DashboardKPIs {
   totalCustomers: number;
@@ -23,12 +24,20 @@ export interface DashboardKPIs {
 
 interface Props {
   data: DashboardKPIs;
+  period?: DashboardPeriod;
 }
 
 const inr = (n: number) =>
   `₹${new Intl.NumberFormat("en-IN", { maximumFractionDigits: 0 }).format(
     n ?? 0
   )}`;
+
+const shortDate = (iso: string) => {
+  const d = new Date(iso);
+  return d.toLocaleDateString("en-IN", { day: "numeric", month: "short" });
+};
+
+type CardKind = "flow" | "snapshot";
 
 interface CardDef {
   label: string;
@@ -38,19 +47,37 @@ interface CardDef {
   color: string;
   bg: string;
   alert?: boolean;
+  kind: CardKind;
 }
 
-const Dashboardkpicards: React.FC<Props> = ({ data }) => {
+const flowSubtitle = (
+  period: DashboardPeriod | undefined,
+  fallback: string
+): string => {
+  if (!period) return fallback;
+
+  const todayISO = new Date().toISOString().slice(0, 10);
+  const isSingleDay = period.from === period.to;
+
+  if (isSingleDay && period.from === todayISO) return "today";
+  if (isSingleDay) return `on ${shortDate(period.from)}`;
+  return `${shortDate(period.from)} – ${shortDate(period.to)}`;
+};
+
+const Dashboardkpicards: React.FC<Props> = ({ data, period }) => {
+  const invoicesInPeriod = data.todayInvoices;
+
   const cards: CardDef[] = [
     {
-      label: "Today's Collection",
+      label: "Collection",
       value: inr(data.todayCollection),
-      sub: `${data.todayInvoices} invoice${
-        data.todayInvoices === 1 ? "" : "s"
-      } today`,
+      sub: `${invoicesInPeriod} invoice${
+        invoicesInPeriod === 1 ? "" : "s"
+      } · ${flowSubtitle(period, "today")}`,
       icon: <HiOutlineCurrencyRupee size={20} />,
       color: "#059669",
       bg: "#ecfdf5",
+      kind: "flow",
     },
     {
       label: "Total Customers",
@@ -59,6 +86,7 @@ const Dashboardkpicards: React.FC<Props> = ({ data }) => {
       icon: <HiOutlineUsers size={20} />,
       color: "#2563eb",
       bg: "#eff6ff",
+      kind: "snapshot",
     },
     {
       label: "Total Outstanding",
@@ -68,6 +96,7 @@ const Dashboardkpicards: React.FC<Props> = ({ data }) => {
       color: "#d97706",
       bg: "#fffbeb",
       alert: data.totalOutstanding > 0,
+      kind: "snapshot",
     },
     {
       label: "Products",
@@ -80,14 +109,18 @@ const Dashboardkpicards: React.FC<Props> = ({ data }) => {
       color: data.lowStockCount > 0 ? "#dc2626" : "#7c3aed",
       bg: data.lowStockCount > 0 ? "#fef2f2" : "#f5f3ff",
       alert: data.lowStockCount > 0,
+      kind: "snapshot",
     },
     {
-      label: "Billed Today",
+      label: "Billed",
       value: inr(data.totalBilled),
-      sub: `${data.todayInvoices} invoices generated`,
+      sub: `${invoicesInPeriod} invoice${
+        invoicesInPeriod === 1 ? "" : "s"
+      } · ${flowSubtitle(period, "today")}`,
       icon: <HiOutlineReceiptTax size={20} />,
       color: "#0891b2",
       bg: "#ecfeff",
+      kind: "flow",
     },
     {
       label: "Out of Stock",
@@ -97,6 +130,7 @@ const Dashboardkpicards: React.FC<Props> = ({ data }) => {
       color: data.outOfStockCount > 0 ? "#dc2626" : "#059669",
       bg: data.outOfStockCount > 0 ? "#fef2f2" : "#ecfdf5",
       alert: data.outOfStockCount > 0,
+      kind: "snapshot",
     },
   ];
 
@@ -115,6 +149,14 @@ const Dashboardkpicards: React.FC<Props> = ({ data }) => {
             className="absolute top-0 left-0 right-0 h-[2.5px] opacity-0 group-hover:opacity-100 transition-opacity"
             style={{ backgroundColor: c.color }}
           />
+
+          {c.kind === "snapshot" && (
+            <span className="absolute top-2.5 right-2.5 inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-emerald-50 text-emerald-600 tracking-wide">
+              <span className="w-1 h-1 rounded-full bg-emerald-500 animate-pulse" />
+              LIVE
+            </span>
+          )}
+
           <div className="px-4 py-4">
             <div
               className="w-10 h-10 rounded-xl flex items-center justify-center mb-3 transition-transform group-hover:scale-105"

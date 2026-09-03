@@ -1,4 +1,6 @@
 "use client";
+
+import dayjs from "dayjs";
 import React from "react";
 import { DatePicker, Tooltip } from "antd";
 import { Dayjs } from "dayjs";
@@ -23,6 +25,7 @@ interface CustomDateRangeProps {
   rules?: RegisterOptions;
   disabled?: boolean;
   size?: "large" | "middle" | "small";
+  disableFuture?: boolean;
   onChange?: (dates: [Dayjs | null, Dayjs | null]) => void;
 }
 
@@ -37,6 +40,7 @@ const CustomDateRange: React.FC<CustomDateRangeProps> = ({
   disabled = false,
   size = "middle",
   onChange,
+  disableFuture = false,
 }) => {
   const errorMessage = get(errors, name)?.message;
 
@@ -68,6 +72,11 @@ const CustomDateRange: React.FC<CustomDateRangeProps> = ({
               placeholder={placeholder || ["Start Date", "End Date"]}
               value={value}
               format="YYYY-MM-DD"
+              disabledDate={
+                disableFuture
+                  ? (current) => current && current.isAfter(dayjs(), "day")
+                  : undefined
+              }
               status={errorMessage ? "error" : undefined}
               onChange={(dates) => {
                 fieldChange(dates);
