@@ -1,4 +1,3 @@
-// src/modules/inventory/components/Inventoryoverview.tsx
 import {
   HiOutlineCurrencyRupee,
   HiOutlineExclamation,

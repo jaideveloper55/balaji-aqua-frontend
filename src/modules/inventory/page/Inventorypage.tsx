@@ -50,8 +50,9 @@ import InventoryExportDrawer from "../components/Inventoryexportdrawer";
 const DEFAULT_FILTERS: InventoryFilters = {
   search: "",
   status: "all",
-  category: "all",
+  movementType: "all",
   dateRange: null,
+  category: "",
 };
 
 const Inventorypage = () => {
@@ -70,21 +71,20 @@ const Inventorypage = () => {
     () => ({
       search: filters.search || undefined,
       status: filters.status === "all" ? undefined : filters.status,
-      categoryId: filters.category === "all" ? undefined : filters.category,
       limit: 100,
     }),
-    [filters.search, filters.status, filters.category]
+    [filters.search, filters.status]
   );
 
   const movementParams: MovementFilters = useMemo(
     () => ({
       search: filters.search || undefined,
-      categoryId: filters.category === "all" ? undefined : filters.category,
+      type: filters.movementType === "all" ? undefined : filters.movementType,
       startDate: filters.dateRange?.[0]?.format("YYYY-MM-DD"),
       endDate: filters.dateRange?.[1]?.format("YYYY-MM-DD"),
       limit: 100,
     }),
-    [filters.search, filters.category, filters.dateRange]
+    [filters.search, filters.movementType, filters.dateRange]
   );
 
   // KPI summary — always loaded (header cards show on every tab)
@@ -119,21 +119,15 @@ const Inventorypage = () => {
   });
 
   /* -------------------------- mutations ---------------------------- */
-  // After any stock change these caches are stale -> refetch them all.
   const invalidateAll = () => {
     queryClient.invalidateQueries({ queryKey: ["inventory-stock"] });
     queryClient.invalidateQueries({ queryKey: ["inventory-summary"] });
     queryClient.invalidateQueries({ queryKey: ["inventory-low-stock"] });
     queryClient.invalidateQueries({ queryKey: ["inventory-movements"] });
-    // stock changes affect what's sellable in POS too:
     queryClient.invalidateQueries({ queryKey: ["billing-pos-products"] });
   };
 
   const onMutationError = (err: any) =>
-    // Backend throws BadRequestException with a helpful message (e.g.
-    // "Only 12 available") - surface it instead of a generic error.
-    // authAxios's response interceptor already unwraps to error.response.data
-    // on rejection, so the message is directly on the error.
     message.error(err?.message ?? "Could not save the stock entry");
 
   const stockInMutation = useMutation({
@@ -268,7 +262,6 @@ const Inventorypage = () => {
         }
       />
 
-      {/* KPIs - fed by /inventory/summary */}
       <Inventoryoverview kpis={kpis} onNavigate={handleKpiNavigate} />
 
       <CustomTabs
@@ -305,7 +298,7 @@ const Inventorypage = () => {
               onChange={(next) => setFilters((f) => ({ ...f, ...next }))}
               onReset={() => setFilters(DEFAULT_FILTERS)}
               resultCount={stockData?.meta.total ?? stockItems.length}
-              categories={[]}
+              variant="stock"
             />
             <Spin spinning={stockLoading}>
               <Productstocktable
@@ -359,7 +352,7 @@ const Inventorypage = () => {
               onReset={() => setFilters(DEFAULT_FILTERS)}
               showDateRange
               resultCount={movementsData?.meta.total ?? movements.length}
-              categories={[]}
+              variant="movements"
             />
             <Spin spinning={movementsLoading}>
               <Stockmovementtable movements={movements} loading={false} />

@@ -55,7 +55,14 @@ export const MOVEMENT_TYPE_CONFIG: Record<
   ADJUSTMENT: { label: "Adjustment", color: "#7c3aed", bg: "#f5f3ff", sign: 0 },
 };
 
-// (2) Keyed by MODAL action (lowercase) — used by Stockentrymodal via `mode`.
+export const MOVEMENT_TYPE_FILTER_OPTIONS = [
+  { value: "all", label: "All Types" },
+  ...Object.entries(MOVEMENT_TYPE_CONFIG).map(([value, cfg]) => ({
+    value,
+    label: cfg.label,
+  })),
+];
+
 export const MOVEMENT_TYPE_MODAL_CONFIG: Record<
   MovementType,
   { label: string; color: string }

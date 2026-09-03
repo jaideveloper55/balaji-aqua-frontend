@@ -3,6 +3,7 @@ import type { Dayjs } from "dayjs";
 export type StockStatus = "IN_STOCK" | "LOW_STOCK" | "OUT_OF_STOCK";
 export type MovementType = "stock_in" | "stock_out" | "adjustment";
 export type AlertPriority = "critical" | "warning";
+export type MovementFilterType = "STOCK_IN" | "STOCK_OUT" | "ADJUSTMENT";
 
 export const STOCK_IN_SOURCES = [
   "PURCHASE",
@@ -71,6 +72,7 @@ export interface InventoryFilters {
   search: string;
   status: "all" | StockStatus;
   category: string;
+  movementType: "all" | MovementFilterType;
   dateRange: [Dayjs | null, Dayjs | null] | null;
 }
 
