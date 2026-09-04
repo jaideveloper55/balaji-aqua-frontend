@@ -38,6 +38,7 @@ interface Props {
   search: string;
   statusFilter: string;
   onDelete?: (invoice: Invoice) => void;
+  dateRange: DateRange;
   onSearchChange: (value: string) => void;
   onStatusFilterChange: (value: string) => void;
   onDateRangeChange: (range: DateRange) => void;
@@ -66,6 +67,7 @@ const InvoicesTab: React.FC<Props> = ({
   onStatusFilterChange,
   onView,
   onDelete,
+  dateRange,
   onPrint,
   userRole,
   onCorrect,
@@ -73,7 +75,9 @@ const InvoicesTab: React.FC<Props> = ({
   const {
     control,
     formState: { errors },
-  } = useForm();
+  } = useForm({
+    values: { dateRange },
+  });
 
   const filteredInvoices = useMemo(() => {
     if (!search) return invoices;

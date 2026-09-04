@@ -1415,6 +1415,7 @@ const BillingPage = () => {
             search={invoiceSearch}
             statusFilter={invoiceStatusFilter}
             onDateRangeChange={setInvoiceDateRange}
+            dateRange={invoiceDateRange}
             onDelete={handleDeleteInvoice}
             onSearchChange={setInvoiceSearch}
             onStatusFilterChange={setInvoiceStatusFilter}
