@@ -1,7 +1,6 @@
-import React, { useState, useMemo } from "react";
+import React, { useMemo } from "react";
 import { Table, Tag, Dropdown } from "antd";
 import type { ColumnsType } from "antd/es/table";
-import Dayjs from "dayjs";
 import { useForm } from "react-hook-form";
 import {
   HiOutlineSearch,
@@ -41,6 +40,7 @@ interface Props {
   onDelete?: (invoice: Invoice) => void;
   onSearchChange: (value: string) => void;
   onStatusFilterChange: (value: string) => void;
+  onDateRangeChange: (range: DateRange) => void;
   onView: (invoice: Invoice) => void;
   onPrint: (invoice: Invoice) => void;
   onExport?: () => void;
@@ -61,6 +61,7 @@ const InvoicesTab: React.FC<Props> = ({
   stats,
   search,
   statusFilter,
+  onDateRangeChange,
   onSearchChange,
   onStatusFilterChange,
   onView,
@@ -69,49 +70,20 @@ const InvoicesTab: React.FC<Props> = ({
   userRole,
   onCorrect,
 }) => {
-  const [dateRange, setDateRange] = useState<DateRange>(null);
   const {
     control,
     formState: { errors },
   } = useForm();
 
   const filteredInvoices = useMemo(() => {
-    let result = invoices;
-
-    // Date range filter — filters against the RAW ISO date (dateRaw), never
-    // the pre-formatted display string (date). `date` comes from
-    // toLocaleDateString("en-IN"), e.g. "16/8/2026" — re-parsing that with
-    // Dayjs (with or without a format hint, since customParseFormat may not
-    // be loaded) falls back to native Date parsing, which assumes MM/DD/YYYY.
-    // Day 16 isn't a valid month → parse fails → invoice silently excluded
-    // from every date range, which is why "today" could show zero results
-    // even when today's invoices existed. dateRaw is an untouched ISO string,
-    // so Dayjs parses it unambiguously with no format guessing needed.
-    if (dateRange && dateRange[0] && dateRange[1]) {
-      const start = dateRange[0].startOf("day");
-      const end = dateRange[1].endOf("day");
-      result = result.filter((inv) => {
-        if (!inv.dateRaw) return false;
-        const d = Dayjs(inv.dateRaw);
-        // Inclusive on both ends — a date-only value lands exactly at
-        // midnight, same as `start`, so strict isAfter(start) would always
-        // exclude a same-day match.
-        return d.isValid() && !d.isBefore(start) && !d.isAfter(end);
-      });
-    }
-
-    // Search filter (client-side, on top of backend search)
-    if (search) {
-      const q = search.toLowerCase();
-      result = result.filter(
-        (inv) =>
-          inv.invoiceNo.toLowerCase().includes(q) ||
-          inv.customerName.toLowerCase().includes(q)
-      );
-    }
-
-    return result;
-  }, [invoices, dateRange, search]);
+    if (!search) return invoices;
+    const q = search.toLowerCase();
+    return invoices.filter(
+      (inv) =>
+        inv.invoiceNo.toLowerCase().includes(q) ||
+        inv.customerName.toLowerCase().includes(q)
+    );
+  }, [invoices, search]);
 
   const columns: ColumnsType<Invoice> = [
     {
@@ -122,9 +94,6 @@ const InvoicesTab: React.FC<Props> = ({
         <div>
           <div className="text-[13px] font-semibold text-gray-900">{no}</div>
           <div className="text-[11px] text-gray-400">
-            {/* r.date is already formatted ("D/M/YYYY"-ish) — display as-is.
-                Re-parsing a locale string with Dayjs without an explicit
-                format is what produced "Invalid Date" here before. */}
             {r.date} · {r.time}
           </div>
         </div>
@@ -191,8 +160,6 @@ const InvoicesTab: React.FC<Props> = ({
       align: "center",
       render: (d: string | null) =>
         d ? (
-          // Same fix as the Invoice column: dueDate is already formatted
-          // ("D/M/YYYY"-ish) from toLocaleDateString — don't re-parse it.
           <span className="text-[12px] text-gray-600">{d}</span>
         ) : (
           <span className="text-[12px] text-gray-300">&mdash;</span>
@@ -408,7 +375,7 @@ const InvoicesTab: React.FC<Props> = ({
             control={control}
             errors={errors}
             size="middle"
-            onChange={(val: any) => setDateRange(val)}
+            onChange={(val: any) => onDateRangeChange(val)}
           />
         </div>
 

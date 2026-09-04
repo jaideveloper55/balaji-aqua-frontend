@@ -159,6 +159,7 @@ const BillingPage = () => {
   const [showExport, setShowExport] = useState(false);
   const [correctTarget, setCorrectTarget] = useState<Invoice | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Invoice | null>(null);
+  const [invoiceDateRange, setInvoiceDateRange] = useState<DateRange>(null);
   const [exportDefaultType, setExportDefaultType] =
     useState<ExportType>("invoices");
   const [generatedInvoice, setGeneratedInvoice] = useState<Invoice | null>(
@@ -366,8 +367,14 @@ const BillingPage = () => {
       status: STATUS_FILTER_MAP[invoiceStatusFilter],
       search: invoiceSearch || undefined,
     };
+    if (invoiceDateRange?.[0]) {
+      f.dateFrom = invoiceDateRange[0].format("YYYY-MM-DD");
+    }
+    if (invoiceDateRange?.[1]) {
+      f.dateTo = invoiceDateRange[1].format("YYYY-MM-DD");
+    }
     return f;
-  }, [invoiceStatusFilter, invoiceSearch]);
+  }, [invoiceStatusFilter, invoiceSearch, invoiceDateRange]);
 
   const paymentApiFilters: PaymentFilters = useMemo(() => {
     const onCollection = activeTab === "collection";
@@ -1407,6 +1414,7 @@ const BillingPage = () => {
             stats={invoiceStats}
             search={invoiceSearch}
             statusFilter={invoiceStatusFilter}
+            onDateRangeChange={setInvoiceDateRange}
             onDelete={handleDeleteInvoice}
             onSearchChange={setInvoiceSearch}
             onStatusFilterChange={setInvoiceStatusFilter}

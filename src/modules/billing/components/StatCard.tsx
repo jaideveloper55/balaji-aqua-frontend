@@ -1,5 +1,3 @@
-// modules/billing/components/StatCard.tsx
-
 import React from "react";
 
 interface StatCardProps {
