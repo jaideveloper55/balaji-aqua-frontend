@@ -52,8 +52,6 @@ interface Line {
   unitPrice: number;
 }
 
-// Internal form type — what react-hook-form manages
-// (NOT the same as CreateEventOrderPayload — we assemble that in submit())
 interface FormValues {
   eventName: string;
   eventType: string;
@@ -125,7 +123,6 @@ const CreateEventModal = ({
   isSubmitting = false,
   initialData = null,
 }: Props) => {
-  // isEditMode: true when editing an existing event, false for new creation
   const isEditMode = !!initialData;
   const {
     control,
@@ -193,13 +190,12 @@ const CreateEventModal = ({
         onSiteContactPhone: initialData.onSiteContactPhone ?? undefined,
         notes: initialData.notes ?? undefined,
       });
-      // Populate local date/time state
+
       if (initialData.eventDate) setEventDate(dayjs(initialData.eventDate));
       if (initialData.deliveryTime)
         setDeliveryTime(dayjs(`2000-01-01T${initialData.deliveryTime}`));
       if (initialData.pickupTime)
         setPickupTime(dayjs(`2000-01-01T${initialData.pickupTime}`));
-      // Populate pricing state
       setDiscount(initialData.discount ?? 0);
       setGstEnabled(initialData.gstEnabled ?? true);
     }
@@ -333,10 +329,7 @@ const CreateEventModal = ({
   const removeLine = (idx: number) =>
     setLines((prev) => prev.filter((_, i) => i !== idx));
 
-  // ─── Submit ─────────────────────────────────────────────────────────────
-  // Assembles the CreateEventOrderPayload from form state + local state
   const submit = async (form: FormValues) => {
-    // Final guard — validate all steps before sending
     for (const step of STEPS.slice(0, -1)) {
       const err = await validateStep(step.key);
       if (err) {
@@ -345,46 +338,27 @@ const CreateEventModal = ({
       }
     }
 
-    // Build the payload matching CreateEventOrderPayload exactly
     const payload: CreateEventOrderPayload = {
-      // Step 1: Event
       eventName: form.eventName,
       eventType: form.eventType as CreateEventOrderPayload["eventType"],
       expectedGuests: form.expectedGuests,
-      // ─── FIXED: .format("YYYY-MM-DD") instead of .toISOString() ────
-      // WHY: .toISOString() converts to UTC first, which can shift the date
-      // back by one day for Indian timezone (UTC+5:30). For example:
-      //   User picks "15 Aug 2026" in Chennai (UTC+5:30)
-      //   .toISOString() → "2026-08-14T18:30:00.000Z" ← August 14th!
-      //   .format("YYYY-MM-DD") → "2026-08-15" ← correct
       eventDate: eventDate!.format("YYYY-MM-DD"),
       deliveryTime: deliveryTime!.format("HH:mm"),
       pickupTime: pickupTime?.format("HH:mm"),
-
-      // Step 2: Customer
       customerId: form.customerId ?? undefined,
       customerName: form.customerName,
       customerPhone: form.customerPhone,
-
-      // Step 3: Venue
-      // ─── FIXED: field names to match backend DTO ───────────────────
-      // OLD: contactPersonName / contactPersonPhone
-      // NEW: onSiteContactName / onSiteContactPhone
       venueName: form.venueName,
       venueAddress: form.venueAddress,
       venueCity: form.venueCity,
       venuePincode: form.venuePincode,
       onSiteContactName: form.onSiteContactName,
       onSiteContactPhone: form.onSiteContactPhone,
-
-      // Step 4: Items
       items: lines.map((l) => ({
         productId: l.productId,
         quantity: l.quantity,
         unitPrice: l.unitPrice,
       })),
-
-      // Step 5: Payment
       discount,
       gstEnabled,
       advancePaid: advancePaid > 0 ? advancePaid : undefined,
@@ -394,9 +368,6 @@ const CreateEventModal = ({
     };
 
     onSubmit(payload);
-    // NOTE: We do NOT call onClose() here — the parent (EventsPage) closes
-    // the modal in the mutation's onSuccess callback. This way, if the API
-    // call fails, the modal stays open so the user doesn't lose their data.
   };
 
   // ─── Step content ───────────────────────────────────────────────────────

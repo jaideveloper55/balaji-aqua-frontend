@@ -1,139 +1,260 @@
-import React, { useState } from "react";
+import { useEffect, useMemo } from "react";
+import { useForm } from "react-hook-form";
 import {
   HiOutlineCheckCircle,
-  HiOutlineExclamationCircle,
+  HiOutlineExclamation,
+  HiOutlineShieldCheck,
+  HiOutlineDocumentText,
 } from "react-icons/hi";
 import CustomModal from "../../../components/common/CustomModal";
-import { formatCurrency } from "../../billing/utils/Helpers";
-import { EventOrder } from "../types/Events";
+import CustomInput from "../../../components/common/CustomInput";
+import CustomSelect from "../../../components/common/CustomSelect";
+import type { EventOrder, PaymentMode } from "../types/Events";
 
-type PaymentModeOption = "CASH" | "UPI" | "BANK_TRANSFER" | "CARD";
-
-interface Props {
+interface CompleteEventModalProps {
   open: boolean;
   event: EventOrder | null;
   isSubmitting?: boolean;
-  onRecordAndComplete: (amount: number, paymentMode: PaymentModeOption) => void;
+  onRecordAndComplete: (amount: number, paymentMode: PaymentMode) => void;
   onCompleteAnyway: () => void;
   onClose: () => void;
 }
 
-const PAYMENT_MODES: { value: PaymentModeOption; label: string }[] = [
+const PAYMENT_MODE_OPTIONS = [
   { value: "CASH", label: "Cash" },
   { value: "UPI", label: "UPI" },
   { value: "BANK_TRANSFER", label: "Bank Transfer" },
   { value: "CARD", label: "Card" },
+  { value: "CREDIT", label: "Credit" },
 ];
 
-const Completeeventmodal: React.FC<Props> = ({
+const formatINR = (n: number) =>
+  `₹${(n ?? 0).toLocaleString("en-IN", { maximumFractionDigits: 2 })}`;
+
+interface FormValues {
+  amount: string;
+  paymentMode: PaymentMode;
+}
+
+const Completeeventmodal = ({
   open,
   event,
-  isSubmitting,
+  isSubmitting = false,
   onRecordAndComplete,
   onCompleteAnyway,
   onClose,
-}) => {
-  const [paymentMode, setPaymentMode] = useState<PaymentModeOption>("CASH");
+}: CompleteEventModalProps) => {
+  const balanceDue = event?.balanceDue ?? 0;
+  const hasBalance = balanceDue > 0;
+  const securityDeposit = event?.securityDeposit ?? 0;
+  const hasSecurityDeposit = securityDeposit > 0;
+  const hasNotes = !!event?.notes?.trim();
+
+  const {
+    control,
+    handleSubmit,
+    watch,
+    reset,
+    setValue,
+    formState: { errors },
+  } = useForm<FormValues>({
+    defaultValues: { amount: "", paymentMode: "CASH" },
+  });
+
+  useEffect(() => {
+    if (open && event) {
+      reset({
+        amount: balanceDue > 0 ? String(balanceDue) : "",
+        paymentMode: "CASH",
+      });
+    }
+  }, [open, event?.id]);
+
+  const amountValue = Number(watch("amount")) || 0;
+  const remainingAfter = useMemo(
+    () => Math.max(0, +(balanceDue - amountValue).toFixed(2)),
+    [balanceDue, amountValue]
+  );
 
   if (!event) return null;
 
-  const balanceDue = event.balanceDue ?? 0;
+  const submitPayment = (values: FormValues) => {
+    onRecordAndComplete(Number(values.amount), values.paymentMode);
+  };
+
+  const footer = hasBalance ? (
+    <div className="flex flex-col items-stretch gap-2.5">
+      <button
+        type="button"
+        onClick={handleSubmit(submitPayment)}
+        disabled={isSubmitting}
+        className="w-full px-5 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700
+          text-white text-sm font-semibold shadow-sm shadow-emerald-500/25
+          transition disabled:opacity-50 flex items-center justify-center gap-2"
+      >
+        <HiOutlineCheckCircle size={17} />
+        {isSubmitting ? "Saving..." : "Record Payment & Complete"}
+      </button>
+    </div>
+  ) : (
+    <button
+      type="button"
+      onClick={onCompleteAnyway}
+      disabled={isSubmitting}
+      className="w-full px-5 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700
+        text-white text-sm font-semibold shadow-sm shadow-emerald-500/25
+        transition disabled:opacity-50 flex items-center justify-center gap-2"
+    >
+      <HiOutlineCheckCircle size={17} />
+      {isSubmitting ? "Saving..." : "Mark as Completed"}
+    </button>
+  );
 
   return (
     <CustomModal
       open={open}
       onClose={onClose}
-      title="Complete Event Order"
-      subtitle={`${event.eventNumber} — ${event.customerName}`}
-      icon={<HiOutlineCheckCircle className="w-5 h-5" />}
+      title="Complete Event"
+      subtitle={`${event.eventNumber} · ${event.eventName}`}
+      icon={<HiOutlineExclamation size={22} />}
       iconTone="amber"
       size="md"
       closeOnOverlayClick={!isSubmitting}
       closeOnEsc={!isSubmitting}
       showCloseButton={!isSubmitting}
-      footer={
-        <div className="flex flex-col gap-2">
-          <button
-            onClick={() => onRecordAndComplete(balanceDue, paymentMode)}
-            disabled={isSubmitting}
-            className="w-full px-4 py-2.5 text-[13px] font-semibold text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {isSubmitting
-              ? "Processing..."
-              : `Yes, Record ${formatCurrency(balanceDue)} & Complete`}
-          </button>
-          <div className="flex gap-2">
-            <button
-              onClick={onClose}
-              disabled={isSubmitting}
-              className="flex-1 px-4 py-2 text-[13px] font-medium text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={onCompleteAnyway}
-              disabled={isSubmitting}
-              className="flex-1 px-4 py-2 text-[13px] font-medium text-amber-700 bg-amber-50 border border-amber-200 rounded-lg hover:bg-amber-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              Complete Anyway
-            </button>
-          </div>
-        </div>
-      }
+      footer={footer}
     >
-      <div className="space-y-4">
-        <div className="flex items-start gap-3 bg-amber-50 border border-amber-100 rounded-xl p-4">
-          <HiOutlineExclamationCircle className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
-          <p className="text-[13px] text-amber-800">
-            This event still has a pending balance. Marking it Completed won't
-            clear the balance on its own — confirm whether the remaining amount
-            has actually been received.
+      <div className="flex flex-col gap-5">
+        <div className="grid grid-cols-3 gap-3">
+          <div className="rounded-xl bg-slate-50 border border-slate-100 p-3">
+            <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide">
+              Total
+            </p>
+            <p className="text-base font-bold text-slate-800 mt-1">
+              {formatINR(event.totalAmount)}
+            </p>
+          </div>
+          <div className="rounded-xl bg-emerald-50 border border-emerald-100 p-3">
+            <p className="text-[11px] font-semibold text-emerald-600 uppercase tracking-wide">
+              Already Paid
+            </p>
+            <p className="text-base font-bold text-emerald-700 mt-1">
+              {formatINR(event.advancePaid)}
+            </p>
+          </div>
+          <div className="rounded-xl bg-amber-50 border border-amber-200 p-3">
+            <p className="text-[11px] font-semibold text-amber-600 uppercase tracking-wide">
+              Balance Due
+            </p>
+            <p className="text-base font-bold text-amber-700 mt-1">
+              {formatINR(balanceDue)}
+            </p>
+          </div>
+        </div>
+
+        {hasSecurityDeposit && (
+          <div className="rounded-xl bg-indigo-50 border border-indigo-100 p-3 flex items-start gap-3">
+            <div className="w-8 h-8 rounded-lg bg-indigo-100 text-indigo-600 flex items-center justify-center shrink-0">
+              <HiOutlineShieldCheck size={16} />
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-indigo-700">
+                Security Deposit Held: {formatINR(securityDeposit)}
+              </p>
+              <p className="text-xs text-indigo-500 mt-0.5">
+                This is a refundable hold, not part of the event fee. Confirm
+                all cans/equipment are returned before refunding it separately.
+              </p>
+            </div>
+          </div>
+        )}
+
+        {hasNotes && (
+          <div className="rounded-xl bg-slate-50 border border-slate-100 p-3 flex items-start gap-3">
+            <div className="w-8 h-8 rounded-lg bg-slate-200 text-slate-500 flex items-center justify-center shrink-0">
+              <HiOutlineDocumentText size={16} />
+            </div>
+            <div>
+              <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide">
+                Event Notes
+              </p>
+              <p className="text-sm text-slate-600 mt-0.5">{event.notes}</p>
+            </div>
+          </div>
+        )}
+
+        {hasBalance ? (
+          <div className="border-t border-slate-100 pt-4">
+            <p className="text-sm font-semibold text-slate-700 mb-3">
+              Record final payment
+            </p>
+
+            <div className="flex flex-col gap-3">
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-sm text-slate-600">
+                    Amount received
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setValue("amount", String(balanceDue))}
+                    className="text-xs font-semibold text-blue-600 hover:text-blue-700"
+                  >
+                    Pay full balance ({formatINR(balanceDue)})
+                  </button>
+                </div>
+                <CustomInput
+                  name="amount"
+                  control={control}
+                  errors={errors}
+                  placeholder="0"
+                  numbersOnly
+                  rules={{
+                    required: "Enter the amount received",
+                    validate: (v: string) => {
+                      const num = Number(v);
+                      if (isNaN(num) || num <= 0)
+                        return "Enter an amount greater than 0";
+                      if (num > balanceDue)
+                        return `Cannot exceed balance due (${formatINR(
+                          balanceDue
+                        )})`;
+                      return true;
+                    },
+                  }}
+                />
+              </div>
+
+              <CustomSelect
+                label="Payment mode"
+                name="paymentMode"
+                control={control}
+                errors={errors}
+                placeholder="Select payment mode"
+                options={PAYMENT_MODE_OPTIONS}
+                rules={{ required: "Select a payment mode" }}
+              />
+            </div>
+
+            <div
+              className={`mt-3 rounded-lg px-3 py-2 text-xs font-medium ${
+                remainingAfter > 0
+                  ? "bg-amber-50 text-amber-700"
+                  : "bg-emerald-50 text-emerald-700"
+              }`}
+            >
+              {remainingAfter > 0
+                ? `Event will be marked Completed with ${formatINR(
+                    remainingAfter
+                  )} still due.`
+                : "This fully settles the balance — event will be marked Completed and fully paid."}
+            </div>
+          </div>
+        ) : (
+          <p className="text-sm text-emerald-600 font-medium">
+            This event is already fully paid you can complete it directly.
           </p>
-        </div>
-
-        <div className="space-y-2">
-          <div className="flex justify-between items-center text-[13px]">
-            <span className="text-gray-500">Total Amount</span>
-            <span className="font-semibold text-gray-900">
-              {formatCurrency(event.totalAmount ?? 0)}
-            </span>
-          </div>
-          <div className="flex justify-between items-center text-[13px]">
-            <span className="text-gray-500">Already Paid</span>
-            <span className="font-semibold text-emerald-600">
-              {formatCurrency(event.advancePaid ?? 0)}
-            </span>
-          </div>
-          <div className="flex justify-between items-center text-[13px] border-t border-gray-100 pt-2">
-            <span className="text-gray-700 font-medium">Balance Due</span>
-            <span className="font-bold text-amber-600 text-[15px]">
-              {formatCurrency(balanceDue)}
-            </span>
-          </div>
-        </div>
-
-        <div>
-          <label className="text-[12px] font-medium text-gray-600 mb-1.5 block">
-            If paid, how was the remaining {formatCurrency(balanceDue)}{" "}
-            received?
-          </label>
-          <div className="grid grid-cols-2 gap-2">
-            {PAYMENT_MODES.map((m) => (
-              <button
-                key={m.value}
-                type="button"
-                onClick={() => setPaymentMode(m.value)}
-                className={`px-3 py-2 rounded-lg text-[12px] font-medium border transition-colors ${
-                  paymentMode === m.value
-                    ? "bg-emerald-600 text-white border-emerald-600"
-                    : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
-                }`}
-              >
-                {m.label}
-              </button>
-            ))}
-          </div>
-        </div>
+        )}
       </div>
     </CustomModal>
   );

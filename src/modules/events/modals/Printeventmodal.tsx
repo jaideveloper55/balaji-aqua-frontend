@@ -1,21 +1,12 @@
-import { useRef } from "react";
-import {
-  HiOutlinePrinter,
-  HiOutlineDocumentText,
-  HiOutlineCalendar,
-  HiOutlineLocationMarker,
-  HiOutlinePhone,
-  HiOutlineUser,
-  HiOutlineClock,
-  HiOutlineOfficeBuilding,
-} from "react-icons/hi";
-
+import { HiOutlinePrinter, HiOutlineDocumentText } from "react-icons/hi";
 import CustomModal from "../../../components/common/CustomModal";
 import { formatINR, formatDate } from "../constants/Events.constants";
 import type { EventOrder } from "../types/Events";
+import { COMPANY_INFO } from "../../billing/constants/Mockdata";
 
 interface Company {
   name: string;
+  tagline?: string;
   address: string;
   phone: string;
   email?: string;
@@ -31,11 +22,11 @@ interface Props {
 }
 
 const DEFAULT_COMPANY: Company = {
-  name: "Balaji Aqua Water Plant",
-  address: "12, Industrial Estate, Chennai, Tamil Nadu - 600001",
-  phone: "+91 98765 43210",
-  email: "info@balajiaqua.com",
-  gstNumber: "33AABCB1234C1Z5",
+  name: COMPANY_INFO.name,
+  tagline: COMPANY_INFO.tagline,
+  address: COMPANY_INFO.address,
+  phone: COMPANY_INFO.phone,
+  email: COMPANY_INFO.email,
 };
 
 const STATUS_LABELS: Record<string, string> = {
@@ -57,486 +48,270 @@ const EVENT_TYPE_LABELS: Record<string, string> = {
 };
 
 const PrintEventModal = ({ event, open, onClose, company }: Props) => {
-  const printRef = useRef<HTMLDivElement>(null);
   const co = company ?? DEFAULT_COMPANY;
 
   if (!event) return null;
 
-  const handlePrint = () => {
-    if (!printRef.current) return;
-    const printContent = printRef.current.innerHTML;
-    const printWindow = window.open("", "_blank", "width=900,height=700");
-    if (!printWindow) {
-      alert("Please allow pop-ups to print this order");
-      return;
-    }
-    printWindow.document.write(`
-      <!DOCTYPE html><html>
-        <head>
-          <title>${event.eventNumber} - ${event.eventName}</title>
-          <meta charset="utf-8" />
-          <script src="https://cdn.tailwindcss.com"></script>
-          <style>
-            @page { size: A4; margin: 12mm; }
-            body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; color: #0f172a; }
-            * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-          </style>
-        </head>
-        <body>${printContent}</body>
-      </html>
-    `);
-    printWindow.document.close();
-    printWindow.onload = () => {
-      setTimeout(() => {
-        printWindow.focus();
-        printWindow.print();
-        printWindow.close();
-      }, 400);
-    };
-  };
+  const handlePrint = () => window.print();
 
-  // ─── Status colors ─────────────────────────────────────────────────────
-  const statusColors =
-    event.status === "COMPLETED" || event.status === "DELIVERED"
-      ? { bg: "#d1fae5", color: "#065f46" }
-      : event.status === "CANCELLED"
-      ? { bg: "#fee2e2", color: "#991b1b" }
-      : event.status === "DRAFT"
-      ? { bg: "#f1f5f9", color: "#475569" }
-      : { bg: "#dbeafe", color: "#1e40af" };
-
-  const paymentColors =
-    event.paymentStatus === "PAID"
-      ? { bg: "#d1fae5", color: "#065f46" }
-      : event.paymentStatus === "PARTIAL"
-      ? { bg: "#fef3c7", color: "#92400e" }
-      : { bg: "#fee2e2", color: "#991b1b" };
-
-  // ─── FIXED: cgst + sgst (gstAmount field doesn't exist on EventOrder) ──
   const totalGst = (event.cgst ?? 0) + (event.sgst ?? 0);
+  const totalQty = (event.items ?? []).reduce((s, i) => s + i.quantity, 0);
+  const hasSecurityDeposit = (event.securityDeposit ?? 0) > 0;
+  const hasNotes = !!event.notes?.trim();
+
+  const receiptContent = (
+    <>
+      <div style={{ textAlign: "center", fontWeight: 700, fontSize: "17px" }}>
+        {co.name}
+      </div>
+      {co.tagline && (
+        <div
+          style={{ textAlign: "center", fontSize: "11px", fontStyle: "italic" }}
+        >
+          {co.tagline}
+        </div>
+      )}
+      <div style={{ textAlign: "center", fontSize: "12px" }}>{co.address}</div>
+      <div style={{ textAlign: "center", fontSize: "12px" }}>
+        Phone : {co.phone}
+      </div>
+      {co.gstNumber && (
+        <div style={{ textAlign: "center", fontSize: "12px" }}>
+          GSTIN : {co.gstNumber}
+        </div>
+      )}
+
+      <div style={{ borderTop: "1px dashed #000", margin: "6px 0" }} />
+
+      <div style={{ textAlign: "center", fontWeight: 700, fontSize: "14px" }}>
+        EVENT ORDER
+      </div>
+      <Row label="Event No:" value={event.eventNumber} />
+      <Row label="Event:" value={event.eventName} />
+      <Row
+        label="Type:"
+        value={`${EVENT_TYPE_LABELS[event.eventType] ?? event.eventType} · ${
+          event.expectedGuests
+        } guests`}
+      />
+      <Row label="Date:" value={formatDate(event.eventDate)} />
+      <Row
+        label="Time:"
+        value={`${event.deliveryTime}${
+          event.pickupTime ? ` – ${event.pickupTime}` : ""
+        }`}
+      />
+      <Row
+        label="Status:"
+        value={STATUS_LABELS[event.status] ?? event.status}
+      />
+
+      <div style={{ borderTop: "1px dashed #000", margin: "6px 0" }} />
+
+      <Row label="Customer:" value={event.customerName} />
+      <Row label="Phone:" value={event.customerPhone} />
+      <div style={{ fontSize: "12px", marginTop: "2px" }}>
+        Venue: {event.venueName}
+      </div>
+      <div style={{ fontSize: "12px" }}>
+        {event.venueAddress}, {event.venueCity}
+        {event.venuePincode ? ` - ${event.venuePincode}` : ""}
+      </div>
+      {(event.onSiteContactName || event.onSiteContactPhone) && (
+        <div style={{ fontSize: "12px", marginTop: "2px" }}>
+          On-site: {event.onSiteContactName ?? "—"}
+          {event.onSiteContactPhone ? ` (${event.onSiteContactPhone})` : ""}
+        </div>
+      )}
+
+      <div style={{ borderTop: "1px dashed #000", margin: "6px 0" }} />
+
+      <div style={{ display: "flex", fontWeight: 700, fontSize: "12px" }}>
+        <span style={{ flex: 2 }}>Item</span>
+        <span style={{ flex: 1, textAlign: "right" }}>Qty</span>
+        <span style={{ flex: 1.2, textAlign: "right" }}>Rate</span>
+        <span style={{ flex: 1.4, textAlign: "right" }}>Amt</span>
+      </div>
+      <div style={{ borderTop: "1px solid #000", margin: "3px 0" }} />
+
+      {(event.items ?? []).map((it, idx) => (
+        <div
+          key={it.id ?? idx}
+          style={{ display: "flex", fontSize: "12px", marginBottom: "3px" }}
+        >
+          <span style={{ flex: 2 }}>{it.productName}</span>
+          <span style={{ flex: 1, textAlign: "right" }}>{it.quantity}</span>
+          <span style={{ flex: 1.2, textAlign: "right" }}>
+            {it.unitPrice.toFixed(2)}
+          </span>
+          <span style={{ flex: 1.4, textAlign: "right" }}>
+            {(it.lineTotal ?? it.quantity * it.unitPrice).toFixed(2)}
+          </span>
+        </div>
+      ))}
+
+      <div style={{ borderTop: "1px dashed #000", margin: "6px 0" }} />
+
+      <Row
+        label={`Total Qty: ${totalQty}`}
+        value={`Sub: ${formatINR(event.subtotal)}`}
+      />
+
+      {event.discount > 0 && (
+        <Row label="Discount" value={`- ${formatINR(event.discount)}`} />
+      )}
+
+      {event.gstEnabled && totalGst > 0 && (
+        <Row
+          label={`GST (${event.gstRate ?? 18}%)`}
+          value={formatINR(totalGst)}
+        />
+      )}
+
+      <div style={{ borderTop: "1px solid #000", margin: "5px 0" }} />
+
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          fontWeight: 700,
+          fontSize: "16px",
+        }}
+      >
+        <span>TOTAL:</span>
+        <span>{formatINR(event.totalAmount)}</span>
+      </div>
+
+      <div style={{ borderTop: "1px solid #000", margin: "5px 0" }} />
+
+      {event.advancePaid > 0 && (
+        <Row label="Advance Paid:" value={formatINR(event.advancePaid)} />
+      )}
+
+      {event.balanceDue > 0 ? (
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            fontWeight: 700,
+            fontSize: "14px",
+          }}
+        >
+          <span>BALANCE DUE:</span>
+          <span>{formatINR(event.balanceDue)}</span>
+        </div>
+      ) : (
+        <div style={{ textAlign: "center", fontWeight: 700, fontSize: "13px" }}>
+          *** PAID IN FULL ***
+        </div>
+      )}
+
+      {hasSecurityDeposit && (
+        <>
+          <div style={{ borderTop: "1px dashed #000", margin: "6px 0" }} />
+          <Row
+            label="Security Deposit:"
+            value={formatINR(event.securityDeposit)}
+          />
+          <div style={{ fontSize: "11px" }}>
+            (Refundable on equipment return)
+          </div>
+        </>
+      )}
+
+      {hasNotes && (
+        <>
+          <div style={{ borderTop: "1px dashed #000", margin: "6px 0" }} />
+          <div style={{ fontSize: "12px", fontWeight: 700 }}>Notes:</div>
+          <div style={{ fontSize: "12px", whiteSpace: "pre-wrap" }}>
+            {event.notes}
+          </div>
+        </>
+      )}
+
+      <div style={{ borderTop: "1px dashed #000", margin: "6px 0" }} />
+      <div style={{ textAlign: "center", fontSize: "13px" }}>
+        -: Thank You Visit Again :-
+      </div>
+    </>
+  );
 
   const footer = (
-    <div className="flex justify-between items-center gap-3">
-      <div className="text-xs text-slate-500 hidden sm:block">
-        Preview before printing — buttons won't appear in the print
-      </div>
-      <div className="flex gap-2 ml-auto">
+    <div className="flex flex-col gap-2.5">
+      <p className="text-[11px] text-slate-400 text-center">
+        Prints at 72mm on thermal paper — layout may look slightly denser than
+        this preview
+      </p>
+      <div className="flex gap-2">
         <button
           onClick={onClose}
-          className="px-4 py-2.5 rounded-lg text-slate-700 hover:bg-slate-100 font-medium text-sm transition"
+          className="flex-1 px-4 py-2.5 rounded-xl border border-slate-200
+            text-slate-600 hover:bg-slate-50 font-medium text-sm transition"
         >
           Close
         </button>
         <button
           onClick={handlePrint}
-          className="px-5 py-2.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-medium text-sm transition shadow-sm flex items-center gap-2"
+          className="flex-1 px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700
+            text-white font-semibold text-sm transition shadow-sm
+            shadow-blue-500/25 flex items-center justify-center gap-2
+            whitespace-nowrap"
         >
-          <HiOutlinePrinter className="w-4 h-4" /> Print Order
+          <HiOutlinePrinter className="w-4 h-4" /> Print Receipt
         </button>
       </div>
     </div>
   );
 
   return (
-    <CustomModal
-      open={open}
-      onClose={onClose}
-      title="Print Preview"
-      subtitle={`${event.eventNumber} · ${event.eventName}`}
-      icon={<HiOutlineDocumentText className="w-6 h-6" />}
-      iconTone="slate"
-      size="4xl"
-      footer={footer}
-      bodyClassName="!p-0 !bg-slate-100"
-    >
-      <div className="p-6 bg-slate-100">
-        <div
-          ref={printRef}
-          className="bg-white shadow-lg mx-auto max-w-3xl"
-          style={{ minHeight: "11in" }}
-        >
-          <div className="px-10 py-8 text-slate-900">
-            {/* ─── Letterhead ──────────────────────────────────────────── */}
-            <div className="flex items-start justify-between pb-6 border-b-2 border-slate-900">
-              <div className="flex items-start gap-3">
-                {/* FIXED: replaced 💧 emoji with react-icon */}
-                <div
-                  className="w-14 h-14 rounded-xl flex items-center justify-center text-white shrink-0"
-                  style={{
-                    background: "linear-gradient(135deg, #2563eb, #06b6d4)",
-                  }}
-                >
-                  <HiOutlineOfficeBuilding className="w-7 h-7" />
-                </div>
-                <div>
-                  <div className="text-xl font-bold tracking-tight">
-                    {co.name}
-                  </div>
-                  <div className="text-xs text-slate-600 mt-1 leading-relaxed">
-                    {co.address}
-                    <br />
-                    {co.phone}
-                    {co.email && ` · ${co.email}`}
-                  </div>
-                  {co.gstNumber && (
-                    <div className="text-xs text-slate-500 mt-1">
-                      <span className="font-semibold">GSTIN:</span>{" "}
-                      {co.gstNumber}
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              <div className="text-right">
-                <div className="text-2xl font-bold tracking-tight">
-                  EVENT ORDER
-                </div>
-                <div className="text-xs font-mono text-slate-600 mt-1">
-                  {event.eventNumber}
-                </div>
-                <div className="mt-2 flex justify-end gap-1">
-                  <span
-                    className="inline-block px-2.5 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider"
-                    style={{
-                      backgroundColor: statusColors.bg,
-                      color: statusColors.color,
-                    }}
-                  >
-                    {STATUS_LABELS[event.status] ?? event.status}
-                  </span>
-                  <span
-                    className="inline-block px-2.5 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider"
-                    style={{
-                      backgroundColor: paymentColors.bg,
-                      color: paymentColors.color,
-                    }}
-                  >
-                    {event.paymentStatus}
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* ─── Event Banner ─────────────────────────────────────────── */}
-            <div className="mt-6 grid grid-cols-2 gap-6">
-              <div>
-                <div className="text-[10px] font-semibold tracking-wider text-slate-500 uppercase">
-                  Event
-                </div>
-                <div className="text-lg font-bold mt-1">{event.eventName}</div>
-                <div className="text-xs text-slate-600 mt-1">
-                  {EVENT_TYPE_LABELS[event.eventType] ?? event.eventType} ·{" "}
-                  {event.expectedGuests} guests
-                </div>
-              </div>
-              <div className="text-right">
-                <div className="text-[10px] font-semibold tracking-wider text-slate-500 uppercase">
-                  Issue Date
-                </div>
-                <div className="font-semibold mt-1">
-                  {formatDate(event.createdAt)}
-                </div>
-              </div>
-            </div>
-
-            {/* ─── Customer + Venue ─────────────────────────────────────── */}
-            <div className="mt-6 grid grid-cols-2 gap-4">
-              <InfoBlock
-                title="Customer"
-                rows={[
-                  {
-                    icon: HiOutlineUser,
-                    label: event.customerName,
-                    bold: true,
-                  },
-                  { icon: HiOutlinePhone, label: event.customerPhone },
-                ]}
-              />
-              <InfoBlock
-                title="Event Schedule"
-                rows={[
-                  {
-                    icon: HiOutlineCalendar,
-                    label: formatDate(event.eventDate),
-                    bold: true,
-                  },
-                  {
-                    icon: HiOutlineClock,
-                    label: `${event.deliveryTime}${
-                      event.pickupTime ? ` – ${event.pickupTime}` : ""
-                    }`,
-                  },
-                ]}
-              />
-              <InfoBlock
-                title="Delivery Venue"
-                rows={[
-                  {
-                    icon: HiOutlineLocationMarker,
-                    label: event.venueName,
-                    bold: true,
-                  },
-                  {
-                    label: `${event.venueAddress}, ${event.venueCity}${
-                      event.venuePincode ? ` - ${event.venuePincode}` : ""
-                    }`,
-                  },
-                ]}
-              />
-              {/* FIXED: onSiteContactName / onSiteContactPhone (old names were contactPersonName / contactPersonPhone) */}
-              {(event.onSiteContactName || event.onSiteContactPhone) && (
-                <InfoBlock
-                  title="On-site Contact"
-                  rows={[
-                    {
-                      icon: HiOutlineUser,
-                      label: event.onSiteContactName ?? "—",
-                      bold: true,
-                    },
-                    {
-                      icon: HiOutlinePhone,
-                      label: event.onSiteContactPhone ?? "—",
-                    },
-                  ]}
-                />
-              )}
-            </div>
-
-            {/* ─── Items Table ─────────────────────────────────────────── */}
-            <div className="mt-7">
-              <div className="text-[10px] font-semibold tracking-wider text-slate-500 uppercase mb-2">
-                Order Items
-              </div>
-              <table className="w-full text-sm border-collapse">
-                <thead>
-                  <tr className="bg-slate-900 text-white">
-                    <th className="text-left px-3 py-2 text-xs font-semibold w-10">
-                      #
-                    </th>
-                    <th className="text-left px-3 py-2 text-xs font-semibold">
-                      Product
-                    </th>
-                    <th className="text-center px-3 py-2 text-xs font-semibold w-16">
-                      Qty
-                    </th>
-                    <th className="text-right px-3 py-2 text-xs font-semibold w-24">
-                      Price
-                    </th>
-                    <th className="text-right px-3 py-2 text-xs font-semibold w-28">
-                      Total
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {(event.items ?? []).map((it, idx) => (
-                    <tr key={it.id} className="border-b border-slate-200">
-                      <td className="px-3 py-2.5 text-slate-500 text-xs">
-                        {idx + 1}
-                      </td>
-                      <td className="px-3 py-2.5">
-                        <div className="font-medium">{it.productName}</div>
-                        {it.sku && (
-                          <div className="text-[10px] text-slate-500">
-                            SKU: {it.sku} · {it.unit}
-                          </div>
-                        )}
-                      </td>
-                      <td className="px-3 py-2.5 text-center">{it.quantity}</td>
-                      <td className="px-3 py-2.5 text-right">
-                        {formatINR(it.unitPrice)}
-                      </td>
-                      <td className="px-3 py-2.5 text-right font-semibold">
-                        {/* FIXED: lineTotal may be absent on partial data — compute fallback */}
-                        {formatINR(it.lineTotal ?? it.quantity * it.unitPrice)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            {/* ─── Totals + Notes ──────────────────────────────────────── */}
-            <div className="mt-5 grid grid-cols-5 gap-6">
-              <div className="col-span-3">
-                {event.notes && (
-                  <div className="border border-slate-200 rounded p-3">
-                    <div className="text-[10px] font-semibold tracking-wider text-slate-500 uppercase mb-1">
-                      Notes
-                    </div>
-                    <p className="text-xs text-slate-700 whitespace-pre-line">
-                      {event.notes}
-                    </p>
-                  </div>
-                )}
-                <div className="mt-4 text-[10px] text-slate-500 leading-relaxed">
-                  <div className="font-semibold text-slate-700 mb-1">
-                    Terms & Conditions
-                  </div>
-                  <ul className="list-disc pl-4 space-y-0.5">
-                    <li>
-                      Goods once delivered will not be taken back unless faulty.
-                    </li>
-                    <li>
-                      Security deposit refunded after equipment return in good
-                      condition.
-                    </li>
-                    <li>
-                      Balance due must be settled on or before event date.
-                    </li>
-                    <li>Cancellation within 48 hours forfeits 50% advance.</li>
-                  </ul>
-                </div>
-              </div>
-
-              <div className="col-span-2">
-                <div className="bg-slate-50 rounded p-4 space-y-2 text-sm">
-                  <TRow label="Subtotal" value={formatINR(event.subtotal)} />
-                  {event.discount > 0 && (
-                    <TRow
-                      label="Discount"
-                      value={`− ${formatINR(event.discount)}`}
-                      negative
-                    />
-                  )}
-                  {/* FIXED: use cgst + sgst instead of non-existent gstAmount */}
-                  {event.gstEnabled && totalGst > 0 && (
-                    <TRow
-                      label={`GST (CGST ${formatINR(
-                        event.cgst ?? 0
-                      )} + SGST ${formatINR(event.sgst ?? 0)})`}
-                      value={formatINR(totalGst)}
-                    />
-                  )}
-                  <div className="h-px bg-slate-300 my-1" />
-                  <TRow
-                    label="Total"
-                    value={formatINR(event.totalAmount)}
-                    bold
-                  />
-                  {event.advancePaid > 0 && (
-                    <TRow
-                      label="Advance Paid"
-                      value={`− ${formatINR(event.advancePaid)}`}
-                      negative
-                    />
-                  )}
-                  <div className="h-px bg-slate-300 my-1" />
-                  <TRow
-                    label="Balance Due"
-                    value={formatINR(event.balanceDue)}
-                    bold
-                    large
-                    highlight={event.balanceDue > 0}
-                  />
-                  {event.securityDeposit > 0 && (
-                    <div className="pt-2 mt-2 border-t border-slate-200">
-                      <TRow
-                        label="Security Deposit"
-                        value={formatINR(event.securityDeposit)}
-                        small
-                      />
-                      <div className="text-[9px] text-slate-500 mt-0.5">
-                        (Refundable on equipment return)
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* ─── Signatures ──────────────────────────────────────────── */}
-            <div className="mt-12 grid grid-cols-2 gap-12">
-              <div>
-                <div className="border-t border-slate-400 pt-2 text-xs text-slate-600 text-center">
-                  Customer Signature
-                </div>
-              </div>
-              <div>
-                <div className="border-t border-slate-400 pt-2 text-xs text-slate-600 text-center">
-                  For {co.name}
-                </div>
-              </div>
-            </div>
-
-            {/* ─── Footer ──────────────────────────────────────────────── */}
-            <div className="mt-8 pt-4 border-t border-slate-200 text-center text-[10px] text-slate-500">
-              Thank you for choosing {co.name} · Generated on{" "}
-              {formatDate(new Date().toISOString())}
-            </div>
+    <>
+      <CustomModal
+        open={open}
+        onClose={onClose}
+        title="Print Preview"
+        subtitle={`${event.eventNumber} · ${event.eventName}`}
+        icon={<HiOutlineDocumentText className="w-6 h-6" />}
+        iconTone="slate"
+        size="md"
+        footer={footer}
+        bodyClassName="!p-0 !bg-slate-200"
+      >
+        <div className="py-8 flex justify-center bg-slate-200">
+          <div
+            style={{
+              width: "80mm",
+              padding: "4mm 3mm",
+              background: "#fff",
+              color: "#000",
+              fontFamily: "'Courier New', monospace",
+              fontSize: "13px",
+              fontWeight: 600,
+              lineHeight: 1.5,
+              boxShadow: "0 4px 16px rgba(0,0,0,0.15)",
+            }}
+          >
+            {receiptContent}
           </div>
         </div>
+      </CustomModal>
+
+      <div id="print-area">
+        <div id="thermal-receipt">{receiptContent}</div>
       </div>
-    </CustomModal>
+    </>
   );
 };
 
-// ─── InfoBlock helper ──────────────────────────────────────────────────────
-const InfoBlock = ({
-  title,
-  rows,
-}: {
-  title: string;
-  rows: Array<{
-    icon?: React.ComponentType<{ className?: string }>;
-    label: string;
-    bold?: boolean;
-  }>;
-}) => (
-  <div className="border border-slate-200 rounded p-3">
-    <div className="text-[10px] font-semibold tracking-wider text-slate-500 uppercase mb-1.5">
-      {title}
-    </div>
-    {rows.map((r, i) => (
-      <div
-        key={i}
-        className={`flex items-start gap-1.5 text-xs ${
-          r.bold ? "font-semibold text-slate-900" : "text-slate-600"
-        } ${i > 0 ? "mt-0.5" : ""}`}
-      >
-        {r.icon && (
-          <r.icon className="w-3.5 h-3.5 mt-0.5 shrink-0 text-slate-400" />
-        )}
-        <span>{r.label}</span>
-      </div>
-    ))}
-  </div>
-);
-
-// ─── Row helper ───────────────────────────────────────────────────────────
-const TRow = ({
-  label,
-  value,
-  bold,
-  large,
-  negative,
-  highlight,
-  small,
-}: {
-  label: string;
-  value: string;
-  bold?: boolean;
-  large?: boolean;
-  negative?: boolean;
-  highlight?: boolean;
-  small?: boolean;
-}) => (
+const Row: React.FC<{ label: string; value: string }> = ({ label, value }) => (
   <div
-    className={`flex justify-between items-baseline ${
-      large ? "text-base" : small ? "text-xs" : "text-sm"
-    }`}
+    style={{
+      display: "flex",
+      justifyContent: "space-between",
+      fontSize: "12px",
+    }}
   >
-    <span className="text-slate-600">{label}</span>
-    <span
-      className={`${bold ? "font-bold" : "font-medium"} ${
-        highlight
-          ? "text-red-600"
-          : negative
-          ? "text-slate-700"
-          : "text-slate-900"
-      }`}
-    >
-      {value}
-    </span>
+    <span>{label}</span>
+    <span>{value}</span>
   </div>
 );
 

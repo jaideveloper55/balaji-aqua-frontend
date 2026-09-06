@@ -40,6 +40,7 @@ import {
 } from "../../../components/common/Notification";
 import Deleteeventordermodal from "../components/Deleteeventordermodal";
 import Completeeventmodal from "../modals/Completeeventmodal";
+import { COMPANY_INFO } from "../../billing/constants/Mockdata";
 
 const EventOrdersPage = () => {
   const queryClient = useQueryClient();
@@ -164,6 +165,11 @@ const EventOrdersPage = () => {
       setDetailsOpen(false);
       queryClient.invalidateQueries({ queryKey: ["events"] });
       queryClient.invalidateQueries({ queryKey: ["event-stats"] });
+      queryClient.invalidateQueries({ queryKey: ["inventory-stock"] });
+      queryClient.invalidateQueries({ queryKey: ["inventory-summary"] });
+      queryClient.invalidateQueries({ queryKey: ["inventory-low-stock"] });
+      queryClient.invalidateQueries({ queryKey: ["inventory-movements"] });
+      queryClient.invalidateQueries({ queryKey: ["billing-pos-products"] });
     },
     onError: (err: any) => {
       errorNotification(
@@ -192,6 +198,11 @@ const EventOrdersPage = () => {
       setDetailsOpen(false);
       queryClient.invalidateQueries({ queryKey: ["events"] });
       queryClient.invalidateQueries({ queryKey: ["event-stats"] });
+      queryClient.invalidateQueries({ queryKey: ["inventory-stock"] });
+      queryClient.invalidateQueries({ queryKey: ["inventory-summary"] });
+      queryClient.invalidateQueries({ queryKey: ["inventory-low-stock"] });
+      queryClient.invalidateQueries({ queryKey: ["inventory-movements"] });
+      queryClient.invalidateQueries({ queryKey: ["billing-pos-products"] });
     },
     onError: (err: any) => {
       errorNotification(
@@ -217,7 +228,11 @@ const EventOrdersPage = () => {
   };
 
   const handleMarkComplete = (e: EventOrder) => {
-    statusMutation.mutate({ id: e.id, status: "COMPLETED" });
+    if (e.balanceDue > 0) {
+      setCompleteTarget(e);
+    } else {
+      statusMutation.mutate({ id: e.id, status: "COMPLETED" });
+    }
   };
 
   const handleCancel = (e: EventOrder) => {
@@ -370,13 +385,7 @@ const EventOrdersPage = () => {
         event={printTarget}
         open={!!printTarget}
         onClose={() => setPrintTarget(null)}
-        company={{
-          name: "Your Company",
-          address: "Your address",
-          phone: "+91 ...",
-          gstNumber: "33XXXXX...",
-          logoUrl: "/logo.png",
-        }}
+        company={COMPANY_INFO}
       />
 
       <Deleteeventordermodal

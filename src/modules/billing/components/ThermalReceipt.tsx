@@ -8,7 +8,6 @@ interface Props {
 }
 
 const ThermalReceipt: React.FC<Props> = ({ invoice }) => {
-  // Sum of all item quantities — shown as "Total Qty" like your physical bill
   const totalQty = invoice.items.reduce((sum, item) => sum + item.qty, 0);
 
   return (
@@ -109,9 +108,7 @@ const ThermalReceipt: React.FC<Props> = ({ invoice }) => {
       <div style={{ borderTop: "1px solid #000", margin: "5px 0" }} />
 
       {/* ── PAYMENT (Tendered / Balance, exactly like Image 1) ── */}
-      {/* ── PAYMENT ──
-          When old dues were also collected, the cash handed over exceeds
-          this bill. Show the split so the slip reconciles with the drawer. */}
+
       {(invoice.extraPaymentCollected ?? 0) > 0 && (
         <>
           <Row label="This Bill:" value={invoice.paidAmount.toFixed(2)} />
