@@ -19,6 +19,7 @@ import {
   BsCart3,
   BsBuilding,
   BsCalendarEvent,
+  BsShieldLock,
 } from "react-icons/bs";
 import type { IconType } from "react-icons";
 
@@ -28,6 +29,7 @@ export interface MenuItem {
   label: string;
   href: string;
   group: string;
+  roles?: ("SUPER_ADMIN" | "ADMIN" | "STAFF" | "DELIVERY_BOY")[];
 }
 
 export interface QuickLink {
@@ -84,7 +86,15 @@ const waterPlantConfig: OrgConfig = {
     dropdownHoverText: "hover:text-blue-600",
     iconGroupHover: "group-hover/item:text-blue-500",
   },
-  groups: ["Main", "Operations", "Billing", "HR", "Finance", "Analytics"],
+  groups: [
+    "Main",
+    "Operations",
+    "Billing",
+    "HR",
+    "Finance",
+    "Analytics",
+    "Admin",
+  ],
   menuItems: [
     {
       id: "dashboard",
@@ -170,6 +180,14 @@ const waterPlantConfig: OrgConfig = {
       href: "/admin/expenses",
       group: "Finance",
     },
+    {
+      id: "uam",
+      icon: BsShieldLock,
+      label: "User Access Management",
+      href: "/admin/uam",
+      group: "Admin",
+      roles: ["SUPER_ADMIN"],
+    },
     // {
     //   id: "production",
     //   icon: BsGraphUp,
@@ -215,7 +233,15 @@ const beverageConfig: OrgConfig = {
     dropdownHoverText: "hover:text-teal-600",
     iconGroupHover: "group-hover/item:text-teal-500",
   },
-  groups: ["Main", "Inventory", "Sales", "Fleet", "HR", "Analytics"],
+  groups: [
+    "Main",
+    "Operations",
+    "Billing",
+    "HR",
+    "Finance",
+    "Analytics",
+    "Admin",
+  ],
   menuItems: [
     {
       id: "dashboard",

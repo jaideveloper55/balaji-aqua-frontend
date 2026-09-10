@@ -198,6 +198,22 @@ const CreateEventModal = ({
         setPickupTime(dayjs(`2000-01-01T${initialData.pickupTime}`));
       setDiscount(initialData.discount ?? 0);
       setGstEnabled(initialData.gstEnabled ?? true);
+
+      // Same class of bug as advancePaid/securityDeposit below — `lines`
+      // lives in plain useState, completely outside the form, so reset()
+      // can never touch it. Without this explicit seed, editing ANY
+      // existing event always starts the Items step from empty, no
+      // matter how many real products the order actually has.
+      if (initialData.items) {
+        setLines(
+          initialData.items.map((it) => ({
+            productId: it.productId,
+            productName: it.productName,
+            quantity: it.quantity,
+            unitPrice: it.unitPrice,
+          }))
+        );
+      }
     }
   }, [open, initialData, reset]);
 
@@ -385,7 +401,6 @@ const CreateEventModal = ({
                 name="eventName"
                 control={control}
                 label="Event Name"
-                size="large"
                 placeholder="e.g. Ramesh & Priya Wedding Reception"
                 isrequired
                 errors={errors}
@@ -396,7 +411,6 @@ const CreateEventModal = ({
                 name="eventType"
                 control={control}
                 label="Event Type"
-                size="large"
                 placeholder="Select type"
                 isrequired
                 errors={errors}
@@ -415,7 +429,6 @@ const CreateEventModal = ({
                   render={({ field }) => (
                     <InputNumber
                       {...field}
-                      size="large"
                       className="w-full"
                       min={1}
                       placeholder="100"
@@ -426,7 +439,6 @@ const CreateEventModal = ({
 
               <Field label="Event Date" required>
                 <DatePicker
-                  size="large"
                   className="w-full"
                   value={eventDate}
                   onChange={setEventDate}
@@ -439,7 +451,6 @@ const CreateEventModal = ({
               <div className="grid grid-cols-2 gap-3">
                 <Field label="Delivery Time" required>
                   <TimePicker
-                    size="large"
                     className="w-full"
                     format="HH:mm"
                     value={deliveryTime}
@@ -449,7 +460,6 @@ const CreateEventModal = ({
                 </Field>
                 <Field label="Pickup Time" hint="Optional">
                   <TimePicker
-                    size="large"
                     className="w-full"
                     format="HH:mm"
                     value={pickupTime}
@@ -477,13 +487,12 @@ const CreateEventModal = ({
               >
                 <Spin spinning={loadingCustomers} size="small">
                   <Select
-                    size="large"
                     className="w-full"
                     showSearch
                     allowClear
                     placeholder="Search by name or phone..."
                     optionFilterProp="label"
-                    // ─── CHANGED: real customers from API ─────────────
+                    value={watch("customerId") ?? undefined}
                     options={(customers as any[]).map((c: any) => ({
                       value: c.id,
                       label: `${c.name} · ${c.phone}`,
@@ -648,13 +657,11 @@ const CreateEventModal = ({
                       <div className="col-span-12 md:col-span-5">
                         <Spin spinning={loadingProducts} size="small">
                           <Select
-                            size="large"
                             className="w-full"
                             placeholder="Select product"
                             showSearch
                             optionFilterProp="label"
                             value={line.productId || undefined}
-                            // ─── CHANGED: real products from API ──────
                             onChange={(id) => {
                               const p = (products as any[]).find(
                                 (x: any) => x.id === id
@@ -667,16 +674,33 @@ const CreateEventModal = ({
                                 });
                               }
                             }}
-                            options={(products as any[]).map((p: any) => ({
-                              value: p.id,
-                              label: `${p.name} (${p.sku})`,
-                            }))}
+                            options={(() => {
+                              const activeOptions = (products as any[]).map(
+                                (p: any) => ({
+                                  value: p.id,
+                                  label: `${p.name} (${p.sku})`,
+                                })
+                              );
+
+                              const alreadyListed = activeOptions.some(
+                                (o) => o.value === line.productId
+                              );
+                              if (line.productId && !alreadyListed) {
+                                return [
+                                  {
+                                    value: line.productId,
+                                    label: `${line.productName} (unavailable)`,
+                                  },
+                                  ...activeOptions,
+                                ];
+                              }
+                              return activeOptions;
+                            })()}
                           />
                         </Spin>
                       </div>
                       <div className="col-span-4 md:col-span-2">
                         <InputNumber
-                          size="large"
                           className="w-full"
                           min={1}
                           value={line.quantity}
@@ -688,7 +712,6 @@ const CreateEventModal = ({
                       </div>
                       <div className="col-span-4 md:col-span-2">
                         <InputNumber
-                          size="large"
                           className="w-full"
                           min={0}
                           value={line.unitPrice}
@@ -756,7 +779,6 @@ const CreateEventModal = ({
                   hint="Flat amount, applied before GST"
                 >
                   <InputNumber
-                    size="large"
                     className="w-full"
                     min={0}
                     max={totals.subtotal}
@@ -781,7 +803,6 @@ const CreateEventModal = ({
                 <div className="grid grid-cols-2 gap-3">
                   <Field label="Advance Paid" hint="Already received">
                     <InputNumber
-                      size="large"
                       className="w-full"
                       min={0}
                       max={totals.totalAmount}
@@ -792,7 +813,6 @@ const CreateEventModal = ({
                   </Field>
                   <Field label="Security Deposit" hint="Refundable">
                     <InputNumber
-                      size="large"
                       className="w-full"
                       min={0}
                       value={securityDeposit}
@@ -833,7 +853,6 @@ const CreateEventModal = ({
   // ─── Footer ─────────────────────────────────────────────────────────────
   const footer = (
     <div className="flex items-center justify-between gap-3">
-      {/* Left side: live total preview */}
       <div className="hidden sm:flex items-baseline gap-2 text-sm">
         <span className="text-slate-500">Order total:</span>
         <span className="text-lg font-bold text-slate-900">
@@ -846,7 +865,6 @@ const CreateEventModal = ({
         )}
       </div>
 
-      {/* Right side: nav buttons */}
       <div className="flex gap-2 ml-auto">
         {!isFirstStep && (
           <button
@@ -869,7 +887,6 @@ const CreateEventModal = ({
           <button
             type="button"
             onClick={handleSubmit(submit)}
-            // ─── FIXED: uses isSubmitting prop from parent ──────────────
             disabled={isSubmitting || lines.length === 0}
             className="px-5 py-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white font-medium text-sm transition shadow-sm flex items-center gap-2"
           >

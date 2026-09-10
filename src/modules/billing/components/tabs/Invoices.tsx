@@ -1,5 +1,5 @@
 import React, { useMemo } from "react";
-import { Table, Tag, Dropdown } from "antd";
+import { Table, Tag, Dropdown, message, Tooltip } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { useForm } from "react-hook-form";
 import {
@@ -12,6 +12,7 @@ import {
   HiOutlinePencil,
   HiOutlineDotsVertical,
   HiOutlineTrash,
+  HiOutlineChat,
 } from "react-icons/hi";
 import { HiClipboardDocumentList } from "react-icons/hi2";
 import { formatCurrency, getCustomerTypeColor } from "../../utils/Helpers";
@@ -56,6 +57,58 @@ const STATUS_TABS = [
   { key: "partial", label: "Partial" },
   { key: "overdue", label: "Overdue" },
 ];
+
+// Builds the actual bill/receipt text sent over WhatsApp. Branches on
+// whether there's a balance, since this button now fires for EVERY
+// invoice — paid or not — not just ones with money still owed. Sending a
+// fully-paid customer a message that says "reminder: ₹0 is pending"
+// would look broken, so a paid invoice gets a thank-you/receipt framing
+// instead of a reminder framing.
+const buildInvoiceMessage = (invoice: Invoice): string => {
+  const lines = [
+    `Hi ${invoice.customerName}, here are your invoice details:`,
+    "",
+    `Invoice No: ${invoice.invoiceNo}`,
+    `Date: ${invoice.date}`,
+    `Total Amount: ${formatCurrency(invoice.grandTotal)}`,
+  ];
+
+  if (invoice.balanceAmount > 0) {
+    lines.push(`Paid: ${formatCurrency(invoice.paidAmount)}`);
+    lines.push(`Balance Due: ${formatCurrency(invoice.balanceAmount)}`);
+    if (invoice.dueDate) lines.push(`Due Date: ${invoice.dueDate}`);
+    lines.push("", "Kindly settle the balance at your convenience.");
+  } else {
+    lines.push("Status: Fully Paid \u2705");
+    lines.push("", "Thank you for your payment!");
+  }
+
+  lines.push("", "\u2014 Balaji Aqua Water Plant");
+  return lines.join("\n");
+};
+
+const sendInvoiceWhatsApp = async (invoice: Invoice) => {
+  const raw = (invoice.customerPhone || "").replace(/\D/g, "");
+  if (!raw) return;
+  const phone = raw.length === 10 ? `91${raw}` : raw;
+
+  const msg = buildInvoiceMessage(invoice);
+  const url = `https://wa.me/${phone}?text=${encodeURIComponent(msg)}`;
+  const win = window.open(url, "_blank", "noopener,noreferrer");
+
+  if (!win || win.closed || typeof win.closed === "undefined") {
+    try {
+      await navigator.clipboard.writeText(msg);
+      message.warning(
+        "Pop-up was blocked. The invoice message has been copied — paste it into WhatsApp manually."
+      );
+    } catch {
+      message.warning(
+        "Pop-up was blocked. Please allow pop-ups for this site to send WhatsApp messages."
+      );
+    }
+  }
+};
 
 const InvoicesTab: React.FC<Props> = ({
   invoices,
@@ -251,6 +304,36 @@ const InvoicesTab: React.FC<Props> = ({
         return <span className="text-[12px] text-gray-300">&mdash;</span>;
       },
     },
+
+    {
+      title: "WhatsApp",
+      key: "whatsapp",
+      width: 90,
+      align: "center",
+      render: (_: unknown, record: Invoice) => {
+        const hasPhone = !!(record.customerPhone || "").replace(/\D/g, "");
+        return (
+          <Tooltip
+            title={
+              hasPhone ? "Send WhatsApp reminder" : "No phone number on file"
+            }
+          >
+            <button
+              onClick={() => hasPhone && sendInvoiceWhatsApp(record)}
+              disabled={!hasPhone}
+              className={
+                "inline-flex items-center justify-center w-8 h-8 rounded-full transition-all " +
+                (hasPhone
+                  ? "bg-emerald-500 text-white hover:bg-emerald-600 shadow-sm hover:scale-105"
+                  : "bg-gray-100 text-gray-300 cursor-not-allowed")
+              }
+            >
+              <HiOutlineChat size={16} />
+            </button>
+          </Tooltip>
+        );
+      },
+    },
     {
       title: "Actions",
       key: "actions",
@@ -438,7 +521,7 @@ const InvoicesTab: React.FC<Props> = ({
         columns={columns}
         dataSource={filteredInvoices}
         size="middle"
-        scroll={{ x: 1050 }}
+        scroll={{ x: 1140 }}
         onRow={(record) => ({
           onClick: () => onView(record),
           className: "cursor-pointer hover:bg-gray-50/50 transition-colors",

@@ -77,7 +77,7 @@ const AddPaymentDrawer: React.FC<Props> = ({
   // Reset form whenever the drawer opens
   useEffect(() => {
     if (open) reset({ ...DEFAULTS, ...defaultValues });
-  }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [open]); 
 
   const paymentCustomer = watch("paymentCustomer");
   const paymentAmount = watch("paymentAmount");

@@ -20,6 +20,7 @@ import ExpensesPage from "./modules/expenses/pages/Expensespage";
 import ProductionPage from "./modules/production/pages/Productionpage";
 import ReportsPage from "./modules/reports/pages/Reportspage";
 import Dashboard from "./modules/dashboard/pages/DashboardPage";
+import UamPage from "./modules/uam/UamPage";
 
 function App() {
   return (
@@ -56,6 +57,14 @@ function App() {
           <Route path="expenses" element={<ExpensesPage />} />
           <Route path="production" element={<ProductionPage />} />
           <Route path="reports" element={<ReportsPage />} />
+          <Route
+            path="/admin/uam"
+            element={
+              <ProtectedRoute allowedRoles={["SUPER_ADMIN"]}>
+                <UamPage />
+              </ProtectedRoute>
+            }
+          />
         </Route>
 
         {/* ─── 404 FALLBACK ───────────────────────────────────────────── */}

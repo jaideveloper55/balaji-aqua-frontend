@@ -1,8 +1,11 @@
-import { Input, Select, DatePicker } from "antd";
-import { HiOutlineSearch } from "react-icons/hi";
+import { useEffect } from "react";
+import { useForm } from "react-hook-form";
+import { DatePicker } from "antd";
 import dayjs, { Dayjs } from "dayjs";
 import { EVENT_TYPE_OPTIONS } from "../constants/Events.constants";
 import type { EventFilters } from "../types/Events";
+import CustomInput from "../../../components/common/CustomInput";
+import CustomSelect from "../../../components/common/CustomSelect";
 
 const { RangePicker } = DatePicker;
 
@@ -20,7 +23,22 @@ interface Props {
   onChange: (next: EventFilters) => void;
 }
 
+interface SearchFormValues {
+  search: string;
+}
+
 const EventFilterBar = ({ filters, onChange }: Props) => {
+  const { control, watch } = useForm<SearchFormValues>({
+    values: { search: filters.search ?? "" },
+  });
+  const searchValue = watch("search");
+
+  useEffect(() => {
+    if (searchValue !== (filters.search ?? "")) {
+      onChange({ ...filters, search: searchValue, page: 1 });
+    }
+  }, [searchValue]);
+
   const rangeValue: [Dayjs, Dayjs] | null =
     filters.dateFrom && filters.dateTo
       ? [dayjs(filters.dateFrom), dayjs(filters.dateTo)]
@@ -29,25 +47,21 @@ const EventFilterBar = ({ filters, onChange }: Props) => {
   return (
     <div className="bg-white rounded-2xl border border-slate-200 p-4 grid grid-cols-1 md:grid-cols-12 gap-3">
       <div className="md:col-span-4">
-        <Input
-          size="large"
-          allowClear
-          prefix={<HiOutlineSearch className="text-slate-400" />}
+        <CustomInput
+          name="search"
+          control={control}
+          errors={{}}
+          iconType="search"
           placeholder="Search event #, name, customer, venue..."
-          value={filters.search ?? ""}
-          onChange={(e) =>
-            onChange({ ...filters, search: e.target.value, page: 1 })
-          }
         />
       </div>
 
       <div className="md:col-span-3">
-        <Select
-          size="large"
-          className="w-full"
+        <CustomSelect
+          name="eventType"
+          control={control}
+          errors={{}}
           placeholder="Event Type"
-          value={filters.eventType ?? "ALL"}
-          onChange={(v) => onChange({ ...filters, eventType: v, page: 1 })}
           options={[
             { value: "ALL", label: "All Types" },
             ...EVENT_TYPE_OPTIONS.map((o) => ({
@@ -55,46 +69,52 @@ const EventFilterBar = ({ filters, onChange }: Props) => {
               label: o.label,
             })),
           ]}
+          value={filters.eventType ?? "ALL"}
+          onChange={(v) =>
+            onChange({
+              ...filters,
+              eventType: v as EventFilters["eventType"],
+              page: 1,
+            })
+          }
         />
       </div>
 
-      {/* ─── Status ──────────────────────────────────────────────────── */}
       <div className="md:col-span-2">
-        <Select
-          size="large"
-          className="w-full"
+        <CustomSelect
+          name="status"
+          control={control}
+          errors={{}}
           placeholder="Status"
-          value={filters.status ?? "ALL"}
-          onChange={(v) => onChange({ ...filters, status: v, page: 1 })}
           options={[
             { value: "ALL", label: "All Status" },
             ...EVENT_STATUS_OPTIONS,
           ]}
+          value={filters.status ?? "ALL"}
+          onChange={(v) =>
+            onChange({
+              ...filters,
+              status: v as EventFilters["status"],
+              page: 1,
+            })
+          }
         />
       </div>
 
-      {/* ─── Date Range ──────────────────────────────────────────────── */}
       <div className="md:col-span-3">
         <RangePicker
-          size="large"
           className="w-full"
           placeholder={["Event from", "Event to"]}
-          // ─── FIXED: read from dateFrom + dateTo, not dateRange ──────
           value={rangeValue}
           onChange={(dates) => {
             if (dates && dates[0] && dates[1]) {
               onChange({
                 ...filters,
-                // ─── FIXED: .format("YYYY-MM-DD") not .toISOString() ─
-                // .toISOString() shifts date by -5:30 for Indian timezone.
-                // "15 Aug 2026" → toISOString → "2026-08-14T18:30:00Z" ← wrong day!
-                // .format("YYYY-MM-DD") → "2026-08-15" ← always correct
                 dateFrom: (dates[0] as Dayjs).format("YYYY-MM-DD"),
                 dateTo: (dates[1] as Dayjs).format("YYYY-MM-DD"),
                 page: 1,
               });
             } else {
-              // User cleared the date range — remove both filter fields
               onChange({
                 ...filters,
                 dateFrom: undefined,

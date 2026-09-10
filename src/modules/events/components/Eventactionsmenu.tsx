@@ -85,10 +85,6 @@ const EventActionsMenu = ({
       onClick: () => onCancel(event),
     },
 
-    // Same plain pattern as Cancel Event above — no `danger` flag, since
-    // that AntD prop renders as a solid red hover block in this app's
-    // theme instead of the light tint AntD ships by default. Red text via
-    // className alone matches Cancel Event's already-correct look.
     ...(isSuperAdmin
       ? [
           { type: "divider" as const },

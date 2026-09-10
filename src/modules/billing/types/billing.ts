@@ -88,16 +88,8 @@ export interface Invoice {
   grandTotal: number;
   paidAmount: number;
   balanceAmount: number;
-
-  /** Cash collected against the customer's PREVIOUS outstanding, separate
-      from this invoice's own total. Without this the receipt understates
-      what the customer actually handed over. */
   extraPaymentCollected?: number;
-
-  /** The customer's total outstanding AFTER this transaction —
-      unpaid balance on this bill plus whatever old dues remain. */
   outstandingAfter?: number;
-
   status: "Paid" | "Pending" | "Partial" | "Overdue" | "Cancelled";
   paymentMode: string;
   deliveryMode: string;

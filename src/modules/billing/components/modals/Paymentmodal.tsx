@@ -665,6 +665,117 @@ const PaymentModal: React.FC<Props> = ({
               <div className="space-y-3">
                 {!upiVerified ? (
                   <>
+                    {/* ── Amount Received — same editable control as Cash mode.
+            Previously this section only showed a fixed computed total
+            with no way to actually change what's being collected via
+            UPI (e.g. a partial UPI payment, or a customer paying a
+            custom amount). Now amountReceived drives everything below,
+            including what the QR code actually encodes. ── */}
+                    <div className="space-y-2.5">
+                      <label className="text-[11px] font-bold text-gray-500 uppercase tracking-wider block">
+                        Amount Received
+                      </label>
+
+                      <div className="flex gap-2 flex-wrap">
+                        {quickFillOptions.map((opt) => (
+                          <button
+                            key={opt.amount}
+                            onClick={() => onAmountReceivedChange(opt.amount)}
+                            className={
+                              "px-3 py-1.5 rounded-lg text-[11px] font-medium border transition-all " +
+                              (Math.abs(amountReceived - opt.amount) < 0.01
+                                ? "bg-blue-600 text-white border-blue-600"
+                                : "bg-white text-gray-600 border-gray-200 hover:border-blue-300")
+                            }
+                          >
+                            {opt.label}
+                          </button>
+                        ))}
+                      </div>
+
+                      <InputNumber
+                        size="large"
+                        value={amountReceived}
+                        onChange={(v) => onAmountReceivedChange(v || 0)}
+                        prefix={"\u20B9"}
+                        className="w-full"
+                      />
+
+                      {amountReceived > 0 && (
+                        <div className="bg-gray-50 rounded-xl p-3 space-y-1.5 text-[12px]">
+                          <div className="flex justify-between text-gray-600">
+                            <span>Toward this bill</span>
+                            <span className="font-semibold text-gray-900">
+                              {formatCurrency(
+                                Math.min(amountReceived, grandTotal)
+                              )}
+                            </span>
+                          </div>
+
+                          {isPartial && (
+                            <div className="flex justify-between text-amber-600">
+                              <span>Bill balance (pay later)</span>
+                              <span className="font-semibold">
+                                {formatCurrency(grandTotal - amountReceived)}
+                              </span>
+                            </div>
+                          )}
+
+                          {extraForOutstanding > 0 && (
+                            <>
+                              <div className="h-px bg-gray-200 my-1" />
+                              <div className="flex justify-between text-blue-700">
+                                <span>Toward old dues</span>
+                                <span className="font-semibold">
+                                  {formatCurrency(extraForOutstanding)}
+                                </span>
+                              </div>
+                              <div className="flex justify-between text-gray-500 text-[11px]">
+                                <span>Outstanding after</span>
+                                <span className="font-medium">
+                                  {formatCurrency(remainingDueAfter)}
+                                </span>
+                              </div>
+                            </>
+                          )}
+
+                          {changeToReturn > 0 && (
+                            <>
+                              <div className="h-px bg-gray-200 my-1" />
+                              <div className="flex justify-between text-orange-600 font-semibold">
+                                <span>Change to return</span>
+                                <span>{formatCurrency(changeToReturn)}</span>
+                              </div>
+                            </>
+                          )}
+
+                          {!isPartial &&
+                            extraForOutstanding === 0 &&
+                            changeToReturn === 0 && (
+                              <div className="flex justify-between text-emerald-700 font-semibold pt-1">
+                                <span>Exact amount</span>
+                                <span>{"\u2713"}</span>
+                              </div>
+                            )}
+                        </div>
+                      )}
+
+                      {previousDue > 0 &&
+                        Math.abs(amountReceived - grandTotal) < 0.01 && (
+                          <p className="text-[12px] text-gray-500">
+                            Tip: Enter more than{" "}
+                            <span className="font-medium text-gray-700">
+                              {formatCurrency(grandTotal)}
+                            </span>{" "}
+                            to automatically reduce the{" "}
+                            <span className="font-semibold text-red-500 pr-1">
+                              {formatCurrency(previousDue)}
+                            </span>
+                            outstanding.
+                          </p>
+                        )}
+                    </div>
+
                     <div className="bg-white rounded-xl border-2 border-blue-100 p-4">
                       <div className="text-center mb-3">
                         <div className="text-[11px] font-semibold text-blue-600 uppercase tracking-wide mb-1">
@@ -672,16 +783,7 @@ const PaymentModal: React.FC<Props> = ({
                         </div>
                         <div className="text-[12px] font-bold text-blue-900">
                           {"Total: " +
-                            formatCurrency(
-                              previousDue > 0
-                                ? grandTotal + previousDue
-                                : grandTotal
-                            )}
-                          {previousDue > 0 && (
-                            <span className="text-[10px] font-normal text-gray-500 ml-1">
-                              (Invoice + Due)
-                            </span>
-                          )}
+                            formatCurrency(amountReceived || grandTotal)}
                         </div>
                       </div>
                       <div className="flex justify-center mb-3">
@@ -690,10 +792,7 @@ const PaymentModal: React.FC<Props> = ({
                           alt="UPI QR"
                           className="w-48 h-48 object-contain border border-gray-200 rounded-lg p-1"
                           onError={(e) => {
-                            const total =
-                              previousDue > 0
-                                ? grandTotal + previousDue
-                                : grandTotal;
+                            const total = amountReceived || grandTotal;
                             const l =
                               "upi://pay?pa=" +
                               encodeURIComponent(BUSINESS_UPI_ID) +

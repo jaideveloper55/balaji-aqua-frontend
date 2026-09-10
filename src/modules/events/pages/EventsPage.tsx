@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Spin } from "antd";
-import { HiOutlinePlus, HiOutlineDownload } from "react-icons/hi";
+import { HiOutlinePlus } from "react-icons/hi";
 import { MdEventNote } from "react-icons/md";
 import {
   getEventStatsApi,
@@ -34,6 +34,8 @@ import CancelEventModal from "../modals/Canceleventmodal";
 import EventTable from "../components/Eventtable";
 import PrintEventModal from "../modals/Printeventmodal";
 import CustomPageHeader from "../../../components/common/CustomPageHeader";
+import EventCreatedBanner from "../components/Eventcreatedbanner";
+
 import {
   successNotification,
   errorNotification,
@@ -41,6 +43,7 @@ import {
 import Deleteeventordermodal from "../components/Deleteeventordermodal";
 import Completeeventmodal from "../modals/Completeeventmodal";
 import { COMPANY_INFO } from "../../billing/constants/Mockdata";
+import EventPendingBanner from "../components/Eventpendingbanner";
 
 const EventOrdersPage = () => {
   const queryClient = useQueryClient();
@@ -60,6 +63,13 @@ const EventOrdersPage = () => {
   const [printTarget, setPrintTarget] = useState<EventOrder | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<EventOrder | null>(null);
   const [completeTarget, setCompleteTarget] = useState<EventOrder | null>(null);
+  const [justCreatedEvent, setJustCreatedEvent] = useState<EventOrder | null>(
+    null
+  );
+
+  const [dismissedPendingIds, setDismissedPendingIds] = useState<Set<string>>(
+    new Set()
+  );
 
   const { data: stats, isLoading: isLoadingStats } = useQuery({
     queryKey: ["event-stats"],
@@ -76,6 +86,28 @@ const EventOrdersPage = () => {
     queryFn: () => getEventOrdersApi(filters).then((res) => res.data),
     staleTime: 1000 * 30,
   });
+
+  const { data: allEventsData } = useQuery({
+    queryKey: ["events-pending-check"],
+    queryFn: () =>
+      getEventOrdersApi({ page: 1, limit: 100 }).then((res) => res.data),
+    staleTime: 1000 * 30,
+  });
+
+  const pendingEvents = useMemo(() => {
+    const all = allEventsData?.data ?? [];
+    return all.filter(
+      (e: EventOrder) =>
+        e.status !== "COMPLETED" &&
+        e.status !== "CANCELLED" &&
+        e.balanceDue > 0 &&
+        e.id !== justCreatedEvent?.id &&
+        !dismissedPendingIds.has(e.id)
+    );
+  }, [allEventsData, justCreatedEvent, dismissedPendingIds]);
+
+  const dismissPending = (id: string) =>
+    setDismissedPendingIds((prev) => new Set(prev).add(id));
 
   const recordPaymentMutation = useMutation({
     mutationFn: ({
@@ -98,6 +130,7 @@ const EventOrdersPage = () => {
     onSuccess: (data) => {
       successNotification("Event Deleted", data?.message ?? "Event removed");
       queryClient.invalidateQueries({ queryKey: ["events"] });
+      queryClient.invalidateQueries({ queryKey: ["events-pending-check"] });
       setDeleteTarget(null);
     },
     onError: (err: any) =>
@@ -123,14 +156,16 @@ const EventOrdersPage = () => {
         "Event Order Created",
         `${created.eventNumber} · ${created.eventName}`
       );
+      setJustCreatedEvent(created);
       setCreateOpen(false);
       queryClient.invalidateQueries({ queryKey: ["events"] });
       queryClient.invalidateQueries({ queryKey: ["event-stats"] });
+      queryClient.invalidateQueries({ queryKey: ["events-pending-check"] });
     },
     onError: (err: any) => {
       errorNotification(
         "Failed to Create Event",
-        err?.response?.data?.message ?? "Please check all required fields"
+        err?.message ?? "Please check all required fields"
       );
     },
   });
@@ -144,11 +179,12 @@ const EventOrdersPage = () => {
       setCreateOpen(false);
       queryClient.invalidateQueries({ queryKey: ["events"] });
       queryClient.invalidateQueries({ queryKey: ["event-stats"] });
+      queryClient.invalidateQueries({ queryKey: ["events-pending-check"] });
     },
     onError: (err: any) => {
       errorNotification(
         "Update Failed",
-        err?.response?.data?.message ?? "Could not update event"
+        err?.message ?? "Could not update event"
       );
     },
   });
@@ -165,6 +201,7 @@ const EventOrdersPage = () => {
       setDetailsOpen(false);
       queryClient.invalidateQueries({ queryKey: ["events"] });
       queryClient.invalidateQueries({ queryKey: ["event-stats"] });
+      queryClient.invalidateQueries({ queryKey: ["events-pending-check"] });
       queryClient.invalidateQueries({ queryKey: ["inventory-stock"] });
       queryClient.invalidateQueries({ queryKey: ["inventory-summary"] });
       queryClient.invalidateQueries({ queryKey: ["inventory-low-stock"] });
@@ -174,7 +211,7 @@ const EventOrdersPage = () => {
     onError: (err: any) => {
       errorNotification(
         "Status Update Failed",
-        err?.response?.data?.message ?? "Could not update event status"
+        err?.message ?? "Could not update event status"
       );
     },
   });
@@ -198,6 +235,7 @@ const EventOrdersPage = () => {
       setDetailsOpen(false);
       queryClient.invalidateQueries({ queryKey: ["events"] });
       queryClient.invalidateQueries({ queryKey: ["event-stats"] });
+      queryClient.invalidateQueries({ queryKey: ["events-pending-check"] });
       queryClient.invalidateQueries({ queryKey: ["inventory-stock"] });
       queryClient.invalidateQueries({ queryKey: ["inventory-summary"] });
       queryClient.invalidateQueries({ queryKey: ["inventory-low-stock"] });
@@ -207,7 +245,7 @@ const EventOrdersPage = () => {
     onError: (err: any) => {
       errorNotification(
         "Cancellation Failed",
-        err?.response?.data?.message ?? "Could not cancel this event"
+        err?.message ?? "Could not cancel this event"
       );
     },
   });
@@ -263,7 +301,7 @@ const EventOrdersPage = () => {
         onError: (err: any) =>
           errorNotification(
             "Payment Failed",
-            err?.response?.data?.message ?? "Could not record payment"
+            err?.message ?? "Could not record payment"
           ),
       }
     );
@@ -295,14 +333,6 @@ const EventOrdersPage = () => {
         actions={
           <>
             <button
-              onClick={() =>
-                successNotification("Coming Soon", "Export feature in progress")
-              }
-              className="px-4 py-2.5 rounded-xl border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 font-medium text-sm transition flex items-center gap-2 shadow-sm"
-            >
-              <HiOutlineDownload /> Export
-            </button>
-            <button
               onClick={() => setCreateOpen(true)}
               className="px-4 py-2.5 rounded-xl bg-blue-500 hover:bg-blue-600 text-white font-medium text-sm transition flex items-center gap-2 shadow-sm"
             >
@@ -311,6 +341,26 @@ const EventOrdersPage = () => {
           </>
         }
       />
+
+      {justCreatedEvent && (
+        <EventCreatedBanner
+          event={justCreatedEvent}
+          onDismiss={() => setJustCreatedEvent(null)}
+        />
+      )}
+
+      {pendingEvents.length > 0 && (
+        <div className="flex flex-col gap-2">
+          {pendingEvents.map((e: EventOrder) => (
+            <EventPendingBanner
+              key={e.id}
+              event={e}
+              onDismiss={() => dismissPending(e.id)}
+              onView={() => handleView(e)}
+            />
+          ))}
+        </div>
+      )}
 
       <Spin spinning={isLoadingStats}>
         <EventStatCards stats={stats} />
@@ -352,7 +402,7 @@ const EventOrdersPage = () => {
       />
 
       {/* ─── Create Modal ─────────────────────────────────────────────────── */}
-      {/* CreateEventModal handles BOTH create and edit */}
+
       <CreateEventModal
         open={createOpen}
         onClose={() => {
