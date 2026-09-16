@@ -80,7 +80,6 @@ const CollectionTab: React.FC<Props> = ({
   selectedCash,
   selectedUPI,
   selectedBank,
-
   selectedTotal,
   totalOutstanding,
   invoiceCount,
@@ -107,14 +106,12 @@ const CollectionTab: React.FC<Props> = ({
 }) => {
   const [showClosing, setShowClosing] = useState(false);
   const reportRef = useRef<HTMLDivElement>(null);
-
   const safePayments = selectedPayments ?? [];
   const safeCash = selectedCash ?? 0;
   const safeUPI = selectedUPI ?? 0;
   const safeBank = selectedBank ?? 0;
   const safeTotal = selectedTotal ?? 0;
   const safeOutstanding = totalOutstanding ?? 0;
-
   const from = dateRange?.[0] ?? null;
   const to = dateRange?.[1] ?? null;
   const hasRange = !!(from && to);
@@ -311,8 +308,35 @@ const CollectionTab: React.FC<Props> = ({
   );
 
   // ── Build closing report data ──────────────────────────────────────
-  const closingData: DayClosingData = useMemo(
-    () => ({
+  const closingData: DayClosingData = useMemo(() => {
+    const invoicesByCustomer = new Map<string, Invoice[]>();
+    for (const inv of dayInvoices ?? []) {
+      if (inv.status === "Cancelled") continue;
+      const name = inv.customerName?.trim() || "Walk-in";
+      if (!invoicesByCustomer.has(name)) invoicesByCustomer.set(name, []);
+      invoicesByCustomer.get(name)!.push(inv);
+    }
+
+    const enrichedCustomerBreakdown = customerBreakdown.map((c) => {
+      const invoicesForCustomer = invoicesByCustomer.get(c.name) ?? [];
+      const sorted = [...invoicesForCustomer].sort((a, b) => {
+        const ta = a.dateRaw ? dayjs(a.dateRaw).valueOf() : 0;
+        const tb = b.dateRaw ? dayjs(b.dateRaw).valueOf() : 0;
+        return ta - tb;
+      });
+      const firstInvoice = sorted[0];
+      const lastInvoice = sorted[sorted.length - 1];
+      const newOutstanding = lastInvoice?.outstandingAfter ?? c.creditAmount;
+      const previousOutstanding = firstInvoice?.outstandingAfter
+        ? firstInvoice.outstandingAfter -
+          (firstInvoice.balanceAmount ?? 0) +
+          (firstInvoice.extraPaymentCollected ?? 0)
+        : newOutstanding;
+
+      return { ...c, previousOutstanding, newOutstanding };
+    });
+
+    return {
       date: from?.format("YYYY-MM-DD") ?? dayjs().format("YYYY-MM-DD"),
       companyName: companyName ?? "",
       invoiceCount: safeInvoiceCount,
@@ -328,32 +352,32 @@ const CollectionTab: React.FC<Props> = ({
       cashExpenses: cashExpenses ?? 0,
       pettyCashExpenses: pettyCashTransactions ?? [],
       totalPettyCashOut,
-      customerBreakdown,
+      customerBreakdown: enrichedCustomerBreakdown,
       productBreakdown,
       payments: allPayments ?? safePayments,
-    }),
-    [
-      from,
-      companyName,
-      safeInvoiceCount,
-      safeInvoicedTotal,
-      safeCreditSales,
-      safeCash,
-      safeUPI,
-      safeBank,
-      safeTotal,
-      safeOutstanding,
-      expenses,
-      totalExpenses,
-      cashExpenses,
-      pettyCashTransactions,
-      totalPettyCashOut,
-      customerBreakdown,
-      productBreakdown,
-      allPayments,
-      safePayments,
-    ]
-  );
+    };
+  }, [
+    from,
+    companyName,
+    safeInvoiceCount,
+    safeInvoicedTotal,
+    safeCreditSales,
+    safeCash,
+    safeUPI,
+    safeBank,
+    safeTotal,
+    safeOutstanding,
+    expenses,
+    totalExpenses,
+    cashExpenses,
+    pettyCashTransactions,
+    totalPettyCashOut,
+    customerBreakdown,
+    productBreakdown,
+    allPayments,
+    safePayments,
+    dayInvoices,
+  ]);
 
   const handlePrintClosing = () => {
     const content = reportRef.current;

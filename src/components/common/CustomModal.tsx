@@ -158,7 +158,7 @@ const CustomModal = ({
           <div
             className={`flex items-center justify-between px-6 py-4 border-b border-slate-100
               bg-gradient-to-r ${tone.gradient}
-              sticky top-0 z-20 rounded-t-2xl`}
+              relative z-20 rounded-t-2xl`}
           >
             <div className="flex items-center gap-4 flex-1 min-w-0">
               {icon && (
@@ -211,7 +211,7 @@ const CustomModal = ({
           {footer && (
             <div
               className="border-t border-slate-100 bg-gradient-to-r from-slate-50 via-white to-slate-50
-                px-6 py-4 sticky bottom-0 z-20 rounded-b-2xl"
+              px-6 py-4 relative z-20 rounded-b-2xl"
             >
               {footer}
             </div>

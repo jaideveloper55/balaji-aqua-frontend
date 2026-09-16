@@ -32,12 +32,10 @@ interface CustomerSummary {
   bankAmount: number;
   creditAmount: number;
   invoiceCount: number;
+  previousOutstanding: number;
+  newOutstanding: number;
 }
 
-// NEW — one row per product sold today. Sourced from InvoiceItem, which
-// already snapshots productName/sku/unit/quantity/lineTotal on every sale
-// line, so this is an aggregation of data you already store, not a new
-// data source.
 export interface ProductSummary {
   productName: string;
   sku: string;
@@ -187,8 +185,9 @@ const DayClosingReport = forwardRef<HTMLDivElement, Props>(
                       <Th align="center">Bills</Th>
                       <Th align="right">Cash</Th>
                       <Th align="right">UPI</Th>
-                      <Th align="right">Bank</Th>
                       <Th align="right">Credit</Th>
+                      <Th align="right">Old Balance</Th>
+                      <Th align="right">New Balance</Th>
                       <Th align="right">Total</Th>
                     </tr>
                   </thead>
@@ -213,15 +212,22 @@ const DayClosingReport = forwardRef<HTMLDivElement, Props>(
                         <td className="py-1.5 text-right text-gray-700">
                           {c.upiAmount > 0 ? formatCurrency(c.upiAmount) : "—"}
                         </td>
-                        <td className="py-1.5 text-right text-gray-700">
-                          {c.bankAmount > 0
-                            ? formatCurrency(c.bankAmount)
-                            : "—"}
-                        </td>
                         <td className="py-1.5 text-right text-amber-600">
                           {c.creditAmount > 0
                             ? formatCurrency(c.creditAmount)
                             : "—"}
+                        </td>
+                        <td className="py-1.5 text-right text-gray-600">
+                          {formatCurrency(c.previousOutstanding)}
+                        </td>
+                        <td
+                          className={`py-1.5 text-right font-semibold ${
+                            c.newOutstanding > 0
+                              ? "text-amber-600"
+                              : "text-emerald-600"
+                          }`}
+                        >
+                          {formatCurrency(c.newOutstanding)}
                         </td>
                         <td className="py-1.5 text-right font-semibold text-gray-900">
                           {formatCurrency(c.totalAmount)}
@@ -256,10 +262,34 @@ const DayClosingReport = forwardRef<HTMLDivElement, Props>(
                           )
                         )}
                       </td>
-                      <td className="py-2 text-right font-bold text-gray-800">
+                      <td className="py-2 text-right font-bold text-amber-600">
                         {formatCurrency(
                           data.customerBreakdown.reduce(
-                            (s, c) => s + c.bankAmount,
+                            (s, c) => s + c.creditAmount,
+                            0
+                          )
+                        )}
+                      </td>
+                      <td className="py-2 text-right font-bold text-gray-700">
+                        {formatCurrency(
+                          data.customerBreakdown.reduce(
+                            (s, c) => s + c.previousOutstanding,
+                            0
+                          )
+                        )}
+                      </td>
+                      <td className="py-2 text-right font-bold text-amber-600">
+                        {formatCurrency(
+                          data.customerBreakdown.reduce(
+                            (s, c) => s + c.newOutstanding,
+                            0
+                          )
+                        )}
+                      </td>
+                      <td className="py-2 text-right font-bold text-gray-900">
+                        {formatCurrency(
+                          data.customerBreakdown.reduce(
+                            (s, c) => s + c.totalAmount,
                             0
                           )
                         )}
