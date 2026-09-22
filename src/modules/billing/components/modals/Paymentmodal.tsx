@@ -126,11 +126,21 @@ const PaymentModal: React.FC<Props> = ({
     [splitAmounts]
   );
   const splitCredit = Math.max(0, grandTotal - splitEntered);
-  const splitOverpaid = splitEntered > grandTotal;
 
-  // ─── Unified amount logic ───
-  // Overpayment beyond grandTotal goes to outstanding automatically.
-  // If no outstanding, it becomes change to return.
+  const splitExcess = Math.max(0, splitEntered - grandTotal);
+  const splitExtraForOutstanding = useMemo(() => {
+    if (splitExcess <= 0 || previousDue <= 0) return 0;
+    return Math.min(splitExcess, previousDue);
+  }, [splitExcess, previousDue]);
+  const splitChangeToReturn = Math.max(
+    0,
+    splitExcess - splitExtraForOutstanding
+  );
+  const splitRemainingDueAfter = Math.max(
+    0,
+    previousDue - splitExtraForOutstanding
+  );
+
   const extraForOutstanding = useMemo(() => {
     if (isSplit || paymentMode === "credit" || previousDue <= 0) return 0;
     const overpaid = amountReceived - grandTotal;
@@ -189,13 +199,27 @@ const PaymentModal: React.FC<Props> = ({
     return true;
   };
 
+  const buildCappedSplits = (): PaymentSplit[] => {
+    let toStrip = splitExcess;
+    const capped: Record<PaymentSplit["mode"], number> = { ...splitAmounts };
+    for (const row of [...SPLIT_ROWS].reverse()) {
+      if (toStrip <= 0) break;
+      const take = Math.min(capped[row.mode], toStrip);
+      capped[row.mode] -= take;
+      toStrip -= take;
+    }
+    return SPLIT_ROWS.filter((r) => capped[r.mode] > 0).map((r) => ({
+      mode: r.mode,
+      amount: capped[r.mode],
+      referenceId: r.needsRef
+        ? splitRefs[r.mode].trim() || undefined
+        : undefined,
+    }));
+  };
+
   const handleConfirmSplit = () => {
     if (splitEntered <= 0 && splitCredit <= 0) {
       message.warning("Enter at least one payment amount");
-      return;
-    }
-    if (splitOverpaid) {
-      message.warning("Entered amount is more than the bill total");
       return;
     }
     for (const row of SPLIT_ROWS) {
@@ -209,20 +233,11 @@ const PaymentModal: React.FC<Props> = ({
       }
     }
     if (splitCredit > 0 && !validateDueDate()) return;
-    const splits: PaymentSplit[] = SPLIT_ROWS.filter(
-      (r) => splitAmounts[r.mode] > 0
-    ).map((r) => ({
-      mode: r.mode,
-      amount: splitAmounts[r.mode],
-      referenceId: r.needsRef
-        ? splitRefs[r.mode].trim() || undefined
-        : undefined,
-    }));
     onConfirm(
       undefined,
       splitCredit > 0 ? dueDate?.toISOString() : undefined,
-      splits,
-      undefined
+      buildCappedSplits(),
+      splitExtraForOutstanding > 0 ? splitExtraForOutstanding : undefined
     );
   };
 
@@ -314,9 +329,7 @@ const PaymentModal: React.FC<Props> = ({
   })();
 
   const confirmDisabled =
-    isProcessing ||
-    (!isSplit && paymentMode === "upi" && !upiVerified) ||
-    (isSplit && splitOverpaid);
+    isProcessing || (!isSplit && paymentMode === "upi" && !upiVerified);
 
   const paymentMethods = [
     { key: "cash", label: "Cash", icon: <HiOutlineCash className="w-5 h-5" /> },
@@ -498,22 +511,46 @@ const PaymentModal: React.FC<Props> = ({
                 </span>
               </div>
               <div className="h-px bg-gray-200 my-1" />
-              {splitOverpaid ? (
-                <div className="flex justify-between text-red-600 font-semibold">
-                  <span>Over by</span>
-                  <span>{formatCurrency(splitEntered - grandTotal)}</span>
-                </div>
-              ) : splitCredit > 0 ? (
+              {splitCredit > 0 && (
                 <div className="flex justify-between text-amber-700 font-semibold">
                   <span>On credit (pay later)</span>
                   <span>{formatCurrency(splitCredit)}</span>
                 </div>
-              ) : (
-                <div className="flex justify-between text-emerald-700 font-semibold">
-                  <span>Fully paid</span>
-                  <span>{formatCurrency(grandTotal)}</span>
-                </div>
               )}
+              {splitExtraForOutstanding > 0 && (
+                <>
+                  <div className="h-px bg-gray-200 my-1" />
+                  <div className="flex justify-between text-blue-700">
+                    <span>Toward old dues</span>
+                    <span className="font-semibold">
+                      {formatCurrency(splitExtraForOutstanding)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-gray-500 text-[11px]">
+                    <span>Outstanding after</span>
+                    <span className="font-medium">
+                      {formatCurrency(splitRemainingDueAfter)}
+                    </span>
+                  </div>
+                </>
+              )}
+              {splitChangeToReturn > 0 && (
+                <>
+                  <div className="h-px bg-gray-200 my-1" />
+                  <div className="flex justify-between text-orange-600 font-semibold">
+                    <span>Change to return</span>
+                    <span>{formatCurrency(splitChangeToReturn)}</span>
+                  </div>
+                </>
+              )}
+              {splitCredit === 0 &&
+                splitExtraForOutstanding === 0 &&
+                splitChangeToReturn === 0 && (
+                  <div className="flex justify-between text-emerald-700 font-semibold pt-1">
+                    <span>Fully paid</span>
+                    <span>{formatCurrency(grandTotal)}</span>
+                  </div>
+                )}
             </div>
           </div>
         ) : (
