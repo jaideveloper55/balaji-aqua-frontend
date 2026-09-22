@@ -41,7 +41,7 @@ export interface ProductSummary {
   sku: string;
   unit: string;
   quantitySold: number;
-  invoiceCount: number; // how many of today's invoices included this product
+  invoiceCount: number;
   totalAmount: number;
 }
 
@@ -62,7 +62,7 @@ export interface DayClosingData {
   pettyCashExpenses: PettyCashRow[];
   totalPettyCashOut: number;
   customerBreakdown: CustomerSummary[];
-  productBreakdown: ProductSummary[]; // NEW
+  productBreakdown: ProductSummary[];
   payments: PaymentEntry[];
 }
 
@@ -73,13 +73,8 @@ interface Props {
   onPrint: () => void;
 }
 
-/* ── Component ─────────────────────────────────────────────────────── */
-
 const DayClosingReport = forwardRef<HTMLDivElement, Props>(
   ({ open, data, onClose, onPrint }, ref) => {
-    // Petty cash is always cash (no paymentMode on that model — it's a physical box),
-    // so it's deducted alongside cash expenses, but shown as its own line since it
-    // comes from a different source than the Expenses tab.
     const netCashInHand =
       data.cashCollected - data.cashExpenses - data.totalPettyCashOut;
     const formattedDate = dayjs(data.date).format("DD MMM YYYY, dddd");
@@ -218,7 +213,9 @@ const DayClosingReport = forwardRef<HTMLDivElement, Props>(
                             : "—"}
                         </td>
                         <td className="py-1.5 text-right text-gray-600">
-                          {formatCurrency(c.previousOutstanding)}
+                          {c.previousOutstanding > 0
+                            ? formatCurrency(c.previousOutstanding)
+                            : "—"}
                         </td>
                         <td
                           className={`py-1.5 text-right font-semibold ${
@@ -282,22 +279,6 @@ const DayClosingReport = forwardRef<HTMLDivElement, Props>(
                         {formatCurrency(
                           data.customerBreakdown.reduce(
                             (s, c) => s + c.newOutstanding,
-                            0
-                          )
-                        )}
-                      </td>
-                      <td className="py-2 text-right font-bold text-gray-900">
-                        {formatCurrency(
-                          data.customerBreakdown.reduce(
-                            (s, c) => s + c.totalAmount,
-                            0
-                          )
-                        )}
-                      </td>
-                      <td className="py-2 text-right font-bold text-amber-600">
-                        {formatCurrency(
-                          data.customerBreakdown.reduce(
-                            (s, c) => s + c.creditAmount,
                             0
                           )
                         )}

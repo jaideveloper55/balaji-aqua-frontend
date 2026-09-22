@@ -22,6 +22,10 @@ import {
   BsShieldLock,
 } from "react-icons/bs";
 import type { IconType } from "react-icons";
+// Reusing the same MenuKey enum UAM's Role→Menu toggles already speak —
+// one shared vocabulary, so a sidebar item and its RoleMenuPermission row
+// always refer to the exact same thing, spelled the exact same way.
+import type { MenuKey } from "../modules/uam/types/Uam"; // adjust path if orgConfig.ts sits elsewhere relative to modules/uam
 
 export interface MenuItem {
   id: string;
@@ -29,7 +33,16 @@ export interface MenuItem {
   label: string;
   href: string;
   group: string;
+  // Hard, permanent gate — never configurable via the toggle panel.
+  // Used only for things like UAM itself, which must always be
+  // Super-Admin-only regardless of what any RoleMenuPermission row says.
   roles?: ("SUPER_ADMIN" | "ADMIN" | "STAFF" | "DELIVERY_BOY")[];
+  // Soft, Super-Admin-configurable gate. If set, the Sidebar checks this
+  // item against the logged-in user's enabledMenuKeys (from login()/me()
+  // — see auth.store.ts) before showing it. Omit entirely for items that
+  // should always show to everyone with base access (rare — most items
+  // should have one).
+  menuKey?: MenuKey;
 }
 
 export interface QuickLink {
@@ -102,6 +115,7 @@ const waterPlantConfig: OrgConfig = {
       label: "Dashboard",
       href: "/admin/dashboard",
       group: "Main",
+      menuKey: "DASHBOARD",
     },
     {
       id: "customers",
@@ -109,6 +123,7 @@ const waterPlantConfig: OrgConfig = {
       label: "Customer Management",
       href: "/admin/customers",
       group: "Operations",
+      menuKey: "CUSTOMER_MANAGEMENT",
     },
     {
       id: "products",
@@ -116,27 +131,15 @@ const waterPlantConfig: OrgConfig = {
       label: "Product Management",
       href: "/admin/products",
       group: "Operations",
+      menuKey: "PRODUCT_MANAGEMENT",
     },
-    // {
-    //   id: "delivery",
-    //   icon: BsTruck,
-    //   label: "Delivery Management",
-    //   href: "/admin/delivery",
-    //   group: "Operations",
-    // },
-    // {
-    //   id: "jar-tracking",
-    //   icon: BsDroplet,
-    //   label: "Jar / Can Tracking",
-    //   href: "/admin/jar-tracking",
-    //   group: "Operations",
-    // },
     {
       id: "billing-pos",
       icon: BsReceipt,
       label: "Billing & POS",
       href: "/admin/billing-pos",
       group: "Billing",
+      menuKey: "BILLING_POS",
     },
     {
       id: "event-orders",
@@ -144,6 +147,7 @@ const waterPlantConfig: OrgConfig = {
       label: "Event / Function Orders",
       href: "/admin/event-orders",
       group: "Billing",
+      menuKey: "EVENT_ORDERS",
     },
     {
       id: "inventory",
@@ -151,34 +155,15 @@ const waterPlantConfig: OrgConfig = {
       label: "Inventory Management",
       href: "/admin/inventory",
       group: "Billing",
+      menuKey: "INVENTORY",
     },
-    // {
-    //   id: "employees",
-    //   icon: AiOutlineTeam,
-    //   label: "Employee Management",
-    //   href: "/admin/employees",
-    //   group: "HR",
-    // },
-    // {
-    //   id: "attendance",
-    //   icon: AiOutlineCalendar,
-    //   label: "Attendance & Overtime",
-    //   href: "/admin/attendance",
-    //   group: "HR",
-    // },
-    // {
-    //   id: "salary",
-    //   icon: AiOutlineDollar,
-    //   label: "Salary Management",
-    //   href: "/admin/salary",
-    //   group: "HR",
-    // },
     {
       id: "expenses",
       icon: BsWallet2,
       label: "Expense Management",
       href: "/admin/expenses",
       group: "Finance",
+      menuKey: "EXPENSES",
     },
     {
       id: "uam",
@@ -186,22 +171,8 @@ const waterPlantConfig: OrgConfig = {
       label: "User Access Management",
       href: "/admin/uam",
       group: "Admin",
-      roles: ["SUPER_ADMIN"],
+      roles: ["SUPER_ADMIN"], // hard gate only — deliberately no menuKey
     },
-    // {
-    //   id: "production",
-    //   icon: BsGraphUp,
-    //   label: "Water Production & Cost",
-    //   href: "/admin/production",
-    //   group: "Finance",
-    // },
-    // {
-    //   id: "reports",
-    //   icon: AiOutlineBarChart,
-    //   label: "Reports & Analytics",
-    //   href: "/admin/reports",
-    //   group: "Analytics",
-    // },
   ],
   quickLinks: [
     { href: "/admin/dashboard", icon: AiOutlineHome, label: "Dashboard" },
@@ -213,6 +184,12 @@ const waterPlantConfig: OrgConfig = {
 };
 
 // ── Royal Beverage — Refreshing Drinks ────────────────────────────
+// NOTE: this config's menuItem ids/labels (e.g. "SKU Management" instead
+// of "Product Management") don't line up with the shared MenuKey enum at
+// all yet — that enum was built only from the Water Plant sidebar's
+// current items. Leaving menuKey off every entry here for now rather than
+// guessing a mapping; a Beverage-side STAFF/ADMIN account would currently
+// see everything unfiltered until this config gets its own reviewed set.
 const beverageConfig: OrgConfig = {
   id: "royal-beverage",
   name: "Royal Beverage",
@@ -351,13 +328,11 @@ const beverageConfig: OrgConfig = {
   ],
 };
 
-// ── Registry ──────────────────────────────────────────────────────
 export const ORG_CONFIGS: Record<string, OrgConfig> = {
   "balaji-aqua": waterPlantConfig,
   "royal-beverage": beverageConfig,
 };
 
-/** Get config by org ID. Falls back to balaji-aqua. */
 export const getOrgConfig = (orgId?: string | null): OrgConfig => {
   return ORG_CONFIGS[orgId || ""] ?? waterPlantConfig;
 };

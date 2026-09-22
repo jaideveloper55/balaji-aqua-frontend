@@ -1,13 +1,24 @@
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
-import { Switch } from "antd";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { Switch, Spin } from "antd";
 import { HiOutlineShieldCheck, HiOutlineMenuAlt2 } from "react-icons/hi";
 import CustomModal from "../../../components/common/CustomModal";
 import CustomSelect from "../../../components/common/CustomSelect";
-import { successNotification } from "../../../components/common/Notification";
-import { getOrgConfig } from "../../../config/orgConfig";
-import type { MenuItem } from "../../../config/orgConfig";
-import type { UamUser, UserRole } from "../types/Uam";
+import { errorNotification } from "../../../components/common/Notification";
+import {
+  getRolePermissionsApi,
+  updateRolePermissionsApi,
+} from "../api/uam.api";
+
+import type { MenuKey, MenuPermission, UamUser, UserRole } from "../types/Uam";
+import {
+  ALL_MENU_KEYS,
+  GROUPED_MENU_KEYS,
+  MENU_KEY_META,
+} from "../constants/menuKeyMeta";
+
+type AssignableRole = Exclude<UserRole, "SUPER_ADMIN">;
 
 interface Props {
   user: UamUser | null;
@@ -16,97 +27,118 @@ interface Props {
   onSaved: (userId: string, role: UserRole) => void;
 }
 
-const ROLE_OPTIONS = [
-  { value: "SUPER_ADMIN", label: "Super Admin — full platform access" },
+const ROLE_OPTIONS: { value: AssignableRole; label: string }[] = [
   { value: "ADMIN", label: "Admin — owns their company" },
   { value: "STAFF", label: "Staff — limited office access" },
   { value: "DELIVERY_BOY", label: "Delivery Boy — assigned deliveries only" },
 ];
 
+const ROLE_LABEL: Record<AssignableRole, string> = {
+  ADMIN: "Admin",
+  STAFF: "Staff",
+  DELIVERY_BOY: "Delivery Boy",
+};
+
 interface FormValues {
-  role: UserRole;
+  role: AssignableRole;
 }
 
-// An item with no `roles` restriction is visible to everyone today — that
-// counts as "allowed" by default when we first show the checklist for a role.
-const computeDefaultAllowedIds = (role: UserRole, items: MenuItem[]) =>
-  items
-    .filter((item) => !item.roles || item.roles.includes(role))
-    .map((i) => i.id);
-
 const ChangeRoleModal = ({ user, open, onClose, onSaved }: Props) => {
+  const queryClient = useQueryClient();
   const { control, handleSubmit, reset, watch } = useForm<FormValues>({
     defaultValues: { role: "STAFF" },
   });
-  const [isSaving, setIsSaving] = useState(false);
-  const [allowedMenuIds, setAllowedMenuIds] = useState<string[]>([]);
-
   const selectedRole = watch("role");
 
-  // ⚠️ SIMPLIFICATION: sourced from the Water Plant org's menu set specifically,
-  // since that's the org currently active in this app. A user belonging to a
-  // BEVERAGE-type company (e.g. Chennai Beverages Co) would actually see a
-  // different menu — once real per-company menu resolution exists, this
-  // should key off THAT company's config instead of a hardcoded org id.
-  const menuItems = useMemo(() => getOrgConfig("balaji-aqua").menuItems, []);
-
-  const groupedMenuItems = useMemo(() => {
-    const groups = new Map<string, MenuItem[]>();
-    for (const item of menuItems) {
-      if (!groups.has(item.group)) groups.set(item.group, []);
-      groups.get(item.group)!.push(item);
-    }
-    return Array.from(groups.entries());
-  }, [menuItems]);
+  const [permissionMap, setPermissionMap] = useState<
+    Partial<Record<MenuKey, boolean>>
+  >({});
 
   useEffect(() => {
-    if (open && user) reset({ role: user.role });
+    if (open && user && user.role !== "SUPER_ADMIN") {
+      reset({ role: user.role as AssignableRole });
+    }
   }, [open, user, reset]);
 
-  // Re-derives the checklist every time the selected role changes — including
-  // right when the modal opens. This intentionally OVERWRITES any manual
-  // toggles if the role dropdown is changed afterward, trading a small
-  // amount of "lost edits" risk for a much simpler, more predictable model:
-  // switching roles always shows that role's real current defaults, not a
-  // half-edited mix carried over from whichever role was selected before.
+  const { data: permissionsData, isLoading: isLoadingPermissions } = useQuery({
+    queryKey: ["role-permissions", selectedRole],
+    queryFn: () =>
+      getRolePermissionsApi(selectedRole).then(
+        (res) => res.data as MenuPermission[]
+      ),
+    enabled: open && !!user && user.role !== "SUPER_ADMIN",
+  });
+
   useEffect(() => {
-    if (open)
-      setAllowedMenuIds(computeDefaultAllowedIds(selectedRole, menuItems));
-  }, [open, selectedRole, menuItems]);
+    if (permissionsData) {
+      const map: Partial<Record<MenuKey, boolean>> = {};
+      permissionsData.forEach((p) => {
+        map[p.menuKey] = p.isEnabled;
+      });
+      setPermissionMap(map);
+    }
+  }, [permissionsData]);
+
+  const permissionsMutation = useMutation({
+    mutationFn: ({
+      role,
+      items,
+    }: {
+      role: AssignableRole;
+      items: MenuPermission[];
+    }) => updateRolePermissionsApi(role, items).then((res) => res.data),
+  });
 
   if (!user) return null;
 
-  const isSuperAdminSelected = selectedRole === "SUPER_ADMIN";
-  const isNoOp = selectedRole === user.role;
-
-  const toggleMenuItem = (id: string) => {
-    if (isSuperAdminSelected) return; // guarded — see note above render
-    setAllowedMenuIds((prev) =>
-      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+  if (user.role === "SUPER_ADMIN") {
+    return (
+      <CustomModal
+        open={open}
+        onClose={onClose}
+        title="Change User Role"
+        subtitle={`${user.firstName} ${user.lastName} · ${user.email}`}
+        icon={<HiOutlineShieldCheck size={22} />}
+        iconTone="blue"
+      >
+        <div className="rounded-lg bg-slate-50 border border-slate-200 px-4 py-3 text-sm text-slate-600">
+          Super Admin accounts have full platform access by default and aren't
+          managed from this screen.
+        </div>
+      </CustomModal>
     );
+  }
+
+  const toggleMenuItem = (menuKey: MenuKey) => {
+    setPermissionMap((prev) => ({ ...prev, [menuKey]: !prev[menuKey] }));
   };
 
   const submit = (values: FormValues) => {
-    setIsSaving(true);
-    // TEMP: only the role itself is actually persisted right now (via
-    // onSaved, into UamPage's dummy-data state). The menu-access toggles
-    // above are interactive and correct, but there's no backend model yet
-    // to save THOSE against — that needs a real RolePermission table plus
-    // an API call here once the dummy-data phase is done.
-    setTimeout(() => {
-      onSaved(user.id, values.role);
-      successNotification(
-        "Role Updated",
-        `${user.firstName} is now ${values.role
-          .replace("_", " ")
-          .toLowerCase()} — ${
-          allowedMenuIds.length
-        } menu item(s) enabled for this role.`
-      );
-      setIsSaving(false);
-      onClose();
-    }, 500);
+    const items: MenuPermission[] = ALL_MENU_KEYS.map((menuKey) => ({
+      menuKey,
+      isEnabled: permissionMap[menuKey] ?? false,
+    }));
+
+    permissionsMutation.mutate(
+      { role: values.role, items },
+      {
+        onSuccess: () => {
+          queryClient.invalidateQueries({
+            queryKey: ["role-permissions", values.role],
+          });
+          onSaved(user.id, values.role);
+          onClose();
+        },
+        onError: (err: any) =>
+          errorNotification(
+            "Save Failed",
+            err?.message ?? "Could not save menu access for this role"
+          ),
+      }
+    );
   };
+
+  const isSaving = permissionsMutation.isPending;
 
   const footer = (
     <div className="flex justify-end gap-2">
@@ -119,7 +151,7 @@ const ChangeRoleModal = ({ user, open, onClose, onSaved }: Props) => {
       </button>
       <button
         onClick={handleSubmit(submit)}
-        disabled={isSaving || isNoOp}
+        disabled={isSaving || isLoadingPermissions}
         className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm transition shadow-sm shadow-blue-500/25 disabled:opacity-50"
       >
         {isSaving ? "Saving..." : "Save Role"}
@@ -152,71 +184,58 @@ const ChangeRoleModal = ({ user, open, onClose, onSaved }: Props) => {
           isrequired
         />
 
-        {isSuperAdminSelected && (
-          <div className="rounded-lg bg-blue-50 border border-blue-100 px-3 py-2 text-xs text-blue-700">
-            Super Admin can see and manage every company on the platform — grant
-            this carefully.
-          </div>
-        )}
-
-        {/* ── Menu Access ─────────────────────────────────────────────
-            Applies to the whole ROLE, not just this one person — flagged
-            explicitly so nobody mistakes this for a per-user override. */}
         <div className="border-t border-slate-100 pt-4">
           <div className="flex items-center gap-2 mb-1">
             <HiOutlineMenuAlt2 className="text-slate-400" size={16} />
             <p className="text-sm font-semibold text-slate-700">
-              Menu Access for "
-              {
-                ROLE_OPTIONS.find((r) => r.value === selectedRole)?.label.split(
-                  " —"
-                )[0]
-              }
-              "
+              Menu Access for "{ROLE_LABEL[selectedRole]}"
             </p>
           </div>
           <p className="text-[11px] text-slate-400 mb-3">
             These toggles apply to everyone with this role, not just{" "}
             {user.firstName}.
-            {isSuperAdminSelected &&
-              " Super Admin always has full access and can't be restricted here."}
           </p>
 
-          <div className="max-h-64 overflow-y-auto pr-1 flex flex-col gap-4">
-            {groupedMenuItems.map(([group, items]) => (
-              <div key={group}>
-                <p className="text-[10px] font-bold tracking-wider text-slate-400 uppercase mb-1.5">
-                  {group}
-                </p>
-                <div className="flex flex-col gap-1.5">
-                  {items.map((item) => {
-                    const Icon = item.icon;
-                    const checked =
-                      isSuperAdminSelected || allowedMenuIds.includes(item.id);
-                    return (
-                      <div
-                        key={item.id}
-                        className="flex items-center justify-between px-3 py-2 rounded-lg bg-slate-50 border border-slate-100"
-                      >
-                        <div className="flex items-center gap-2">
-                          <Icon className="text-slate-400" size={15} />
-                          <span className="text-[13px] text-slate-700">
-                            {item.label}
-                          </span>
+          {isLoadingPermissions ? (
+            <div className="flex justify-center py-10">
+              <Spin size="small" />
+            </div>
+          ) : (
+            <div className="max-h-64 overflow-y-auto pr-1 flex flex-col gap-4">
+              {GROUPED_MENU_KEYS.map(([group, keys]) => (
+                <div key={group}>
+                  <p className="text-[10px] font-bold tracking-wider text-slate-400 uppercase mb-1.5">
+                    {group}
+                  </p>
+                  <div className="flex flex-col gap-1.5">
+                    {keys.map((menuKey) => {
+                      const meta = MENU_KEY_META[menuKey];
+                      const Icon = meta.icon;
+                      const checked = permissionMap[menuKey] ?? false;
+                      return (
+                        <div
+                          key={menuKey}
+                          className="flex items-center justify-between px-3 py-2 rounded-lg bg-slate-50 border border-slate-100"
+                        >
+                          <div className="flex items-center gap-2">
+                            <Icon className="text-slate-400" size={15} />
+                            <span className="text-[13px] text-slate-700">
+                              {meta.label}
+                            </span>
+                          </div>
+                          <Switch
+                            size="small"
+                            checked={checked}
+                            onChange={() => toggleMenuItem(menuKey)}
+                          />
                         </div>
-                        <Switch
-                          size="small"
-                          checked={checked}
-                          disabled={isSuperAdminSelected}
-                          onChange={() => toggleMenuItem(item.id)}
-                        />
-                      </div>
-                    );
-                  })}
+                      );
+                    })}
+                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </CustomModal>

@@ -1331,6 +1331,17 @@ const BillingPage = () => {
     });
   };
 
+  const customerBalanceMap = useMemo(() => {
+    const map = new Map<string, { oldBalance: number; newBalance: number }>();
+    (dailySummary as any)?.customerBalances?.forEach((cb: any) => {
+      map.set(cb.customerId, {
+        oldBalance: cb.oldBalance,
+        newBalance: cb.newBalance,
+      });
+    });
+    return map;
+  }, [dailySummary]);
+
   return (
     <div className="min-h-screen space-y-10">
       <CustomPageHeader
@@ -1500,6 +1511,7 @@ const BillingPage = () => {
             totalExpenses={totalExpensesAmount}
             cashExpenses={cashExpensesAmount}
             dayInvoices={closingInvoices}
+            customerBalances={customerBalanceMap}
             allPayments={closingPayments}
             pettyCashTransactions={closingPettyCash}
             selectedPayments={payments}

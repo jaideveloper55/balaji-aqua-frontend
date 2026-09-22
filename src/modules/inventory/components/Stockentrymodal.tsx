@@ -157,8 +157,6 @@ const Stockentrymodal = ({
       size="xl"
       footer={
         <div className="flex items-center justify-between gap-3">
-          {/* Confirmation summary lives IN the footer — user sees exactly
-              what will happen right next to the button that does it */}
           <div className="text-[12px] text-slate-500 min-h-[18px]">
             {product && qty > 0 && !overdraw && (
               <>

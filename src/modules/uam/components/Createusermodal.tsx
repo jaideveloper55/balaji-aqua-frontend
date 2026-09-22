@@ -1,35 +1,33 @@
-// src/modules/uam/components/Createusermodal.tsx
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { useForm } from "react-hook-form";
+import { useQuery } from "@tanstack/react-query";
 import { HiOutlineUserAdd } from "react-icons/hi";
 import CustomModal from "../../../components/common/CustomModal";
 import CustomInput from "../../../components/common/CustomInput";
 import CustomSelect from "../../../components/common/CustomSelect";
-import { successNotification } from "../../../components/common/Notification";
-import { DUMMY_COMPANIES } from "../constants/DummyUsers";
-import type { CreateUserPayload, UamUser, UserRole } from "../types/Uam";
+import { getCompaniesApi } from "../api/uam.api";
+import type {
+  CreateUserPayload,
+  UamCompany,
+  UamUser,
+  UserRole,
+} from "../types/Uam";
+
+type AssignableRole = Exclude<UserRole, "SUPER_ADMIN">;
 
 interface Props {
   open: boolean;
   onClose: () => void;
   onCreated: (payload: CreateUserPayload) => void;
-  // Passed in so email/phone can be checked for duplicates against real
-  // current data, not a stale copy — same reasoning as the backend's
-  // phone-conflict check in customers.service.ts.
   existingUsers: UamUser[];
+  isSubmitting: boolean;
 }
 
-const ROLE_OPTIONS = [
-  { value: "SUPER_ADMIN", label: "Super Admin — full platform access" },
+const ROLE_OPTIONS: { value: AssignableRole; label: string }[] = [
   { value: "ADMIN", label: "Admin — owns their company" },
   { value: "STAFF", label: "Staff — limited office access" },
   { value: "DELIVERY_BOY", label: "Delivery Boy — assigned deliveries only" },
 ];
-
-const COMPANY_OPTIONS = DUMMY_COMPANIES.map((c) => ({
-  value: c.id,
-  label: c.name,
-}));
 
 interface FormValues {
   firstName: string;
@@ -37,8 +35,12 @@ interface FormValues {
   email: string;
   phone: string;
   password: string;
-  role: UserRole;
-  companyId?: string;
+  role: AssignableRole;
+  // Real multi-select now — the backend (UsersService.create) already
+  // supports one user belonging to several companies. This used to be a
+  // single string wrapped into a 1-item array right before sending; now
+  // the array itself IS what the form collects, no wrapping needed.
+  companyIds: string[];
 }
 
 const DEFAULT_VALUES: FormValues = {
@@ -48,7 +50,7 @@ const DEFAULT_VALUES: FormValues = {
   phone: "",
   password: "",
   role: "STAFF",
-  companyId: undefined,
+  companyIds: [],
 };
 
 const CreateUserModal = ({
@@ -56,65 +58,58 @@ const CreateUserModal = ({
   onClose,
   onCreated,
   existingUsers,
+  isSubmitting,
 }: Props) => {
   const {
     control,
     handleSubmit,
     reset,
-    watch,
     formState: { errors },
   } = useForm<FormValues>({ defaultValues: DEFAULT_VALUES });
-  const [isSaving, setIsSaving] = useState(false);
 
-  const selectedRole = watch("role");
-  const isSuperAdmin = selectedRole === "SUPER_ADMIN";
-
-  // Fresh, empty form every time this modal opens — otherwise a second
-  // "Add User" click right after creating someone would silently reopen
-  // with that previous person's leftover values still sitting in it.
   useEffect(() => {
     if (open) reset(DEFAULT_VALUES);
   }, [open, reset]);
 
+  const { data: companies, isLoading: isLoadingCompanies } = useQuery({
+    queryKey: ["companies"],
+    queryFn: () => getCompaniesApi().then((res) => res.data as UamCompany[]),
+    enabled: open,
+    staleTime: 1000 * 60 * 5,
+  });
+
+  const companyOptions = (companies ?? []).map((c) => ({
+    value: c.id,
+    label: c.name,
+  }));
+
   const submit = (values: FormValues) => {
-    setIsSaving(true);
-    // TEMP: simulated network delay, same pattern as ChangeRoleModal —
-    // swap this setTimeout wrapper for a real API call once the backend
-    // /admin/users POST endpoint exists. Keep the code inside it as-is.
-    setTimeout(() => {
-      const payload: CreateUserPayload = {
-        ...values,
-        // SUPER_ADMIN is platform-wide — never send a companyId for it,
-        // even if one was left over in the form state from a prior role.
-        companyId: isSuperAdmin ? undefined : values.companyId,
-      };
-      onCreated(payload);
-      successNotification(
-        "User Created",
-        `${values.firstName} ${values.lastName} has been added as ${values.role
-          .replace("_", " ")
-          .toLowerCase()}.`
-      );
-      setIsSaving(false);
-      onClose();
-    }, 500);
+    onCreated({
+      firstName: values.firstName,
+      lastName: values.lastName,
+      email: values.email,
+      phone: values.phone,
+      password: values.password,
+      role: values.role,
+      companyIds: values.companyIds,
+    });
   };
 
   const footer = (
     <div className="flex justify-end gap-2">
       <button
         onClick={onClose}
-        disabled={isSaving}
+        disabled={isSubmitting}
         className="px-4 py-2.5 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 font-medium text-sm transition disabled:opacity-50"
       >
         Cancel
       </button>
       <button
         onClick={handleSubmit(submit)}
-        disabled={isSaving}
+        disabled={isSubmitting}
         className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm transition shadow-sm shadow-blue-500/25 disabled:opacity-50"
       >
-        {isSaving ? "Creating..." : "Create User"}
+        {isSubmitting ? "Creating..." : "Create User"}
       </button>
     </div>
   );
@@ -129,9 +124,9 @@ const CreateUserModal = ({
       iconTone="blue"
       size="lg"
       footer={footer}
-      closeOnOverlayClick={!isSaving}
-      closeOnEsc={!isSaving}
-      showCloseButton={!isSaving}
+      closeOnOverlayClick={!isSubmitting}
+      closeOnEsc={!isSubmitting}
+      showCloseButton={!isSubmitting}
     >
       <div className="flex flex-col gap-5">
         <div>
@@ -153,7 +148,6 @@ const CreateUserModal = ({
               control={control}
               label="Last Name"
               placeholder="Last name"
-              isrequired
               errors={errors}
               rules={{ required: "Last name is required" }}
             />
@@ -184,7 +178,6 @@ const CreateUserModal = ({
               label="Phone"
               placeholder="9876543210"
               numbersOnly
-              isrequired
               errors={errors}
               rules={{
                 required: "Phone is required",
@@ -237,31 +230,26 @@ const CreateUserModal = ({
               rules={{ required: "Select a role" }}
             />
 
-            {/* Hidden entirely (not just disabled) for SUPER_ADMIN — there's
-                no meaningful "which company" answer for a platform-wide role,
-                so showing an empty/disabled dropdown would just be confusing
-                rather than informative. */}
-            {!isSuperAdmin && (
-              <CustomSelect
-                label="Company"
-                name="companyId"
-                control={control}
-                errors={errors}
-                placeholder="Select a company"
-                options={COMPANY_OPTIONS}
-                isrequired
-                rules={{
-                  validate: (v: string) => !!v || "Select a company",
-                }}
-              />
-            )}
-
-            {isSuperAdmin && (
-              <div className="rounded-lg bg-blue-50 border border-blue-100 px-3 py-2 text-xs text-blue-700">
-                Super Admin can see and manage every company on the platform —
-                grant this carefully.
-              </div>
-            )}
+            <CustomSelect
+              label="Company"
+              name="companyIds"
+              control={control}
+              errors={errors}
+              mode="multiple"
+              showSearch
+              placeholder={
+                isLoadingCompanies
+                  ? "Loading companies..."
+                  : "Select one or more companies"
+              }
+              options={companyOptions}
+              isrequired
+              rules={{
+                validate: (v: string[]) =>
+                  (Array.isArray(v) && v.length > 0) ||
+                  "Select at least one company",
+              }}
+            />
           </div>
         </div>
       </div>

@@ -28,6 +28,7 @@ export interface LoginResponse {
   message: string;
   user: User;
   companies: Company[];
+  enabledMenuKeys: string[];
   activeCompanyId: string;
   accessToken: string;
   refreshToken: string;

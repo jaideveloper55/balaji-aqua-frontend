@@ -12,6 +12,11 @@ interface AuthState {
   // ── Persisted state ──
   user: User | null;
   companies: Company[];
+  // Menu keys enabled for the logged-in user's role, from
+  // AuthService.login()/me()'s `enabledMenuKeys` field. SidebarNav reads
+  // this to decide which items to show — see the `menuKey` gate on each
+  // MenuItem in orgConfig.ts.
+  enabledMenuKeys: string[];
   activeCompanyId: string | null;
   accessToken: string | null;
   refreshToken: string | null;
@@ -36,6 +41,7 @@ export const useAuthStore = create<AuthState>()(
     (set, get) => ({
       user: null,
       companies: [],
+      enabledMenuKeys: [],
       activeCompanyId: null,
       accessToken: null,
       refreshToken: null,
@@ -46,6 +52,7 @@ export const useAuthStore = create<AuthState>()(
         set({
           user: data.user,
           companies: data.companies,
+          enabledMenuKeys: data.enabledMenuKeys,
           activeCompanyId: data.activeCompanyId,
           accessToken: data.accessToken,
           refreshToken: data.refreshToken,
@@ -67,6 +74,7 @@ export const useAuthStore = create<AuthState>()(
         set({
           user: null,
           companies: [],
+          enabledMenuKeys: [],
           activeCompanyId: null,
           accessToken: null,
           refreshToken: null,
@@ -95,6 +103,7 @@ export const useAuthStore = create<AuthState>()(
       partialize: (state) => ({
         user: state.user,
         companies: state.companies,
+        enabledMenuKeys: state.enabledMenuKeys,
         activeCompanyId: state.activeCompanyId,
         accessToken: state.accessToken,
         refreshToken: state.refreshToken,

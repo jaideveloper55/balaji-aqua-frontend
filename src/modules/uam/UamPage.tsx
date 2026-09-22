@@ -1,5 +1,6 @@
-import { useState, useMemo } from "react";
-import { Table, Switch, Tooltip } from "antd";
+import { useMemo, useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { Table, Switch, Tooltip, Spin } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { useForm } from "react-hook-form";
 import {
@@ -7,16 +8,28 @@ import {
   HiOutlinePencilAlt,
   HiOutlineOfficeBuilding,
   HiOutlineUserAdd,
+  HiOutlineTrash,
 } from "react-icons/hi";
 import CustomPageHeader from "../../components/common/CustomPageHeader";
 import CustomSelect from "../../components/common/CustomSelect";
 import CustomInput from "../../components/common/CustomInput";
-import { successNotification } from "../../components/common/Notification";
+import {
+  successNotification,
+  errorNotification,
+} from "../../components/common/Notification";
 
 import ChangeRoleModal from "./components/Changerolemodal";
 import CreateUserModal from "./components/Createusermodal";
-import { CreateUserPayload, UamUser, UserRole } from "./types/Uam";
-import { DUMMY_COMPANIES, DUMMY_USERS } from "./constants/DummyUsers";
+import DeleteUserModal from "./components/Deleteusermodal";
+import {
+  getUsersApi,
+  createUserApi,
+  updateUserRoleApi,
+  updateUserStatusApi,
+  deleteUserPermanentlyApi,
+} from "./api/uam.api";
+import type { CreateUserPayload, UamUser, UserRole } from "./types/Uam";
+import { useAuthStore } from "../../store/auth.store";
 
 const ROLE_FILTER_OPTIONS = [
   { value: "ALL", label: "All Roles" },
@@ -28,23 +41,30 @@ const ROLE_FILTER_OPTIONS = [
 
 const ROLE_STYLES: Record<
   UserRole,
-  { bg: string; text: string; label: string }
+  {
+    bg: string;
+    text: string;
+    label: string;
+  }
 > = {
   SUPER_ADMIN: {
     bg: "bg-purple-50",
     text: "text-purple-700",
     label: "Super Admin",
   },
+
   ADMIN: {
     bg: "bg-blue-50",
     text: "text-blue-700",
     label: "Admin",
   },
+
   STAFF: {
     bg: "bg-slate-100",
     text: "text-slate-700",
     label: "Staff",
   },
+
   DELIVERY_BOY: {
     bg: "bg-amber-50",
     text: "text-amber-700",
@@ -56,21 +76,62 @@ const initials = (first: string, last: string) =>
   `${first?.[0] ?? ""}${last?.[0] ?? ""}`.toUpperCase();
 
 const UamPage = () => {
+  const queryClient = useQueryClient();
+  const currentUserId = useAuthStore((s) => s.user?.id);
+
   const { control, watch } = useForm({
-    defaultValues: { roleFilter: "ALL", search: "" },
+    defaultValues: { search: "", roleFilter: "ALL" },
   });
   const search = watch("search");
+  const roleFilter = watch("roleFilter") as UserRole | "ALL";
 
-  const [users, setUsers] = useState<UamUser[]>(DUMMY_USERS);
-  const [roleFilter, setRoleFilter] = useState("ALL");
   const [editingUser, setEditingUser] = useState<UamUser | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<UamUser | null>(null);
+
+  const {
+    data: usersData,
+    isLoading: isLoadingUsers,
+    isFetching: isFetchingUsers,
+  } = useQuery({
+    queryKey: ["users"],
+    queryFn: () => getUsersApi().then((res) => res.data),
+  });
+
+  // Permanent, irreversible delete — separate from the Status switch below,
+  // which stays reversible. Blocked server-side (409) if the user has any
+  // linked invoices/payments/etc.
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) =>
+      deleteUserPermanentlyApi(id).then((res) => res.data),
+    onSuccess: () => {
+      successNotification(
+        "User Deleted",
+        "The account has been permanently removed."
+      );
+      queryClient.invalidateQueries({ queryKey: ["users"] });
+    },
+    onError: (err: any) =>
+      errorNotification(
+        "Delete Failed",
+        err?.message ?? "Could not delete this user"
+      ),
+  });
+
+  const confirmDeleteUser = () => {
+    if (!deleteTarget) return;
+    deleteMutation.mutate(deleteTarget.id, {
+      onSuccess: () => setDeleteTarget(null),
+    });
+  };
+
+  const allUsers = usersData ?? [];
 
   const filteredUsers = useMemo(() => {
-    let rows = users;
+    let rows = allUsers;
     if (roleFilter !== "ALL") rows = rows.filter((u) => u.role === roleFilter);
     if (search.trim()) {
-      const q = search.toLowerCase();
+      const q = search.trim().toLowerCase();
       rows = rows.filter(
         (u) =>
           `${u.firstName} ${u.lastName}`.toLowerCase().includes(q) ||
@@ -78,39 +139,78 @@ const UamPage = () => {
       );
     }
     return rows;
-  }, [users, roleFilter, search]);
+  }, [allUsers, roleFilter, search]);
 
-  const handleToggleActive = (id: string, isActive: boolean) => {
-    const target = users.find((u) => u.id === id);
-    setUsers((prev) => prev.map((u) => (u.id === id ? { ...u, isActive } : u)));
-    successNotification(
-      isActive ? "User Activated" : "User Deactivated",
-      `${target?.firstName ?? "User"}'s access has been updated.`
-    );
-  };
+  // ── Create user ──
+  const createMutation = useMutation({
+    mutationFn: (data: CreateUserPayload) =>
+      createUserApi(data).then((res) => res.data),
+    onSuccess: (created) => {
+      successNotification(
+        "User Created",
+        `${created.firstName} ${created.lastName} can now log in.`
+      );
+      setCreateOpen(false);
+      queryClient.invalidateQueries({ queryKey: ["users"] });
+    },
+    onError: (err: any) =>
+      errorNotification(
+        "Failed to Create User",
+        err?.message ?? "Please check all required fields"
+      ),
+  });
+
+  // ── Change role ──
+  const roleMutation = useMutation({
+    mutationFn: ({
+      id,
+      role,
+    }: {
+      id: string;
+      role: Exclude<UserRole, "SUPER_ADMIN">;
+    }) => updateUserRoleApi(id, role).then((res) => res.data),
+    onSuccess: () => {
+      successNotification("Role Updated", "The user's role has been changed.");
+      queryClient.invalidateQueries({ queryKey: ["users"] });
+    },
+    onError: (err: any) =>
+      errorNotification(
+        "Role Update Failed",
+        err?.message ?? "Could not update role"
+      ),
+  });
 
   const handleRoleSaved = (id: string, role: UserRole) => {
-    setUsers((prev) => prev.map((u) => (u.id === id ? { ...u, role } : u)));
+    if (role === "SUPER_ADMIN") {
+      errorNotification(
+        "Not Allowed",
+        "Super Admin access can't be granted from this screen."
+      );
+      return;
+    }
+    roleMutation.mutate({ id, role });
   };
 
-  const handleUserCreated = (payload: CreateUserPayload) => {
-    const company = payload.companyId
-      ? DUMMY_COMPANIES.find((c) => c.id === payload.companyId)
-      : undefined;
+  // ── Toggle active status (reversible — separate from permanent delete) ──
+  const statusMutation = useMutation({
+    mutationFn: ({ id, isActive }: { id: string; isActive: boolean }) =>
+      updateUserStatusApi(id, isActive).then((res) => res.data),
+    onSuccess: (_data, variables) => {
+      successNotification(
+        variables.isActive ? "User Activated" : "User Deactivated",
+        "Their access has been updated."
+      );
+      queryClient.invalidateQueries({ queryKey: ["users"] });
+    },
+    onError: (err: any) =>
+      errorNotification(
+        "Update Failed",
+        err?.message ?? "Could not update user status"
+      ),
+  });
 
-    const newUser: UamUser = {
-      id: `u${Date.now()}`,
-      firstName: payload.firstName,
-      lastName: payload.lastName,
-      email: payload.email,
-      phone: payload.phone,
-      role: payload.role,
-      isActive: true,
-      createdAt: new Date().toISOString(),
-      userCompanies: company ? [{ company }] : [],
-    };
-
-    setUsers((prev) => [newUser, ...prev]);
+  const handleToggleActive = (id: string, isActive: boolean) => {
+    statusMutation.mutate({ id, isActive });
   };
 
   const columns: ColumnsType<UamUser> = [
@@ -138,7 +238,7 @@ const UamPage = () => {
       width: 220,
       align: "center",
       render: (_, u) =>
-        u.userCompanies.length === 0 ? (
+        u.companies.length === 0 ? (
           <div className="w-full flex justify-center">
             <span className="text-[12px] text-slate-300">
               — platform-wide —
@@ -146,13 +246,13 @@ const UamPage = () => {
           </div>
         ) : (
           <div className="w-full flex flex-wrap justify-center gap-1">
-            {u.userCompanies.map(({ company }) => (
+            {u.companies.map((c) => (
               <span
-                key={company.id}
+                key={c.id}
                 className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-slate-50 border border-slate-200 text-[11px] text-slate-600"
               >
                 <HiOutlineOfficeBuilding className="w-3 h-3 text-slate-400" />
-                {company.name}
+                {c.name}
               </span>
             ))}
           </div>
@@ -186,6 +286,9 @@ const UamPage = () => {
           <Switch
             size="small"
             checked={u.isActive}
+            loading={
+              statusMutation.isPending && statusMutation.variables?.id === u.id
+            }
             onChange={(checked) => handleToggleActive(u.id, checked)}
           />
         </Tooltip>
@@ -194,18 +297,44 @@ const UamPage = () => {
     {
       title: "",
       key: "actions",
-      width: 80,
+      width: 110,
       align: "right",
-      render: (_, u) => (
-        <Tooltip title="Change role">
-          <button
-            onClick={() => setEditingUser(u)}
-            className="p-2 rounded-lg hover:bg-slate-100 transition-colors"
-          >
-            <HiOutlinePencilAlt size={16} className="text-slate-500" />
-          </button>
-        </Tooltip>
-      ),
+      render: (_, u) => {
+        const isSelf = u.id === currentUserId;
+        const isSuperAdmin = u.role === "SUPER_ADMIN";
+        const canDelete = !isSelf && !isSuperAdmin;
+
+        return (
+          <div className="flex items-center justify-end gap-1">
+            <Tooltip title="Change role">
+              <button
+                onClick={() => setEditingUser(u)}
+                className="p-2 rounded-lg hover:bg-slate-100 transition-colors"
+              >
+                <HiOutlinePencilAlt size={16} className="text-slate-500" />
+              </button>
+            </Tooltip>
+
+            <Tooltip
+              title={
+                isSelf
+                  ? "You can't delete your own account"
+                  : isSuperAdmin
+                  ? "Super Admin can't be deleted"
+                  : "Permanently delete user"
+              }
+            >
+              <button
+                onClick={() => canDelete && setDeleteTarget(u)}
+                disabled={!canDelete}
+                className="p-2 rounded-lg hover:bg-red-50 transition-colors disabled:opacity-30 disabled:hover:bg-transparent disabled:cursor-not-allowed"
+              >
+                <HiOutlineTrash size={16} className="text-red-500" />
+              </button>
+            </Tooltip>
+          </div>
+        );
+      },
     },
   ];
 
@@ -244,38 +373,38 @@ const UamPage = () => {
             errors={{}}
             placeholder="Filter by role"
             options={ROLE_FILTER_OPTIONS}
-            value={roleFilter}
-            onChange={(v) => setRoleFilter(v)}
           />
         </div>
       </div>
 
       <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
-        <Table<UamUser>
-          rowKey="id"
-          columns={columns}
-          dataSource={filteredUsers}
-          pagination={{
-            pageSize: 15,
-            showTotal: (total, range) =>
-              `Showing ${range[0]}–${range[1]} of ${total} users`,
-          }}
-          locale={{
-            emptyText: (
-              <div className="py-16 text-center">
-                <div className="w-16 h-16 rounded-2xl bg-purple-50 flex items-center justify-center mx-auto mb-4">
-                  <HiOutlineShieldCheck className="w-8 h-8 text-purple-400" />
+        <Spin spinning={isLoadingUsers || isFetchingUsers}>
+          <Table<UamUser>
+            rowKey="id"
+            columns={columns}
+            dataSource={filteredUsers}
+            pagination={{
+              pageSize: 15,
+              showTotal: (total, range) =>
+                `Showing ${range[0]}–${range[1]} of ${total} users`,
+            }}
+            locale={{
+              emptyText: (
+                <div className="py-16 text-center">
+                  <div className="w-16 h-16 rounded-2xl bg-purple-50 flex items-center justify-center mx-auto mb-4">
+                    <HiOutlineShieldCheck className="w-8 h-8 text-purple-400" />
+                  </div>
+                  <div className="font-semibold text-slate-700">
+                    No users found
+                  </div>
+                  <div className="text-sm text-slate-500 mt-1">
+                    Try a different search or role filter.
+                  </div>
                 </div>
-                <div className="font-semibold text-slate-700">
-                  No users found
-                </div>
-                <div className="text-sm text-slate-500 mt-1">
-                  Try a different search or role filter.
-                </div>
-              </div>
-            ),
-          }}
-        />
+              ),
+            }}
+          />
+        </Spin>
       </div>
 
       <ChangeRoleModal
@@ -288,8 +417,17 @@ const UamPage = () => {
       <CreateUserModal
         open={createOpen}
         onClose={() => setCreateOpen(false)}
-        onCreated={handleUserCreated}
-        existingUsers={users}
+        onCreated={(payload) => createMutation.mutate(payload)}
+        existingUsers={allUsers}
+        isSubmitting={createMutation.isPending}
+      />
+
+      <DeleteUserModal
+        open={!!deleteTarget}
+        user={deleteTarget}
+        isDeleting={deleteMutation.isPending}
+        onConfirm={confirmDeleteUser}
+        onClose={() => setDeleteTarget(null)}
       />
     </div>
   );

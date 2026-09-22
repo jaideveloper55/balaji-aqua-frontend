@@ -30,6 +30,11 @@ import DayClosingReport, {
 
 export type DateRange = [Dayjs | null, Dayjs | null] | null;
 
+const customerKey = (name?: string | null): string => {
+  const trimmed = name?.trim();
+  return trimmed ? trimmed.toLowerCase() : "walk-in";
+};
+
 interface ExpenseRow {
   id: string;
   expenseNo: string;
@@ -70,8 +75,8 @@ interface Props {
   cashExpenses?: number;
   allPayments?: PaymentEntry[];
   pettyCashTransactions?: PettyCashRow[];
-
   dayInvoices?: Invoice[];
+  customerBalances?: Map<string, { oldBalance: number; newBalance: number }>;
 }
 
 const CollectionTab: React.FC<Props> = ({
@@ -103,6 +108,7 @@ const CollectionTab: React.FC<Props> = ({
   allPayments,
   pettyCashTransactions,
   dayInvoices,
+  customerBalances,
 }) => {
   const [showClosing, setShowClosing] = useState(false);
   const reportRef = useRef<HTMLDivElement>(null);
@@ -208,16 +214,32 @@ const CollectionTab: React.FC<Props> = ({
     const invoicesList = dayInvoices ?? [];
     const paymentsList = allPayments ?? safePayments;
 
+    // First real (non-generic) casing seen for each canonical key wins,
+    // so "LOCAL" and "local" both render under one label instead of
+    // splitting into separate rows.
+    const displayNameByKey = new Map<string, string>();
+    const keyFor = (raw?: string | null) => {
+      const key = customerKey(raw);
+      if (!displayNameByKey.has(key)) {
+        displayNameByKey.set(key, raw?.trim() || "Walk-in");
+      }
+      return key;
+    };
+
     const paidByCustomer = new Map<
       string,
-      { cash: number; upi: number; bank: number }
+      {
+        cash: number;
+        upi: number;
+        bank: number;
+      }
     >();
     for (const p of paymentsList) {
-      const name = p.customerName?.trim() || "Walk-in";
-      if (!paidByCustomer.has(name)) {
-        paidByCustomer.set(name, { cash: 0, upi: 0, bank: 0 });
+      const key = keyFor(p.customerName);
+      if (!paidByCustomer.has(key)) {
+        paidByCustomer.set(key, { cash: 0, upi: 0, bank: 0 });
       }
-      const entry = paidByCustomer.get(name)!;
+      const entry = paidByCustomer.get(key)!;
       const mode = (p.mode ?? "").toLowerCase();
       if (mode === "cash" || mode === "card") entry.cash += p.amount ?? 0;
       else if (mode === "upi") entry.upi += p.amount ?? 0;
@@ -226,34 +248,50 @@ const CollectionTab: React.FC<Props> = ({
 
     const salesByCustomer = new Map<
       string,
-      { name: string; total: number; credit: number; count: number }
+      { total: number; credit: number; count: number }
     >();
     for (const inv of invoicesList) {
       if (inv.status === "Cancelled") continue;
-      const name = inv.customerName?.trim() || "Walk-in";
-      if (!salesByCustomer.has(name)) {
-        salesByCustomer.set(name, { name, total: 0, credit: 0, count: 0 });
+      const key = keyFor(inv.customerName);
+      if (!salesByCustomer.has(key)) {
+        salesByCustomer.set(key, { total: 0, credit: 0, count: 0 });
       }
-      const entry = salesByCustomer.get(name)!;
+      const entry = salesByCustomer.get(key)!;
       entry.total += inv.grandTotal ?? 0;
       entry.credit += inv.balanceAmount ?? 0;
       entry.count += 1;
     }
 
-    return Array.from(salesByCustomer.values())
-      .map((e) => {
-        const paid = paidByCustomer.get(e.name) ?? { cash: 0, upi: 0, bank: 0 };
+    const allKeys = new Set([
+      ...salesByCustomer.keys(),
+      ...paidByCustomer.keys(),
+    ]);
+
+    return Array.from(allKeys)
+      .map((key) => {
+        const sales = salesByCustomer.get(key) ?? {
+          total: 0,
+          credit: 0,
+          count: 0,
+        };
+        const paid = paidByCustomer.get(key) ?? { cash: 0, upi: 0, bank: 0 };
         return {
-          name: e.name,
-          totalAmount: e.total,
+          name: displayNameByKey.get(key) ?? "Walk-in",
+          totalAmount: sales.total,
           cashAmount: paid.cash,
           upiAmount: paid.upi,
           bankAmount: paid.bank,
-          creditAmount: e.credit,
-          invoiceCount: e.count,
+          creditAmount: sales.credit,
+          invoiceCount: sales.count,
         };
       })
-      .sort((a, b) => b.totalAmount - a.totalAmount);
+      .sort((a, b) => {
+        const activityA =
+          a.totalAmount + a.cashAmount + a.upiAmount + a.bankAmount;
+        const activityB =
+          b.totalAmount + b.cashAmount + b.upiAmount + b.bankAmount;
+        return activityB - activityA;
+      });
   }, [dayInvoices, allPayments, safePayments]);
 
   const productBreakdown = useMemo(() => {
@@ -309,31 +347,26 @@ const CollectionTab: React.FC<Props> = ({
 
   // ── Build closing report data ──────────────────────────────────────
   const closingData: DayClosingData = useMemo(() => {
-    const invoicesByCustomer = new Map<string, Invoice[]>();
+    const customerIdByName = new Map<string, string | null>();
     for (const inv of dayInvoices ?? []) {
       if (inv.status === "Cancelled") continue;
-      const name = inv.customerName?.trim() || "Walk-in";
-      if (!invoicesByCustomer.has(name)) invoicesByCustomer.set(name, []);
-      invoicesByCustomer.get(name)!.push(inv);
+      const key = customerKey(inv.customerName);
+      if (!customerIdByName.has(key)) {
+        customerIdByName.set(key, inv.customerDbId ?? null);
+      }
     }
 
     const enrichedCustomerBreakdown = customerBreakdown.map((c) => {
-      const invoicesForCustomer = invoicesByCustomer.get(c.name) ?? [];
-      const sorted = [...invoicesForCustomer].sort((a, b) => {
-        const ta = a.dateRaw ? dayjs(a.dateRaw).valueOf() : 0;
-        const tb = b.dateRaw ? dayjs(b.dateRaw).valueOf() : 0;
-        return ta - tb;
-      });
-      const firstInvoice = sorted[0];
-      const lastInvoice = sorted[sorted.length - 1];
-      const newOutstanding = lastInvoice?.outstandingAfter ?? c.creditAmount;
-      const previousOutstanding = firstInvoice?.outstandingAfter
-        ? firstInvoice.outstandingAfter -
-          (firstInvoice.balanceAmount ?? 0) +
-          (firstInvoice.extraPaymentCollected ?? 0)
-        : newOutstanding;
+      const customerId = customerIdByName.get(customerKey(c.name));
+      const balances = customerId
+        ? customerBalances?.get(customerId)
+        : undefined;
 
-      return { ...c, previousOutstanding, newOutstanding };
+      return {
+        ...c,
+        previousOutstanding: balances?.oldBalance ?? 0,
+        newOutstanding: balances?.newBalance ?? c.creditAmount,
+      };
     });
 
     return {
@@ -377,6 +410,7 @@ const CollectionTab: React.FC<Props> = ({
     allPayments,
     safePayments,
     dayInvoices,
+    customerBalances,
   ]);
 
   const handlePrintClosing = () => {
