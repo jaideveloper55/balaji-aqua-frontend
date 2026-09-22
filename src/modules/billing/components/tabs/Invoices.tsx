@@ -132,6 +132,13 @@ const InvoicesTab: React.FC<Props> = ({
     values: { dateRange },
   });
 
+  // Staff shouldn't see the total amount collected at a glance — same
+  // reasoning as hiding Total Collection on the Billing Daily Summary tab
+  // and Total Stock on Inventory. This only hides the card here; the
+  // table's own Paid column still shows each invoice's paid amount
+  // individually, so this is a summary-level restriction, not a full one.
+  const canSeeCollected = userRole !== "STAFF";
+
   const filteredInvoices = useMemo(() => {
     if (!search) return invoices;
     const q = search.toLowerCase();
@@ -407,7 +414,11 @@ const InvoicesTab: React.FC<Props> = ({
 
   return (
     <div className="space-y-5 py-5">
-      <div className="grid grid-cols-4 gap-4">
+      <div
+        className={`grid gap-4 ${
+          canSeeCollected ? "grid-cols-4" : "grid-cols-3"
+        }`}
+      >
         <StatCard
           icon={<HiClipboardDocumentList size={20} />}
           color="blue"
@@ -415,13 +426,15 @@ const InvoicesTab: React.FC<Props> = ({
           value={stats.total}
           sub={formatCurrency(stats.totalAmount) + " total"}
         />
-        <StatCard
-          icon={<HiOutlineCheckCircle size={20} />}
-          color="green"
-          label="Collected"
-          value={formatCurrency(stats.collected)}
-          sub={stats.paid + " invoices paid"}
-        />
+        {canSeeCollected && (
+          <StatCard
+            icon={<HiOutlineCheckCircle size={20} />}
+            color="green"
+            label="Collected"
+            value={formatCurrency(stats.collected)}
+            sub={stats.paid + " invoices paid"}
+          />
+        )}
         <StatCard
           icon={<HiOutlineExclamationCircle size={20} />}
           color="orange"

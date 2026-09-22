@@ -9,6 +9,7 @@ import {
 import CustomStatCard from "../../../components/common/CustomStatCard";
 import { InventoryKpis } from "../types/Inventory";
 import { InventoryTabKey } from "../constants/Inventoryconstants";
+import { useAuthStore } from "../../../store/auth.store";
 
 interface InventoryoverviewProps {
   kpis: InventoryKpis;
@@ -19,8 +20,16 @@ const formatINR = (v: number) =>
   `₹${v.toLocaleString("en-IN", { maximumFractionDigits: 0 })}`;
 
 const Inventoryoverview = ({ kpis, onNavigate }: InventoryoverviewProps) => {
-  const cards = [
+  // Staff shouldn't see the total stock valuation (a cost/revenue figure)
+  // at a glance — same reasoning as hiding Total Collection on the
+  // Billing Daily Summary tab. This only hides the card here; it doesn't
+  // restrict the underlying stock data anywhere else.
+  const currentRole = useAuthStore((s) => s.user?.role);
+  const canSeeStockValue = currentRole !== "STAFF";
+
+  const allCards = [
     {
+      key: "totalStock",
       icon: <HiOutlineCurrencyRupee size={22} />,
       label: "Total Stock",
       value: formatINR(kpis.totalStockValue),
@@ -28,8 +37,10 @@ const Inventoryoverview = ({ kpis, onNavigate }: InventoryoverviewProps) => {
       bg: "#eff6ff",
       tooltip: "Current stock × unit cost, all products",
       onClick: () => onNavigate("stock"),
+      visible: canSeeStockValue,
     },
     {
+      key: "lowStock",
       icon: <HiOutlineExclamation size={22} />,
       label: "Low Stock",
       value: kpis.lowStockItems,
@@ -38,8 +49,10 @@ const Inventoryoverview = ({ kpis, onNavigate }: InventoryoverviewProps) => {
       alert: kpis.lowStockItems > 0,
       tooltip: "Items at or below reorder level — click to review",
       onClick: () => onNavigate("alerts"),
+      visible: true,
     },
     {
+      key: "outOfStock",
       icon: <HiOutlineXCircle size={22} />,
       label: "Out of Stock",
       value: kpis.outOfStockItems,
@@ -48,8 +61,10 @@ const Inventoryoverview = ({ kpis, onNavigate }: InventoryoverviewProps) => {
       alert: kpis.outOfStockItems > 0,
       tooltip: "Items with zero stock — click to review",
       onClick: () => onNavigate("alerts"),
+      visible: true,
     },
     {
+      key: "damaged",
       icon: <HiOutlineShieldExclamation size={22} />,
       label: "Damaged Items",
       value: kpis.damagedItems,
@@ -57,8 +72,10 @@ const Inventoryoverview = ({ kpis, onNavigate }: InventoryoverviewProps) => {
       bg: "#fff7ed",
       tooltip: "Stock written off as damaged — see Movement History",
       onClick: () => onNavigate("movements"),
+      visible: true,
     },
     {
+      key: "inward",
       icon: <HiOutlineArrowDown size={22} />,
       label: "Inward Today",
       value: `${kpis.inwardToday}`,
@@ -66,8 +83,10 @@ const Inventoryoverview = ({ kpis, onNavigate }: InventoryoverviewProps) => {
       bg: "#ecfdf5",
       tooltip: "Units received today (production + purchase)",
       onClick: () => onNavigate("movements"),
+      visible: true,
     },
     {
+      key: "outward",
       icon: <HiOutlineArrowUp size={22} />,
       label: "Outward Today",
       value: `${kpis.outwardToday}`,
@@ -75,14 +94,17 @@ const Inventoryoverview = ({ kpis, onNavigate }: InventoryoverviewProps) => {
       bg: "#f5f3ff",
       tooltip: "Units issued today (delivery + internal use)",
       onClick: () => onNavigate("movements"),
+      visible: true,
     },
   ];
+
+  const cards = allCards.filter((c) => c.visible);
 
   return (
     <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4">
       {cards.map((c) => (
         <button
-          key={c.label}
+          key={c.key}
           type="button"
           onClick={c.onClick}
           className="text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-300 rounded-2xl"

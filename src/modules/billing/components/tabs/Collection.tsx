@@ -27,6 +27,7 @@ import DayClosingReport, {
   DayClosingData,
   PettyCashRow,
 } from "../DayClosingReport";
+import { useAuthStore } from "../../../../store/auth.store";
 
 export type DateRange = [Dayjs | null, Dayjs | null] | null;
 
@@ -138,6 +139,9 @@ const CollectionTab: React.FC<Props> = ({
   })();
 
   const isSingleDay = hasRange && from!.isSame(to!, "day");
+
+  const currentRole = useAuthStore((s) => s.user?.role);
+  const canSeeTotalCollection = currentRole !== "STAFF";
 
   const {
     control,
@@ -561,14 +565,20 @@ const CollectionTab: React.FC<Props> = ({
         </div>
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
-        <StatCard
-          icon={<HiBanknotes className="w-5 h-5" />}
-          label="Total Collection"
-          value={formatCurrency(safeTotal)}
-          sub={`${paymentsTotal ?? 0} payments`}
-          color="green"
-        />
+      <div
+        className={`grid grid-cols-2 gap-3 ${
+          canSeeTotalCollection ? "lg:grid-cols-5" : "lg:grid-cols-4"
+        }`}
+      >
+        {canSeeTotalCollection && (
+          <StatCard
+            icon={<HiBanknotes className="w-5 h-5" />}
+            label="Total Collection"
+            value={formatCurrency(safeTotal)}
+            sub={`${paymentsTotal ?? 0} payments`}
+            color="green"
+          />
+        )}
         <StatCard
           icon={<HiClipboardDocumentList className="w-5 h-5" />}
           label="Invoices Generated"
