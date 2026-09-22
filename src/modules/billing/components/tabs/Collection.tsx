@@ -157,6 +157,11 @@ const CollectionTab: React.FC<Props> = ({
   );
   const firstRun = useRef(true);
 
+  const onSearchChangeRef = useRef(onSearchChange);
+  useEffect(() => {
+    onSearchChangeRef.current = onSearchChange;
+  }, [onSearchChange]);
+
   useEffect(() => {
     if (firstRun.current) {
       firstRun.current = false;
@@ -164,12 +169,12 @@ const CollectionTab: React.FC<Props> = ({
     }
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
-      onSearchChange?.(searchInput.trim());
+      onSearchChangeRef.current?.(searchInput.trim());
     }, 350);
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
-  }, [searchInput, onSearchChange]);
+  }, [searchInput]);
 
   const safeInvoiceCount = invoiceCount ?? 0;
   const safeInvoicedTotal = invoicedTotal ?? 0;
