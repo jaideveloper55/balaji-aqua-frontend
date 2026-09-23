@@ -31,6 +31,7 @@ import {
   createVendorApi,
   updateVendorApi,
   deleteVendorApi,
+  getCategoriesSimpleApi,
   type CreateVendorPayload,
   type UpdateVendorPayload,
   type VendorFilters,
@@ -135,6 +136,12 @@ const Vendorspanel: React.FC = () => {
     queryKey: ["vendors", filters],
     queryFn: () => getVendorsApi(filters).then((res) => res.data),
     staleTime: 1000 * 60 * 2,
+  });
+
+  const { data: categoriesSimple, isLoading: isLoadingCategories } = useQuery({
+    queryKey: ["categories-simple"],
+    queryFn: () => getCategoriesSimpleApi().then((res) => res.data),
+    staleTime: 1000 * 60 * 10,
   });
 
   const vendors: any[] = vendorsData ?? [];
@@ -458,6 +465,8 @@ const Vendorspanel: React.FC = () => {
         }}
         onSubmit={handleFormSubmit}
         isSubmitting={isSubmitting}
+        categories={categoriesSimple ?? []}
+        isLoadingCategories={isLoadingCategories}
       />
     </div>
   );

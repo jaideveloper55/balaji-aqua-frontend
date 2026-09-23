@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useMemo } from "react";
 import { useForm } from "react-hook-form";
 import { HiOutlineUserGroup } from "react-icons/hi";
 import CustomModal from "../../../components/common/CustomModal";
@@ -28,6 +28,10 @@ interface ApiVendor {
   notes?: string;
   isActive?: boolean;
 }
+interface ApiCategory {
+  id: string;
+  name: string;
+}
 
 interface Props {
   open: boolean;
@@ -35,20 +39,9 @@ interface Props {
   onSubmit: (payload: CreateVendorPayload) => void;
   initialData?: ApiVendor | null;
   isSubmitting?: boolean;
+  categories?: ApiCategory[];
+  isLoadingCategories?: boolean;
 }
-
-const VENDOR_CATEGORY_OPTIONS = [
-  { value: "Utilities", label: "Utilities" },
-  { value: "Vehicle & Fuel", label: "Vehicle & Fuel" },
-  { value: "Plant Operations", label: "Plant Operations" },
-  { value: "Packaging", label: "Packaging" },
-  { value: "Rent & Lease", label: "Rent & Lease" },
-  { value: "Repairs", label: "Repairs" },
-  { value: "Office", label: "Office" },
-  { value: "Compliance", label: "Compliance" },
-  { value: "Marketing", label: "Marketing" },
-  { value: "Other", label: "Other" },
-];
 
 const Vendorformmodal: React.FC<Props> = ({
   open,
@@ -56,8 +49,15 @@ const Vendorformmodal: React.FC<Props> = ({
   onSubmit,
   initialData = null,
   isSubmitting = false,
+  categories = [],
+  isLoadingCategories = false,
 }) => {
   const isEdit = !!initialData;
+
+  const categoryOptions = useMemo(
+    () => categories.map((c) => ({ value: c.name, label: c.name })),
+    [categories]
+  );
 
   const {
     control,
@@ -165,8 +165,11 @@ const Vendorformmodal: React.FC<Props> = ({
             control={control}
             errors={errors}
             label="Category"
-            placeholder="Select category"
-            options={VENDOR_CATEGORY_OPTIONS}
+            placeholder={
+              isLoadingCategories ? "Loading categories..." : "Select category"
+            }
+            options={categoryOptions}
+            isLoading={isLoadingCategories}
             isrequired
             showSearch
             rules={{ required: "Category is required" }}

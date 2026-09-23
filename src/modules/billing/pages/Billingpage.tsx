@@ -676,7 +676,7 @@ const BillingPage = () => {
         paymentNo: p.paymentNumber,
         invoiceNo: p.invoice?.invoiceNumber ?? "—",
         customerId: p.customer?.customerCode ?? "",
-        customerName: p.customer?.name ?? "",
+        customerName: p.customer?.name ?? p.walkInName ?? "",
         amount: p.amount,
         mode: PAYMENT_MODE_LABEL[p.paymentMode] ?? p.paymentMode,
         date: new Date(p.paymentDate ?? p.createdAt).toLocaleDateString(
@@ -702,7 +702,7 @@ const BillingPage = () => {
         paymentNo: p.paymentNumber,
         invoiceNo: p.invoice?.invoiceNumber ?? "—",
         customerId: p.customer?.customerCode ?? "",
-        customerName: p.customer?.name ?? "",
+        customerName: p.customer?.name ?? p.walkInName ?? "",
         amount: p.amount,
         mode: PAYMENT_MODE_LABEL[p.paymentMode] ?? p.paymentMode,
         date: new Date(p.paymentDate ?? p.createdAt).toLocaleDateString(
