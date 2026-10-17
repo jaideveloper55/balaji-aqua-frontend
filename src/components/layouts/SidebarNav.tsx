@@ -34,16 +34,6 @@ const SidebarNav: React.FC<SidebarNavProps> = ({
 }) => {
   const { theme, menuItems, groups } = config;
 
-  // Two independent gates, checked once here rather than inside the render
-  // loop below:
-  //  - `roles`: a hard, permanent gate (e.g. User Access Management is
-  //    always Super-Admin-only, regardless of any saved toggle)
-  //  - `menuKey`: the dynamic gate a Super Admin controls from the
-  //    "Change User Role" toggle panel — saved server-side per role, sent
-  //    down as `enabledMenuKeys` on login()/me()
-  // An item with neither field set is always shown to any authenticated
-  // user (currently none of your items are like this, but the logic
-  // supports it for future additions).
   const currentRole = useAuthStore((s) => s.user?.role);
   const enabledMenuKeys = useAuthStore((s) => s.enabledMenuKeys);
 
@@ -53,9 +43,11 @@ const SidebarNav: React.FC<SidebarNavProps> = ({
     }
 
     if (currentRole === "SUPER_ADMIN") return true;
+
     if (item.menuKey && !enabledMenuKeys.includes(item.menuKey)) {
       return false;
     }
+
     return true;
   });
 

@@ -105,6 +105,7 @@ export interface ProductFilterFormValues {
 
 export interface ProductQueryParams {
   search?: string;
+  isSellable?: boolean;
   categoryId?: string;
   status?: ProductStatus;
   dateFrom?: string;

@@ -7,6 +7,7 @@ import {
   BsCalendarEvent,
   BsClipboardData,
   BsWallet2,
+  BsTruck,
 } from "react-icons/bs";
 import type { MenuKey } from "../types/Uam";
 
@@ -58,6 +59,12 @@ export const MENU_KEY_META: Record<
     label: "Expense Management",
     icon: BsWallet2,
     group: "Finance",
+  },
+
+  DELIVERY: {
+    label: "Delivery Management",
+    icon: BsTruck,
+    group: "Operations",
   },
 };
 

@@ -48,6 +48,7 @@ import {
 import ProductExportDrawer from "../components/Productexportdrawer";
 import ProductTable from "../components/ProductTable";
 import BomModal from "../components/BomModal";
+import { useOrgConfig } from "../../../config/OrgThemeContext";
 
 const FILTER_DEFAULTS: ProductFilterFormValues = {
   categoryFilter: "all",
@@ -66,6 +67,8 @@ const PAGE_SIZE = 10;
 
 const ProductsPage = () => {
   const queryClient = useQueryClient();
+
+  const { theme } = useOrgConfig();
 
   const [search] = useState("");
   const [page, setPage] = useState(1);
@@ -366,7 +369,7 @@ const ProductsPage = () => {
         icon={<HiOutlineSparkles className="text-white" size={20} />}
         title="Product Management"
         subtitle="Manage products, categories, pricing & stock alerts"
-        iconBg="bg-blue-500"
+        iconBg={theme.activeBg} // was "bg-blue-500"
         actions={
           <>
             <Button
@@ -386,7 +389,9 @@ const ProductsPage = () => {
               type="primary"
               icon={<HiOutlinePlus size={15} />}
               onClick={handlePrimaryAdd}
-              className="!bg-blue-600 hover:!bg-blue-700 !rounded-xl !h-9 !font-semibold"
+              // removed !bg-blue-600 and hover:!bg-blue-700
+              className="!rounded-xl !h-9 !font-semibold"
+              style={{ backgroundColor: theme.primary }}
             >
               {activeTab === "products" ? "Add Product" : "Add Category"}
             </Button>
@@ -432,7 +437,7 @@ const ProductsPage = () => {
           items={TABS}
           activeKey={activeTab}
           onChange={(k) => setActiveTab(k as TabKey)}
-          accentColor="#2563eb"
+          accentColor={theme.primary}
         />
       </div>
 

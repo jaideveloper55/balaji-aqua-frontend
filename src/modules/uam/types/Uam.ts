@@ -47,7 +47,8 @@ export type MenuKey =
   | "BILLING_POS"
   | "EVENT_ORDERS"
   | "INVENTORY"
-  | "EXPENSES";
+  | "EXPENSES"
+  | "DELIVERY";
 
 export interface MenuPermission {
   menuKey: MenuKey;

@@ -53,6 +53,8 @@ export interface QuickLink {
 
 export interface OrgTheme {
   primary: string;
+  primaryHover: string;
+  primarySoft: string;
   gradientFrom: string;
   gradientTo: string;
   activeBg: string;
@@ -87,6 +89,8 @@ const waterPlantConfig: OrgConfig = {
   logoIcon: BsDroplet,
   theme: {
     primary: "#3b82f6",
+    primaryHover: "#2563eb",
+    primarySoft: "#eff6ff",
     gradientFrom: "from-blue-500",
     gradientTo: "to-blue-600",
     activeBg: "bg-blue-500",
@@ -149,6 +153,14 @@ const waterPlantConfig: OrgConfig = {
       group: "Billing",
       menuKey: "EVENT_ORDERS",
     },
+    // {
+    //   id: "delivery",
+    //   icon: BsTruck,
+    //   label: "Delivery Management",
+    //   href: "/admin/delivery",
+    //   group: "Operations",
+    //   menuKey: "DELIVERY",
+    // },
     {
       id: "inventory",
       icon: BsClipboardData,
@@ -171,7 +183,7 @@ const waterPlantConfig: OrgConfig = {
       label: "User Access Management",
       href: "/admin/uam",
       group: "Admin",
-      roles: ["SUPER_ADMIN"], // hard gate only — deliberately no menuKey
+      roles: ["SUPER_ADMIN"],
     },
   ],
   quickLinks: [
@@ -184,12 +196,7 @@ const waterPlantConfig: OrgConfig = {
 };
 
 // ── Royal Beverage — Refreshing Drinks ────────────────────────────
-// NOTE: this config's menuItem ids/labels (e.g. "SKU Management" instead
-// of "Product Management") don't line up with the shared MenuKey enum at
-// all yet — that enum was built only from the Water Plant sidebar's
-// current items. Leaving menuKey off every entry here for now rather than
-// guessing a mapping; a Beverage-side STAFF/ADMIN account would currently
-// see everything unfiltered until this config gets its own reviewed set.
+
 const beverageConfig: OrgConfig = {
   id: "royal-beverage",
   name: "Royal Beverage",
@@ -198,6 +205,8 @@ const beverageConfig: OrgConfig = {
   logoIcon: BsCup,
   theme: {
     primary: "#0d9488",
+    primaryHover: "#0f766e",
+    primarySoft: "#f0fdfa",
     gradientFrom: "from-teal-500",
     gradientTo: "to-emerald-600",
     activeBg: "bg-teal-500",
@@ -210,15 +219,7 @@ const beverageConfig: OrgConfig = {
     dropdownHoverText: "hover:text-teal-600",
     iconGroupHover: "group-hover/item:text-teal-500",
   },
-  groups: [
-    "Main",
-    "Operations",
-    "Billing",
-    "HR",
-    "Finance",
-    "Analytics",
-    "Admin",
-  ],
+  groups: ["Main", "Inventory", "Sales", "Fleet", "HR", "Analytics"],
   menuItems: [
     {
       id: "dashboard",

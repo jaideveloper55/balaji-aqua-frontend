@@ -7,7 +7,6 @@ import AdminLayout from "./components/layouts/AdminLayout";
 import CustomerPage from "./modules/customers/pages/Customerpage";
 import Companies from "./modules/companies/pages/Companies";
 import ProductsPage from "./modules/products/pages/ProductsPage";
-import Deliverypage from "./modules/delivery/page/Deliverypage";
 import JarTrackingPage from "./modules/jar-tracking/pages/JarTrackingPage";
 import BillingPage from "./modules/billing/pages/Billingpage";
 import InventoryPage from "./modules/inventory/page/Inventorypage";
@@ -21,6 +20,7 @@ import ProductionPage from "./modules/production/pages/Productionpage";
 import ReportsPage from "./modules/reports/pages/Reportspage";
 import Dashboard from "./modules/dashboard/pages/DashboardPage";
 import UamPage from "./modules/uam/UamPage";
+import DeliveryPage from "./modules/delivery/pages/Deliverypage";
 
 function App() {
   return (
@@ -103,6 +103,8 @@ function App() {
             }
           />
 
+          <Route path="/admin/delivery" element={<DeliveryPage />} />
+
           {/* ── Hard role gate only, no menuKey — matches the sidebar's
               own uam item exactly (never toggleable, always
               Super-Admin-only). ── */}
@@ -120,7 +122,6 @@ function App() {
               authenticated for now rather than guessing a mapping. ── */}
           <Route path="profile" element={<ProfilePage />} />
           <Route path="company" element={<Companies />} />
-          <Route path="delivery" element={<Deliverypage />} />
           <Route path="jar-tracking" element={<JarTrackingPage />} />
           <Route path="employees" element={<EmployeesPage />} />
           <Route path="attendance" element={<AttendancePage />} />

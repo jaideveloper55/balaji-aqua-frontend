@@ -7,6 +7,8 @@ import { logoutApi } from "../../modules/auth/api/auth.api";
 import DesktopSidebar from "./DesktopSidebar";
 import MobileSidebar from "./MobileSidebar";
 import AppHeader from "./AppHeader";
+import { ConfigProvider } from "antd";
+import { OrgConfigProvider } from "../../config/OrgThemeContext";
 
 interface MenuItem {
   id: string;
@@ -146,61 +148,65 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
   const pageTitle = currentPage?.label || "Dashboard";
 
   return (
-    <div className="flex h-screen bg-gray-50 overflow-hidden">
-      <DesktopSidebar
-        config={config}
-        expanded={isSidebarOpen}
-        activeMenu={activeMenu}
-        width={sidebarW}
-        onExpand={() => setIsSidebarOpen(true)}
-        onCollapse={() => setIsSidebarOpen(false)}
-        onMenuClick={setActiveMenu}
-        onLogoClick={() => navigate("/admin/dashboard")}
-        onLogout={handleLogout}
-      />
+    <OrgConfigProvider value={config}>
+      <ConfigProvider theme={{ token: { colorPrimary: config.theme.primary } }}>
+        <div className="flex h-screen bg-gray-50 overflow-hidden">
+          <DesktopSidebar
+            config={config}
+            expanded={isSidebarOpen}
+            activeMenu={activeMenu}
+            width={sidebarW}
+            onExpand={() => setIsSidebarOpen(true)}
+            onCollapse={() => setIsSidebarOpen(false)}
+            onMenuClick={setActiveMenu}
+            onLogoClick={() => navigate("/admin/dashboard")}
+            onLogout={handleLogout}
+          />
 
-      <MobileSidebar
-        open={isMobileSidebarOpen}
-        onClose={() => setIsMobileSidebarOpen(false)}
-        config={config}
-        otherOrgs={otherOrgs}
-        activeMenu={activeMenu}
-        userName={userName}
-        userEmail={userEmail}
-        userInitials={userInitials}
-        onMenuClick={handleMobileMenuClick}
-        onLogoClick={handleMobileLogoClick}
-        onOrgSwitch={handleOrgSwitch}
-        onLogout={handleMobileLogout}
-      />
+          <MobileSidebar
+            open={isMobileSidebarOpen}
+            onClose={() => setIsMobileSidebarOpen(false)}
+            config={config}
+            otherOrgs={otherOrgs}
+            activeMenu={activeMenu}
+            userName={userName}
+            userEmail={userEmail}
+            userInitials={userInitials}
+            onMenuClick={handleMobileMenuClick}
+            onLogoClick={handleMobileLogoClick}
+            onOrgSwitch={handleOrgSwitch}
+            onLogout={handleMobileLogout}
+          />
 
-      <div
-        className="flex-1 flex flex-col min-w-0"
-        style={{
-          marginLeft: mainMarginLeft,
-          transition: "margin-left 0.25s cubic-bezier(0.4,0,0.2,1)",
-        }}
-      >
-        <AppHeader
-          config={config}
-          otherOrgs={otherOrgs}
-          pageTitle={pageTitle}
-          isProfileOpen={isProfileOpen}
-          profileMenuRef={profileMenuRef}
-          onToggleProfile={() => setIsProfileOpen((p) => !p)}
-          onCloseProfile={() => setIsProfileOpen(false)}
-          onOrgSwitch={handleOrgSwitch}
-          onOpenMobileSidebar={() => setIsMobileSidebarOpen(true)}
-        />
+          <div
+            className="flex-1 flex flex-col min-w-0"
+            style={{
+              marginLeft: mainMarginLeft,
+              transition: "margin-left 0.25s cubic-bezier(0.4,0,0.2,1)",
+            }}
+          >
+            <AppHeader
+              config={config}
+              otherOrgs={otherOrgs}
+              pageTitle={pageTitle}
+              isProfileOpen={isProfileOpen}
+              profileMenuRef={profileMenuRef}
+              onToggleProfile={() => setIsProfileOpen((p) => !p)}
+              onCloseProfile={() => setIsProfileOpen(false)}
+              onOrgSwitch={handleOrgSwitch}
+              onOpenMobileSidebar={() => setIsMobileSidebarOpen(true)}
+            />
 
-        <main className="flex-1 overflow-y-auto bg-gray-50 p-3 sm:p-4 lg:p-6 custom-scrollbar">
-          {children ?? <Outlet />}
-          <p className="mt-8 pb-2 text-center text-gray-600 text-[11px]">
-            &copy; {new Date().getFullYear()} JAI Dev. All Rights Reserved.
-          </p>
-        </main>
-      </div>
-    </div>
+            <main className="flex-1 overflow-y-auto bg-gray-50 p-3 sm:p-4 lg:p-6 custom-scrollbar">
+              {children ?? <Outlet />}
+              <p className="mt-8 pb-2 text-center text-gray-600 text-[11px]">
+                &copy; {new Date().getFullYear()} JAI Dev. All Rights Reserved.
+              </p>
+            </main>
+          </div>
+        </div>
+      </ConfigProvider>
+    </OrgConfigProvider>
   );
 };
 

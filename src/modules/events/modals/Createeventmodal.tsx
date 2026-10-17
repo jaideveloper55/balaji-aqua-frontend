@@ -155,9 +155,14 @@ const CreateEventModal = ({
   const isFirstStep = stepIndex === 0;
 
   const { data: productsData, isLoading: loadingProducts } = useQuery({
-    queryKey: ["products-dropdown"],
-    queryFn: () => getProductsApi({ status: "ACTIVE" }).then((res) => res.data),
-    staleTime: 1000 * 60 * 10,
+    queryKey: ["products-sellable-dropdown"],
+    queryFn: () =>
+      getProductsApi({
+        status: "ACTIVE",
+        isSellable: true,
+        pageSize: 100,
+      }).then((res) => res.data),
+    staleTime: 1000 * 60 * 2,
     enabled: open,
   });
 

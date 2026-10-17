@@ -46,6 +46,7 @@ import {
   LowStockRow,
 } from "../api/inventory.api";
 import InventoryExportDrawer from "../components/Inventoryexportdrawer";
+import { useOrgConfig } from "../../../config/OrgThemeContext";
 
 const DEFAULT_FILTERS: InventoryFilters = {
   search: "",
@@ -57,6 +58,7 @@ const DEFAULT_FILTERS: InventoryFilters = {
 
 const Inventorypage = () => {
   const queryClient = useQueryClient();
+  const { theme } = useOrgConfig();
 
   const [activeTab, setActiveTab] = useState<InventoryTabKey>("stock");
   const [filters, setFilters] = useState<InventoryFilters>(DEFAULT_FILTERS);
@@ -226,7 +228,7 @@ const Inventorypage = () => {
         icon={<HiOutlineArchive className="text-white" size={20} />}
         title="Inventory Management"
         subtitle="Track stock levels, movements & get low-stock alerts"
-        iconBg="bg-blue-500"
+        iconBg={theme.activeBg}
         actions={
           <>
             <Button
@@ -283,7 +285,7 @@ const Inventorypage = () => {
         }))}
         activeKey={activeTab}
         onChange={(k) => setActiveTab(k as InventoryTabKey)}
-        accentColor={activeTab === "alerts" ? "#dc2626" : "#2563eb"}
+        accentColor={activeTab === "alerts" ? "#dc2626" : theme.primary}
       />
 
       {activeTab === "stock" && (

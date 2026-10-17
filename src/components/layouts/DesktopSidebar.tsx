@@ -29,7 +29,7 @@ const DesktopSidebar: React.FC<DesktopSidebarProps> = ({
   onLogout,
 }) => (
   <aside
-    className="hidden lg:flex flex-col bg-white border-r border-gray-100 z-30 fixed top-0 left-0 h-full"
+    className="hidden lg:flex flex-col bg-white border-r border-gray-100 z-30 fixed top-0 left-0 h-dvh min-h-0"
     style={{
       width,
       transition: "width 0.25s cubic-bezier(0.4,0,0.2,1)",
