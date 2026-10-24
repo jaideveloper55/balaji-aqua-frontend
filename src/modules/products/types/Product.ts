@@ -233,6 +233,8 @@ export const UNIT_OPTIONS = [
   { value: "PCS", label: "Pieces" },
   { value: "LITRE", label: "Litre" },
   { value: "ML", label: "Millilitre" },
+  { value: "GRAM", label: "Gram" },
+  { value: "MILLILITRE", label: "Millilitre" },
   { value: "BOX", label: "Box" },
   { value: "CARTON", label: "Carton" },
   { value: "KG", label: "Kilogram" },

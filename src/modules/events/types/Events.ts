@@ -202,6 +202,7 @@ export interface CreateEventOrderPayload {
   gstEnabled?: boolean;
   advancePaid?: number;
   advancePaymentMode?: PaymentMode;
+  advanceReferenceId?: string;
   securityDeposit?: number;
   notes?: string;
 }

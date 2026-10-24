@@ -26,6 +26,8 @@ import {
   HiOutlineExclamationCircle,
   HiOutlineArchive,
   HiOutlinePencilAlt,
+  HiOutlineDeviceMobile,
+  HiOutlineLibrary,
 } from "react-icons/hi";
 
 import CustomModal from "../../../components/common/CustomModal";
@@ -66,6 +68,7 @@ interface FormValues {
   onSiteContactName?: string;
   onSiteContactPhone?: string;
   notes?: string;
+  advanceReferenceId?: string;
 }
 
 type StepKey = "event" | "customer" | "venue" | "items" | "money";
@@ -116,6 +119,30 @@ const STEPS: StepDef[] = [
   },
 ];
 
+// Must match the PaymentMode enum in schema.prisma exactly (same spelling and case).
+type AdvanceMode = "CASH" | "UPI" | "BANK_TRANSFER";
+
+const PAYMENT_MODES: {
+  value: AdvanceMode;
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
+  refLabel?: string; // only UPI and bank need a reference
+}[] = [
+  { value: "CASH", label: "Cash", icon: HiOutlineCash },
+  {
+    value: "UPI",
+    label: "UPI",
+    icon: HiOutlineDeviceMobile,
+    refLabel: "UPI Transaction ID / UTR",
+  },
+  {
+    value: "BANK_TRANSFER",
+    label: "Bank Transfer",
+    icon: HiOutlineLibrary,
+    refLabel: "Bank Reference / UTR Number",
+  },
+];
+
 const CreateEventModal = ({
   open,
   onClose,
@@ -148,6 +175,8 @@ const CreateEventModal = ({
   const [discount, setDiscount] = useState(0);
   const [advancePaid, setAdvancePaid] = useState(0);
   const [securityDeposit, setSecurityDeposit] = useState(0);
+  const [advanceMode, setAdvanceMode] = useState<AdvanceMode>("CASH");
+
   const [gstEnabled, setGstEnabled] = useState(true);
 
   const stepIndex = STEPS.findIndex((s) => s.key === currentStep);
@@ -383,7 +412,11 @@ const CreateEventModal = ({
       discount,
       gstEnabled,
       advancePaid: advancePaid > 0 ? advancePaid : undefined,
-      advancePaymentMode: advancePaid > 0 ? "CASH" : undefined,
+      advancePaymentMode: advancePaid > 0 ? advanceMode : undefined,
+      advanceReferenceId:
+        advancePaid > 0 && advanceMode !== "CASH"
+          ? form.advanceReferenceId?.trim()
+          : undefined,
       securityDeposit: securityDeposit > 0 ? securityDeposit : undefined,
       notes: form.notes,
     };
@@ -826,6 +859,64 @@ const CreateEventModal = ({
                     />
                   </Field>
                 </div>
+
+                {advancePaid > 0 && (
+                  <div className="space-y-3 p-4 rounded-xl bg-slate-50 border border-slate-100">
+                    <div className="text-sm font-medium text-slate-800">
+                      How was the advance paid?
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-2">
+                      {PAYMENT_MODES.map((m) => {
+                        const Icon = m.icon;
+                        const active = advanceMode === m.value;
+                        return (
+                          <button
+                            key={m.value}
+                            type="button"
+                            onClick={() => {
+                              setAdvanceMode(m.value);
+                              if (m.value === "CASH") {
+                                setValue("advanceReferenceId", "");
+                              }
+                            }}
+                            className={`flex flex-col items-center gap-1 py-3 rounded-xl border-2 text-sm font-medium transition ${
+                              active
+                                ? "border-blue-600 bg-blue-50 text-blue-700"
+                                : "border-slate-200 bg-white text-slate-600 hover:border-blue-300"
+                            }`}
+                          >
+                            <Icon className="w-5 h-5" />
+                            {m.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    {advanceMode !== "CASH" && (
+                      <CustomInput
+                        name="advanceReferenceId"
+                        control={control}
+                        label={
+                          PAYMENT_MODES.find((m) => m.value === advanceMode)
+                            ?.refLabel ?? "Reference"
+                        }
+                        placeholder="e.g. 412345678901"
+                        isrequired
+                        errors={errors}
+                        rules={{
+                          validate: (v?: string) =>
+                            !!v?.trim() ||
+                            "Reference number is required for UPI / bank transfer",
+                          maxLength: {
+                            value: 50,
+                            message: "Reference can be at most 50 characters",
+                          },
+                        }}
+                      />
+                    )}
+                  </div>
+                )}
 
                 <CustomInput
                   name="notes"
