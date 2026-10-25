@@ -674,7 +674,7 @@ const BillingPage = () => {
       (paymentsData?.data ?? []).map((p: any) => ({
         id: p.id,
         paymentNo: p.paymentNumber,
-        invoiceNo: p.invoice?.invoiceNumber ?? "—",
+        invoiceNo: p.invoiceLabel ?? p.invoice?.invoiceNumber ?? "—",
         customerId: p.customer?.customerCode ?? "",
         customerName: p.customer?.name ?? p.walkInName ?? "",
         amount: p.amount,
@@ -700,7 +700,7 @@ const BillingPage = () => {
       (closingPaymentsData?.data ?? []).map((p: any) => ({
         id: p.id,
         paymentNo: p.paymentNumber,
-        invoiceNo: p.invoice?.invoiceNumber ?? "—",
+        invoiceNo: p.invoice?.invoiceNumber ?? "Opening Balance",
         customerId: p.customer?.customerCode ?? "",
         customerName: p.customer?.name ?? p.walkInName ?? "",
         amount: p.amount,
