@@ -75,6 +75,9 @@ export interface Invoice {
   customerId: string;
   customerName: string;
   customerType: string;
+  eventOrderId?: string | null;
+  eventNumber?: string | null;
+  eventName?: string | null;
   customerPhone?: string;
   customerAddress?: string;
   items: InvoiceItem[];

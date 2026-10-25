@@ -607,17 +607,16 @@ const BillingPage = () => {
       customerType: TYPE_MAP[inv.customer?.type] ?? "Walk-in",
       customerPhone: inv.customer?.phone ?? inv.walkInPhone ?? "",
       customerAddress: inv.customer?.address ?? "",
+      eventOrderId: inv.eventOrderId ?? inv.eventOrder?.id ?? null,
+      eventNumber: inv.eventOrder?.eventNumber ?? null,
+      eventName: inv.eventOrder?.eventName ?? null,
       items: (inv.items ?? []).map((item: any) => ({
         product: item.productName,
         qty: item.quantity,
         price: item.unitPrice,
         total: item.lineTotal,
         sku: item.sku,
-        unit: item.unit, // NEW — needed for the Product-wise Sales table's
-        // "20 Litre" style display. ⚠️ If TypeScript flags this as an
-        // unexpected property, it means the Invoice item type in
-        // types/billing.ts needs `unit: string;` added too — same one-line
-        // addition, just in a file I haven't seen directly.
+        unit: item.unit,
       })),
       subtotal: inv.subtotal,
       gst: (inv.cgst ?? 0) + (inv.sgst ?? 0),
@@ -922,11 +921,7 @@ const BillingPage = () => {
           price: c.unitPrice,
           total: c.total,
           sku: c.sku,
-          // Same fix as mapInvoice above, needed here too: Invoice.items
-          // requires unit on every item, and this build path is unrelated
-          // to that one — no renaming needed this time, since the cart's
-          // useEffect spreads raw cart-item fields through unchanged
-          // (...item), so c.unit is already the real field name.
+
           unit: c.unit,
         })),
         subtotal,

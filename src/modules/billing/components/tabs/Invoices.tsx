@@ -163,23 +163,37 @@ const InvoicesTab: React.FC<Props> = ({
         </div>
       ),
     },
+
     {
       title: "Customer",
       dataIndex: "customerName",
-      width: 160,
+      width: 180,
       align: "center",
       render: (name: string, r) => (
-        <div>
+        <div className="flex flex-col items-center">
           <div className="text-[13px] font-medium text-gray-800">{name}</div>
+
           <Tag
             className="!text-[10px] !px-1.5 !py-0 !m-0 !mt-0.5 !border-0 !rounded-md"
             color={getCustomerTypeColor(r.customerType)}
           >
             {r.customerType}
           </Tag>
+
+          {r.eventNumber && (
+            <div className="mt-1 text-[11px] text-blue-600">
+              <Tag color="blue" className="!m-0 !text-[10px]">
+                Event: {r.eventNumber}
+              </Tag>
+              {r.eventName && (
+                <div className="mt-0.5 text-gray-500">{r.eventName}</div>
+              )}
+            </div>
+          )}
         </div>
       ),
     },
+
     {
       title: "Amount",
       dataIndex: "grandTotal",
