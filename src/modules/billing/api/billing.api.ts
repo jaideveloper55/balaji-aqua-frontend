@@ -35,7 +35,7 @@ export interface CreateInvoicePayload {
 }
 
 export interface CreatePaymentPayload {
-  customerId: string;
+  customerId?: string;
   invoiceId?: string;
   amount: number;
   paymentMode: "CASH" | "UPI" | "BANK_TRANSFER" | "CREDIT";

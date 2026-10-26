@@ -170,7 +170,7 @@ const AddPaymentDrawer: React.FC<Props> = ({
     [pendingInvoices]
   );
 
-  const canSubmit = !!paymentCustomer && paymentAmount > 0;
+  const canSubmit = paymentAmount > 0;
 
   return (
     <Drawer
@@ -191,7 +191,6 @@ const AddPaymentDrawer: React.FC<Props> = ({
           control={control}
           errors={errors}
           label="Customer"
-          isrequired
           placeholder="Search by name, phone, or code..."
           showSearch
           isLoading={isLoadingCustomers}

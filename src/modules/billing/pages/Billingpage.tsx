@@ -1258,16 +1258,20 @@ const BillingPage = () => {
   };
 
   const handleSubmitPayment = () => {
-    if (!paymentCustomer || paymentAmount <= 0) {
-      errorNotification("Missing Fields", "Select customer and enter amount");
+    const inv = invoices.find((i) => i.invoiceNo === paymentInvoice);
+
+    // A customer is required only when no invoice is selected.
+    if ((!paymentCustomer && !inv) || paymentAmount <= 0) {
+      errorNotification(
+        "Missing Fields",
+        "Select an invoice or customer and enter a valid amount"
+      );
       return;
     }
 
-    const inv = invoices.find((i) => i.invoiceNo === paymentInvoice);
-
     createPaymentMutation.mutate(
       {
-        customerId: paymentCustomer,
+        customerId: paymentCustomer || undefined,
         invoiceId: inv?.id || undefined,
         amount: paymentAmount,
         paymentMode: PAYMENT_MODE_MAP[paymentMethod] ?? "CASH",
@@ -1280,6 +1284,7 @@ const BillingPage = () => {
             "Payment Recorded",
             formatCurrency(paymentAmount)
           );
+
           setShowAddPayment(false);
           setPaymentCustomer("");
           setPaymentInvoice("");
